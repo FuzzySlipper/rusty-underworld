@@ -99,7 +99,12 @@ object physics coordination, and Engine-backed collision. No second mover, no
 parallel physics world.
 
 **Fidelity.** The movement vocabulary matches. Speeds, jump arcs, collision
-tolerances, and camera feel are ours.
+tolerances, and camera feel are ours. The control scheme is deliberately Ours,
+not the original's: modern WASD + locked-cursor mouselook (and twin-stick
+gamepad), as in OpenUnderworld's `CONTROLS.md` — not the original's
+cursor-shape View-Window drive (manual pp. 4–5) and not UnderworldGodot's
+keyboard turning (Q/E turn, A/D strafe, mouselook code obsolete/commented
+out). This is a settled decision, not fidelity debt.
 
 ### 3.3 Melee and missile combat — Match (charge structure) / Approximate (numbers)
 
