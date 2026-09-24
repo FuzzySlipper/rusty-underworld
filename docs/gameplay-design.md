@@ -100,11 +100,15 @@ parallel physics world.
 
 **Fidelity.** The movement vocabulary matches. Speeds, jump arcs, collision
 tolerances, and camera feel are ours. The control scheme is deliberately Ours,
-not the original's: modern WASD + locked-cursor mouselook (and twin-stick
-gamepad), as in OpenUnderworld's `CONTROLS.md` — not the original's
-cursor-shape View-Window drive (manual pp. 4–5) and not UnderworldGodot's
-keyboard turning (Q/E turn, A/D strafe, mouselook code obsolete/commented
-out). This is a settled decision, not fidelity debt.
+not the original's: the Engine's `FpsInput` (WASD `Standard` bindings,
+pointer-lock mouselook, twin-stick gamepad) consumed in ruleset locomotion
+policy — the same arrangement rusty-dagger uses (`DaggerfallLocomotionPolicy`
+over Engine `FpsInput`, with Kit `SpatialMovementSystem.Step` underneath).
+This rejects both the original's cursor-shape View-Window drive (manual
+pp. 4–5) and UnderworldGodot's keyboard turning (Q/E turn, A/D strafe,
+mouselook code obsolete/commented out). Agent testing rides the Engine's
+conveniences (`controller-interaction.md` inspect/use, `--exercise` contract,
+`Debugging.Snapshot`), not bespoke hooks. Settled decision, not fidelity debt.
 
 ### 3.3 Melee and missile combat — Match (charge structure) / Approximate (numbers)
 

@@ -1,6 +1,7 @@
 # tests
 
-Planned suites, mirroring the product graph. No suite is checked in yet.
+Suites mirroring the product graph. `AbyssRpg.Architecture.Tests` is checked
+in and executed by `scripts/verify.sh`; the remaining suites are planned.
 
 | Directory | Planned suite | Answers |
 | --- | --- | --- |

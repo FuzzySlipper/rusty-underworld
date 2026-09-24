@@ -17,11 +17,13 @@ remains donor context for formats and divergences; it is not a target.
 The working formula is: **Engine guarantees. Kit shapes. Ruleset decides.
 Bundle assembles. Host launches.**
 
-> **Current state: setup pass.** This repository owns its shape, its build
-> configuration, its verification script, and its donor research. It contains no
-> C# project, no TypeScript, and no content yet — the directory structure states
-> intended ownership so the first implementation task has an owning home. Do not
-> read the layout below as a description of working code.
+> **Current state: setup pass with a Kit bootstrap.** This repository owns its
+> shape, its build configuration, its verification script, and its donor
+> research, plus a one-time bootstrap copy of `WorldRpg.Kit` mechanics as
+> `AbyssRpg.Kit` (see `docs/research/rusty-dagger-kit-survey.md`). Ruleset,
+> Host, Importer, UI, and content remain owned empty shells — the directory
+> structure states intended ownership so implementation tasks have an owning
+> home. Do not read the layout below as a description of working gameplay.
 
 ## Ownership
 
@@ -166,8 +168,8 @@ Routine verification:
 ```
 
 Today that verifies the installed pair identity and installs the product UI
-dependencies, then reports plainly that no product project exists to build.
-NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
+dependencies, then builds the checked-in projects and runs the architecture
+suite. NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
 first project lands, add it to `product_projects` and its suite to
 `test_projects` in the script — the lists are explicit on purpose, because a
 discovery-based loop silently stops covering a project that moved.

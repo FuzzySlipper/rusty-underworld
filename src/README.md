@@ -1,9 +1,11 @@
 # src
 
-Planned product graph for Rusty Underworld. No C# project is checked in yet:
-this pass created the repository shape and fixed the design, so the directories
-below state ownership rather than implemented behavior. The owner-level contract
-is in [`../docs/code-organization.md`](../docs/code-organization.md).
+Product graph for Rusty Underworld. `AbyssRpg.Kit` is a working one-time
+bootstrap copy of `WorldRpg.Kit` mechanics (see `AbyssRpg.Kit/README.md` and
+[`../docs/research/rusty-dagger-kit-survey.md`](../docs/research/rusty-dagger-kit-survey.md));
+ruleset, Host, Importer, and Tool are owned project shells with the final
+dependency graph and no behavior yet. The owner-level contract is in
+[`../docs/code-organization.md`](../docs/code-organization.md).
 
 | Directory | Planned project | Owns |
 | --- | --- | --- |

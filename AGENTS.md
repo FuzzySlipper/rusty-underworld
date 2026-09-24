@@ -74,15 +74,18 @@ documents decide, and the difference is recorded rather than silently rounded.
 
 ## Current state
 
-**This repository is a setup pass: it owns its shape and its donor research, and
-it implements nothing yet.** Concretely:
+**This repository is a setup pass with a Kit bootstrap: it owns its shape,
+its donor research, and a working `AbyssRpg.Kit` copied once from
+`WorldRpg.Kit`, and it implements no gameplay yet.** Concretely:
 
-- There is no C# project, no TypeScript, and no content. The directories exist so
-  the first implementation task has an owning home.
+- `AbyssRpg.Kit` holds renamed Engine-native mechanisms (identity, actors,
+  combat execution, targeting, inventory, effects, controls, presentation,
+  composition) with no UW policy in them. Ruleset, Host, Importer, UI, and
+  content are owned empty shells so implementation tasks have a home.
 - Every directory README states *intended* ownership. Those statements are
-  declarations for planning, not descriptions of working code.
-- `scripts/verify.sh` verifies the pinned Engine pair and the UI toolchain and
-  reports plainly that no product project exists to build.
+  declarations for planning, not descriptions of working gameplay.
+- `scripts/verify.sh` verifies the pinned Engine pair and the UI toolchain,
+  builds the checked-in projects, and runs the architecture suite.
 - The shape is written down and binding: `docs/gameplay-design.md` fixes the
   loop, each system, and its fidelity verdict; `docs/code-organization.md` fixes
   the owners, the modes, and where new code goes. Both describe intent, not

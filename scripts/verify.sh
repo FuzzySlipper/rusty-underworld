@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Routine repository verification for rusty-underworld.
 #
-# This pass checked in the repository shape and no product code, so the script
+# This pass landed the repository shell and the Kit bootstrap, so the script
 # currently proves the installed Engine pair identity and the product UI
-# toolchain, and says plainly that no product project exists to build. Add each
-# landed project to `product_projects` and each suite to `test_projects`; the
-# explicit lists are deliberate, because a discovery-based loop silently stops
-# covering a project whose csproj moved or was renamed.
+# toolchain, builds the checked-in projects, and runs the architecture suite.
+# Add each landed project to `product_projects` and each suite to
+# `test_projects`; the explicit lists are deliberate, because a
+# discovery-based loop silently stops covering a project whose csproj moved
+# or was renamed.
 #
 # NativeAOT is a separate fidelity/release target and stays opt-in through
 # --aot; the ordinary development loop does not need it.
@@ -72,10 +73,18 @@ else
   echo "No product UI tests are checked in yet."
 fi
 
-# Every project this repository builds and runs. Empty until planning lands the
-# product graph; that is a declaration of current state, not a skipped check.
-product_projects=()
-test_projects=()
+# Every project this repository builds and runs. Explicit lists: a
+# discovery-based loop silently stops covering a project that moved.
+product_projects=(
+  "src/AbyssRpg.Kit/AbyssRpg.Kit.csproj"
+  "src/AbyssRpg.Rulesets.UltimaUnderworld/AbyssRpg.Rulesets.UltimaUnderworld.csproj"
+  "src/AbyssRpg.Host/AbyssRpg.Host.csproj"
+  "src/UltimaUnderworld.Import/UltimaUnderworld.Import.csproj"
+  "src/UltimaUnderworld.Import.Tool/UltimaUnderworld.Import.Tool.csproj"
+)
+test_projects=(
+  "tests/AbyssRpg.Architecture.Tests/AbyssRpg.Architecture.Tests.csproj"
+)
 host_project=""
 
 if [[ ${#product_projects[@]} -eq 0 ]]; then
