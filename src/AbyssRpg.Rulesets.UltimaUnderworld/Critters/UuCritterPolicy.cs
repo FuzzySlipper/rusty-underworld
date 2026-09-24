@@ -7,9 +7,12 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Critters;
 /// below a third of maximum health trigger retreat, and vertical movement
 /// follows locomotion kind — fliers climb freely, swimmers hold water level,
 /// walkers stay grounded.
-/// Donor structure: retreat-on-crit-below-third (Critter fear branch);
-/// corpse item id 0xC0 + table index; swimmer/flier flags from the critter
-/// row. Sense radii and the retreat threshold shape are Ours.
+/// Donor structure: retreat-on-crit-below-third (Critter fear branch).
+/// DELIBERATE SIMPLIFICATION: the donor additionally gates fear on
+/// victim-level >= critter-level plus a 50% coin flip; this policy retreats
+/// deterministically on any below-third crit. Corpse item id 0xC0 + table
+/// index; swimmer/flier flags from the critter row. Sense radii and the
+/// retreat threshold shape are Ours.
 /// </summary>
 public static class UuCritterPolicy
 {

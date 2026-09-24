@@ -8,9 +8,9 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Critters;
 
 /// <summary>
 /// Builds critter actors from table rows: Kit actor construction (stats,
-/// pose, vitals) plus a pursuit-memory component seeded Idle. Corpses are
-/// created through the Kit CorpseLootCoordinator by the session death path,
-/// not here.
+/// pose, vitals) plus a pursuit-memory component seeded Idle. Speed is
+/// carried for the movement/AI wiring task (UW-T29); corpses are created
+/// through the Kit CorpseLootCoordinator by the session death path, not here.
 /// </summary>
 public static class UuCritterFactory
 {
