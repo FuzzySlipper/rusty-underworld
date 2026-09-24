@@ -52,9 +52,21 @@ public sealed class UuSessionTests
         Assert.Equal(2, session.Dungeon.CurrentLevel);
         Assert.Equal((ulong)100, session.Clock.ElapsedTicks);
 
+        // Level-1 entities were abandoned with the travel.
+        Assert.False(session.Directory.TryResolve(
+            new AbyssRpg.Kit.World.DurableIdentityReference(AbyssRpg.Kit.World.DurableIdentityKind.Item, 1029), out _));
+
+        // Re-travel replays the stored delta: the removal persists.
+        session.TravelTo(Level(1), costTicks: 50);
+        Assert.Equal(1, session.Dungeon.CurrentLevel);
+        Assert.False(session.Dungeon.Current.IsLive(5));
+        Assert.Equal((ulong)150, session.Clock.ElapsedTicks);
+
         UuSaveData save = session.CaptureSave();
-        Assert.Equal((ulong)100, save.Clock.ElapsedTicks);
+        Assert.Equal((ulong)150, save.Clock.ElapsedTicks);
         Assert.True(save.LevelDeltas[1].RemovedObjects.Contains(5));
+        Assert.NotEmpty(save.ActorIdentities.Kinds);
+        Assert.NotEmpty(save.ItemIdentities.Kinds);
         Assert.Throws<ObjectDisposedException>(() => { session.Dispose(); session.CaptureSave(); });
     }
 }
