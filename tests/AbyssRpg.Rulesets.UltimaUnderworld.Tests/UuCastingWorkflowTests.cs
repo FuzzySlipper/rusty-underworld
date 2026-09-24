@@ -34,7 +34,7 @@ public sealed class UuCastingWorkflowTests
         Assert.Equal(1, weaker!.SpellId);
         Assert.DoesNotContain(maintained.Spells, s => s.SpellId == 1);
 
-        // Full with no kin: lowest circle (circle 2, spell 4) evicted.
+        // Full with no kin: lowest cost (cost 9, spell 2) evicted.
         var evicted = maintained.Admit(5, "KM", 21);
         Assert.Equal(9, evicted!.Cost);
         Assert.True(maintained.Dismiss(5));
