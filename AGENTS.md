@@ -256,10 +256,10 @@ with the claim, as the donor surveys do. Where donors disagree or a divergence i
 unverified, say so rather than picking the convenient answer.
 
 Coverage planning — what behavior is in scope for the emulated game, in what
-order, and which donor artifact documents it — does not exist yet. Plan
-dependencies and explicit behavior contracts in a coverage plan plus feature map
-before large implementation campaigns, and keep the point-in-time donor inventory
-separate from live status.
+order, and which donor artifact documents it — lives in
+`docs/underworld-coverage-plan.md`, `docs/underworld-feature-map.md`, and
+`docs/underworld-task-preparation.md`, with the point-in-time donor inventory
+in `docs/research/` kept separate from live status.
 
 ## Coverage execution and drift
 
