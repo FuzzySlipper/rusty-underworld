@@ -48,10 +48,10 @@ public sealed class ArchitectureLawTests
     [Fact]
     public void Host_concrete_ruleset_references_stay_at_builtin_composition_seams()
     {
-        // UW-T01 landed the entry: selection works by string identity, so no
-        // Host source names the concrete ruleset project — seam included.
-        // (A dagger-shaped seam instantiating the ruleset type here would
-        // fail the assertion below; keep selection identity-level.)
+        // The product-composition seam: selection stays identity-level, and
+        // only AbyssProduct.cs may name the concrete session it admits
+        // updates into. (A dagger-shaped IGameSession interface in Kit would
+        // remove even that; carried as UW-T02 follow-up, not invented here.)
         string host = SourceDirectory("AbyssRpg.Host");
         string[] concreteReferences = SourceFiles(host)
             .Where(path => File.ReadAllText(path).Contains("AbyssRpg.Rulesets.UltimaUnderworld", StringComparison.Ordinal))
@@ -59,7 +59,7 @@ public sealed class ArchitectureLawTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Empty(concreteReferences);
+        Assert.Equal(["AbyssProduct.cs"], concreteReferences);
     }
 
     [Fact]
