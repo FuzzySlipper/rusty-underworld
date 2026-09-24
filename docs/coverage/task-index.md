@@ -1,4 +1,4 @@
-# Task index (proposed slices)
+# Task index
 
 Implementation tasks derived from the ledger. IDs are stable (`UW-T01…`)
 and each has a Den record (`rusty-underworld`) carrying status, delivery

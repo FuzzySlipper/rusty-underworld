@@ -76,6 +76,9 @@ public sealed class UuSnapshotTests
         session.ActorIdentities.Allocate(AbyssRpg.Kit.World.DurableIdentityKind.Actor);
         session.RestoreSnapshot(snapshot);
         Assert.Equal(before, session.ActorIdentities.NextIdentity(AbyssRpg.Kit.World.DurableIdentityKind.Actor));
+        Assert.Equal(
+            snapshot.ItemIdentities.Single(k => k.Kind == AbyssRpg.Kit.World.DurableIdentityKind.Item).NextIdentity,
+            session.ItemIdentities.NextIdentity(AbyssRpg.Kit.World.DurableIdentityKind.Item));
         Assert.Equal((ulong)0, session.Clock.ElapsedTicks);
         Assert.Equal(0, session.Survival.Hunger);
         Assert.Equal(0, session.Quests.Get(5)); // full restore rolls back quest writes

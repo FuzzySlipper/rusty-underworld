@@ -140,7 +140,7 @@ public sealed class UuSession : IDisposable
     /// Capture the slice snapshot (non-destructive). Avatar pose comes from
     /// the Host spatial owner. Restoring level deltas rides with
     /// travel/admission; this restore covers clock, avatar, survival,
-    /// knowledge, and stored deltas.
+    /// knowledge, stored deltas, and identity allocators.
     /// </summary>
     public UuSessionSnapshot CaptureSnapshot(AvatarPoseDto pose)
     {
