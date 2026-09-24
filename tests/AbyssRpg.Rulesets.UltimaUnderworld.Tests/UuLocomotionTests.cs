@@ -76,6 +76,46 @@ public sealed class UuLocomotionTests
         Encoding.UTF8.GetBytes(""), ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty);
 
     [Fact]
+    public void Landing_damage_follows_receipts()
+    {
+        var tuning = UuMovementTuning.Default;
+        var air = Motion(grounded: false, peakY: 10f);
+        var landed = Receipt(grounded: true, y: 4f, dx: 1f);
+        Assert.Equal((10f - 4f - 2f) * 4f, UuStepConsequences.LandingDamage(air, landed, tuning));
+        Assert.True(UuStepConsequences.Moved(landed));
+
+        Assert.Equal(0f, UuStepConsequences.LandingDamage(air, Receipt(true, 9f, 0f), tuning)); // within free fall
+        Assert.Equal(0f, UuStepConsequences.LandingDamage(Motion(true, 4f), landed, tuning)); // never airborne
+        Assert.Equal(0f, UuStepConsequences.LandingDamage(air, Receipt(false, 2f, 0f), tuning)); // still falling
+        Assert.False(UuStepConsequences.Moved(Receipt(true, 4f, 0f)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => (UuMovementTuning.Default with { FeetPerUnit = 0f }).Validate());
+    }
+
+    private static Rusty.Engine.CharacterMotion Motion(bool grounded, float peakY) => new(
+        ControlledVelocity: System.Numerics.Vector3.Zero,
+        ExternalVelocity: System.Numerics.Vector3.Zero,
+        Grounded: grounded,
+        Stance: Rusty.Engine.CharacterStance.Standing,
+        JumpBufferRemaining: 0f, CoyoteRemaining: 0f, LandingLockoutRemaining: 0f,
+        SupportEntityPresent: false, SupportEntity: 0,
+        SupportLocalAnchor: System.Numerics.Vector3.Zero,
+        SupportPreviousTranslation: System.Numerics.Vector3.Zero,
+        SupportPreviousRotation: System.Numerics.Quaternion.Identity,
+        SupportPointVelocity: System.Numerics.Vector3.Zero,
+        FallOriginY: peakY, PeakY: peakY, LastCommandSequence: 0, CollisionWorldHash: 0);
+
+    private static Rusty.Engine.CharacterStepReceipt Receipt(bool grounded, float y, float dx) => new(
+        Generation: 0, RevisionBefore: 0, RevisionAfter: 0, Entity: 0, CommandSequence: 0,
+        TransformBefore: new Rusty.Engine.Transform(new System.Numerics.Vector3(0, 10, 0), System.Numerics.Quaternion.Identity, System.Numerics.Vector3.One),
+        Transform: new Rusty.Engine.Transform(new System.Numerics.Vector3(dx, y, 0), System.Numerics.Quaternion.Identity, System.Numerics.Vector3.One),
+        Motion: Motion(grounded, y),
+        WishVelocity: System.Numerics.Vector3.Zero,
+        Displacement: new System.Numerics.Vector3(dx, 0, 0),
+        Contact: default, Ground: default, FloorProbe: default, Stance: default,
+        Step: default, Platform: default, BlockFlags: default,
+        ContactCount: 0, DynamicImpulseCount: 0, CastCount: 0, RecoveryPasses: 0, RecoveryDistance: 0f);
+
+    [Fact]
     public void Hazards_follow_documented_structure()
     {
         var tuning = UuMovementTuning.Default;

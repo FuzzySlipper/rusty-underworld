@@ -24,7 +24,8 @@ public sealed record UuMovementTuning(
     float AirSecondsPerSwim,
     float EncumberedAirMultiplier,
     float EncumberedJumpMultiplier,
-    float EncumberedSpeedMultiplier)
+    float EncumberedSpeedMultiplier,
+    float FeetPerUnit)
 {
     public static UuMovementTuning Default { get; } = new(
         WalkSpeed: 4.0f,
@@ -40,7 +41,8 @@ public sealed record UuMovementTuning(
         AirSecondsPerSwim: 6.0f,
         EncumberedAirMultiplier: 0.5f,
         EncumberedJumpMultiplier: 0.7f,
-        EncumberedSpeedMultiplier: 0.8f);
+        EncumberedSpeedMultiplier: 0.8f,
+        FeetPerUnit: 1.0f);
 
     public UuMovementTuning Validate()
     {
@@ -54,6 +56,10 @@ public sealed record UuMovementTuning(
             if (!float.IsFinite(value) || value < 0f)
                 throw new ArgumentOutOfRangeException(nameof(value), "Movement tuning must be finite and non-negative.");
         }
+
+        // Engine-units-to-feet scale (Ours until playtest calibration).
+        if (!float.IsFinite(FeetPerUnit) || FeetPerUnit <= 0f)
+            throw new ArgumentOutOfRangeException(nameof(FeetPerUnit));
 
         foreach (float factor in new[] { EncumberedAirMultiplier, EncumberedJumpMultiplier, EncumberedSpeedMultiplier })
         {
