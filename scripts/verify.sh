@@ -90,8 +90,10 @@ test_projects=(
   "tests/UltimaUnderworld.Import.Tests/UltimaUnderworld.Import.Tests.csproj"
 )
 host_project=""
-# Stays empty until UW-T01 lands a stageable Host entry; staging and --aot
-# are skipped with honest messages until then, not silently dropped.
+# Stays empty until the Host entry becomes a stageable product composition
+# (IEngineProduct + SDK targets); entry/selection/save already landed in
+# UW-T01, staging and --aot stay skipped with honest messages until then,
+# not silently dropped.
 
 if [[ ${#product_projects[@]} -eq 0 ]]; then
   echo "No product projects are listed in product_projects."

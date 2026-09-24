@@ -48,8 +48,10 @@ public sealed class ArchitectureLawTests
     [Fact]
     public void Host_concrete_ruleset_references_stay_at_builtin_composition_seams()
     {
-        // UW-T01 landed the entry: the built-in selection seam is the one
-        // allowed Host source naming the ruleset's composition vocabulary.
+        // UW-T01 landed the entry: selection works by string identity, so no
+        // Host source names the concrete ruleset project — seam included.
+        // (A dagger-shaped seam instantiating the ruleset type here would
+        // fail the assertion below; keep selection identity-level.)
         string host = SourceDirectory("AbyssRpg.Host");
         string[] concreteReferences = SourceFiles(host)
             .Where(path => File.ReadAllText(path).Contains("AbyssRpg.Rulesets.UltimaUnderworld", StringComparison.Ordinal))

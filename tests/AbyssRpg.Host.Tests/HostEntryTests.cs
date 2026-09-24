@@ -60,4 +60,32 @@ public sealed class HostEntryTests
         Assert.Throws<ArgumentException>(() => store.Save("bad", new AbyssSaveEnvelope("", [1])));
         Assert.Throws<ArgumentException>(() => store.Save("bad", new AbyssSaveEnvelope("r", [])));
     }
+
+    [Theory]
+    [InlineData("not-json")]
+    [InlineData("null")]
+    [InlineData("{\"Ruleset\":null,\"Payload\":[]}")]
+    [InlineData("{\"Ruleset\":\"\",\"Payload\":[]}")]
+    public void Save_envelope_rejects_corrupt_slots_as_typed_failures(string payload)
+    {
+        var persistence = new InMemoryPersistenceService();
+        persistence.Put("abyssrpg.saves", "slot", System.Text.Encoding.UTF8.GetBytes(payload));
+        using var store = new AbyssSaveStore(EngineContextFake.Create(persistence), "abyssrpg.saves");
+
+        Assert.Throws<AbyssSaveFormatException>(() => store.Load("slot"));
+    }
+
+    [Fact]
+    public void Save_honors_the_engine_revision_guard()
+    {
+        var persistence = new InMemoryPersistenceService();
+        using var store = new AbyssSaveStore(EngineContextFake.Create(persistence), "abyssrpg.saves");
+        var saved = new AbyssSaveEnvelope("abyssrpg.ultima-underworld", [1, 2, 3]);
+
+        var first = store.Save("slot", saved, Rusty.Engine.PersistenceRevisionGuard.Absent);
+        var conflict = store.Save("slot", saved, Rusty.Engine.PersistenceRevisionGuard.Exact, first.Revision + 1);
+        Assert.Equal(Rusty.Engine.PersistenceSaveOutcome.RevisionConflict, conflict.Outcome);
+        Assert.Equal(first.Revision, conflict.Revision);
+        Assert.Equal(first.Revision, store.Load("slot").Revision);
+    }
 }

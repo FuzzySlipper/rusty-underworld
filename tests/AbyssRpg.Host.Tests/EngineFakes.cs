@@ -9,13 +9,19 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
     private readonly Dictionary<(string Scope, string Key), Entry> _values = [];
     private readonly Dictionary<ulong, Entry?> _blobs = [];
     private ulong _nextBlob;
+    private string _scope = "";
 
-    public PersistenceStore OpenStore(PersistenceOpenRequest request) =>
-        new(new PersistenceStoreHandle(1), static () => { });
+    internal void Put(string scope, string key, byte[] payload) => _values[(scope, key)] = new(1, payload.ToArray());
+
+    public PersistenceStore OpenStore(PersistenceOpenRequest request)
+    {
+        _scope = request.Scope;
+        return new(new PersistenceStoreHandle(1), static () => { });
+    }
 
     public PersistenceSaveReceipt Save(PersistenceSaveRequest request)
     {
-        (string Scope, string Key) key = (request.Store.Handle.Value.ToString(), request.Key);
+        (string Scope, string Key) key = (_scope, request.Key);
         bool present = _values.TryGetValue(key, out Entry? existing);
         if ((request.RevisionGuard == PersistenceRevisionGuard.Absent && present)
             || (request.RevisionGuard == PersistenceRevisionGuard.Exact && (!present || existing!.Revision != request.ExpectedRevision)))
@@ -27,7 +33,7 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
 
     public PersistenceDeleteReceipt Delete(PersistenceDeleteRequest request)
     {
-        (string Scope, string Key) key = (request.Store.Handle.Value.ToString(), request.Key);
+        (string Scope, string Key) key = (_scope, request.Key);
         _values.TryGetValue(key, out Entry? existing);
         if (existing is null) return new(PersistenceDeleteOutcome.Missing, 0);
         _values.Remove(key);
@@ -36,7 +42,7 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
 
     public PersistenceBlob Load(PersistenceLoadRequest request)
     {
-        Entry? value = _values.TryGetValue((request.Store.Handle.Value.ToString(), request.Key), out Entry? found) ? found : null;
+        Entry? value = _values.TryGetValue((_scope, request.Key), out Entry? found) ? found : null;
         ulong handle = ++_nextBlob;
         _blobs.Add(handle, value);
         return new(new PersistenceBlobHandle(handle), static () => { });
