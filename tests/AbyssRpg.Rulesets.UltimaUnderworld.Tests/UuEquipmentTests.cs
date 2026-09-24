@@ -24,8 +24,11 @@ public sealed class UuEquipmentTests
     [Fact]
     public void Containers_gate_type_and_weight()
     {
-        // Shipped container row 0: capacity 125, mask 0xFFFF (takes all).
+        // Fixture values (Ours, not extracted): general container capacity
+        // 125 with takes-all mask; rune-bag mask 512 takes runes.
         Assert.True(UuContainerPolicy.AcceptsType(0xFFFF, UuContainerPolicy.ContentRunes, 0));
+        Assert.True(UuContainerPolicy.AcceptsType(512, UuContainerPolicy.ContentRunes, 99));
+        Assert.False(UuContainerPolicy.AcceptsType(512, UuContainerPolicy.ContentArrows, 99));
         Assert.True(UuContainerPolicy.AcceptsType(512 + UuContainerPolicy.ContentArrows, UuContainerPolicy.ContentArrows, 99));
         Assert.False(UuContainerPolicy.AcceptsType(512 + UuContainerPolicy.ContentArrows, UuContainerPolicy.ContentRunes, 99));
         Assert.True(UuContainerPolicy.FitsWeight(125, 100, 24));

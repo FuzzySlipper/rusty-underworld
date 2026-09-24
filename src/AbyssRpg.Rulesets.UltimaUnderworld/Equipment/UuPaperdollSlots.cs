@@ -4,8 +4,10 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Equipment;
 /// UW paperdoll slots and what armour categories they accept. Slot order
 /// follows the secondary donor (OU EInvSlot); acceptance follows the armour
 /// table categories (shield 0, body 1, leggings 3, gloves 4, boots 5, helm 8,
-/// ring 9 — armourobjectdat slot list). Shoulder slots carry containers and
-/// light sources, not armour; weapons wield in the right hand.
+/// ring 9 — armourobjectdat slot list). Shoulder slots are not armour
+/// slots (shoulder light-source use is donor-verified; shoulder container
+/// use is layout convention, cited only to explain the rejection); weapons
+/// wield in the right hand.
 /// </summary>
 public enum UuPaperdollSlot
 {

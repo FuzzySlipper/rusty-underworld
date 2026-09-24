@@ -2,10 +2,12 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Equipment;
 
 /// <summary>
 /// UW container policy: capacity in 0.1-stone units and an acceptance mask
-/// from the OBJECTS.DAT container row (mask 0xFFFF takes all; above 512 the
-/// remainder names an accepted content type — runes 0, arrows 1, scrolls 2,
-/// edibles 3, keys 4; at or below 512 it names one specific item id).
-/// Mask reading follows the primary donor (u16 at row +1); content-type
+/// from the OBJECTS.DAT container row (mask 0xFFFF takes all; 512 and above
+/// names an accepted content type as mask - 512 — runes 0, arrows 1,
+/// scrolls 2, edibles 3, keys 4, with 512 itself the rune bag; below 512 it
+/// names one specific item id). Mask reading follows the primary donor
+/// (u16 at row +1, container.cs rune-bag case); callers pass the mask as an
+/// unsigned 16-bit value (normalize a donor short first). Content-type
 /// assignment for concrete items belongs to the content catalogs.
 /// </summary>
 public static class UuContainerPolicy
@@ -20,7 +22,7 @@ public static class UuContainerPolicy
     public static bool AcceptsType(int mask, int contentType, int contentItemId)
     {
         if (mask == 0xFFFF) return true;
-        if (mask > 512) return (mask - 512) == contentType;
+        if (mask >= 512) return (mask - 512) == contentType;
         return mask == contentItemId;
     }
 
