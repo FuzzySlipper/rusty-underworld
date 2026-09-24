@@ -6,9 +6,11 @@ itself.
 **Donors:** `/home/research/old-games/UnderworldGodot` (Godot 4 + C#, UW1+UW2;
 ~270 files under `src/`) and `/home/research/old-games/OpenUnderground`
 (Unity 6000; 167 files under `Assets/Game/Scripts/`). Neither is a code donor.
-**rusty-underworld:** setup-pass shape per `docs/code-organization.md` —
-no C# project exists yet, so every behavior row is Absent by construction and
-every Engine row names the upstream owner it will consume.
+**rusty-underworld:** assessed at the setup pass per
+`docs/code-organization.md` — no C# project existed yet, so every behavior row
+was Absent by construction and every Engine row named the upstream owner it
+would consume. (The Wave-0 Kit bootstrap landed afterwards; rows keep their
+survey-time notes until their owning tasks update them.)
 **Reading rule:** donor paths below are relative to the donor checkout roots.
 rusty-underworld paths are relative to this repo. Coverage is a point-in-time
 note, not a roadmap promise.
@@ -26,8 +28,9 @@ note, not a roadmap promise.
   `src/player` 15 (+chargen), `src/World` 14, `src/ui` 33; OU
   `Assets/Game/Scripts` 167 (+28 in subfolders).
 - rusty-underworld was assessed from checked planning documents only
-  (`AGENTS.md`, `docs/`, `src/*/README.md`, `content/`, `scripts/`); there is
-  no C# to count as coverage.
+  (`AGENTS.md`, `docs/`, `src/*/README.md`, `content/`, `scripts/`); at survey
+  time there was no C# to count as coverage. Later code landings update their
+  rows through owning tasks; unrevised rows remain survey-time notes.
 - Three survey slices contributed one row per distinct structure; each row
   keeps one donor reference, one behavior description, and one coverage note.
 

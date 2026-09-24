@@ -19,7 +19,7 @@ for argument in "$@"; do
     --aot) aot=true ;;
     -h|--help)
       echo "usage: scripts/verify.sh [--aot]"
-      echo "  no arguments  pair identity, UI dependencies, product build, suites and CoreCLR staging (when projects exist)"
+      echo "  no arguments  pair identity, UI dependencies, product build, suites, and host staging (once the Host entry lands)"
       echo "  --aot         also run the NativeAOT fidelity publish"
       exit 0
       ;;
@@ -64,8 +64,8 @@ jq -e --arg package_version "$pair_version" --arg source_revision "$pair_source_
 }
 
 # The product UI is a Node-built DOM companion. Its dependencies and its DOM
-# tests are checked here even while no product project exists, because the UI
-# toolchain is what the first project will consume.
+# tests are checked here alongside the product projects, because the UI
+# toolchain is what the product companion work consumes.
 npm ci
 if compgen -G "tests/AbyssRpg.Ui.Tests/*.test.mjs" > /dev/null; then
   node --test tests/AbyssRpg.Ui.Tests/*.test.mjs
@@ -86,12 +86,14 @@ test_projects=(
   "tests/AbyssRpg.Architecture.Tests/AbyssRpg.Architecture.Tests.csproj"
 )
 host_project=""
+# Stays empty until UW-T01 lands a stageable Host entry; staging and --aot
+# are skipped with honest messages until then, not silently dropped.
 
 if [[ ${#product_projects[@]} -eq 0 ]]; then
-  echo "No product project exists yet: this pass created the repository shape only."
+  echo "No product projects are listed in product_projects."
   echo "Verified Engine pair ${pair_version} (${pair_source_revision}) with UI dependencies installed."
   [[ "$aot" == false ]] || {
-    echo "NativeAOT verification needs the product host project, which does not exist yet." >&2
+    echo "NativeAOT verification needs a stageable product host project (none listed yet)." >&2
     exit 1
   }
   exit 0
@@ -112,7 +114,7 @@ done
 
 if [[ "$aot" == true ]]; then
   [[ -n "$host_project" ]] || {
-    echo "NativeAOT verification needs the product host project." >&2
+    echo "NativeAOT verification needs a stageable product host project (Host shell has no entry yet; see UW-T01)." >&2
     exit 1
   }
   dotnet msbuild "$host_project" -t:VerifyRustyEngineAot -p:Configuration=Release
