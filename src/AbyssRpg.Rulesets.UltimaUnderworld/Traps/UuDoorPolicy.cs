@@ -25,26 +25,45 @@ public static class UuDoorPolicy
         Unpickable,
     }
 
-    public static PickResult Pick(int lockLevel, int pickSkill, Random rng)
+    /// <summary>
+    /// Pick a lock: roll first (PickLock + 1 vs lock x3, donor player flow;
+    /// the critter routine omits the +1 — disagreement recorded, player flow
+    /// followed), then force dead/master locks to hold. A critical failure
+    /// breaks the pick only if a second DEX check (vs 20) also fails.
+    /// </summary>
+    public static PickResult Pick(int lockLevel, int pickSkill, int dexterity, Random rng)
     {
         ArgumentNullException.ThrowIfNull(rng);
-        if (lockLevel == DeadLockLevel) return PickResult.Unpickable;
-        if (lockLevel == MasterLockLevel && pickSkill < MasterLockSkill) return PickResult.Unpickable;
-        UuStrikeResolution.StrikeResult roll = UuStrikeResolution.RollToHit(pickSkill, lockLevel * 3, rng);
-        return roll switch
+        UuStrikeResolution.StrikeResult roll = UuStrikeResolution.RollToHit(pickSkill + 1, lockLevel * 3, rng);
+        bool locked = lockLevel == DeadLockLevel
+            || (lockLevel == MasterLockLevel && pickSkill < MasterLockSkill);
+        if (roll == UuStrikeResolution.StrikeResult.CritFail)
         {
-            UuStrikeResolution.StrikeResult.CritFail => PickResult.BrokePick,
-            UuStrikeResolution.StrikeResult.Fail => PickResult.Held,
-            _ => PickResult.Opened,
-        };
+            return UuStrikeResolution.RollToHit(dexterity, 20, rng) switch
+            {
+                UuStrikeResolution.StrikeResult.Fail => PickResult.BrokePick,
+                UuStrikeResolution.StrikeResult.CritFail => PickResult.BrokePick,
+                _ => PickResult.Held,
+            };
+        }
+
+        if (locked) return PickResult.Unpickable;
+        return roll == UuStrikeResolution.StrikeResult.Fail ? PickResult.Held : PickResult.Opened;
     }
 
-    /// <summary>Bash a door: quality absorbs damage (shifted by class); unbreakable holds.</summary>
+    /// <summary>
+    /// Bash a door: pristine (63) and unbreakable-class doors hold; quality
+    /// absorbs the rest shifted by class. Callers unlock and open on zero.
+    /// </summary>
     public static int BashDoor(int quality, int qualityClass, int damage) =>
-        qualityClass >= 3 ? quality : Math.Max(0, quality - (damage >> qualityClass));
+        quality >= 63 || qualityClass >= 3 ? quality : Math.Max(0, quality - (damage >> qualityClass));
 
     public static int BashWeaponWear(int weaponQuality) => Math.Max(0, weaponQuality - BashWearPerHit);
 
+    /// <summary>
+    /// Search a secret: caller marks the door discovered/open and reveals
+    /// it on the automap when true.
+    /// </summary>
     public static bool SearchSecret(int searchSkill, int difficulty, Random rng)
     {
         ArgumentNullException.ThrowIfNull(rng);

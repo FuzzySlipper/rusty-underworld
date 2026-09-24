@@ -8,16 +8,20 @@ public sealed class UuDoorTests
     [Fact]
     public void Picks_open_hold_break_or_refuse()
     {
-        Assert.Equal(UuDoorPolicy.PickResult.Unpickable, UuDoorPolicy.Pick(0xF, 30, new Random(1)));
-        Assert.Equal(UuDoorPolicy.PickResult.Unpickable, UuDoorPolicy.Pick(0xE, 0x1F, new Random(1)));
-        Assert.NotEqual(UuDoorPolicy.PickResult.Unpickable, UuDoorPolicy.Pick(0xE, 0x20, new Random(1)));
+        // Dead locks never open (picks can still break: the donor rolls first).
+        for (int i = 0; i < 20; i++)
+            Assert.NotEqual(UuDoorPolicy.PickResult.Opened, UuDoorPolicy.Pick(0xF, 30, 10, new Random(i)));
+        Assert.Equal(UuDoorPolicy.PickResult.BrokePick, UuDoorPolicy.Pick(0xF, 30, 10, new Random(1)));
+        // Under-skilled master locks hold or break, never open.
+        for (int i = 0; i < 20; i++)
+            Assert.NotEqual(UuDoorPolicy.PickResult.Opened, UuDoorPolicy.Pick(0xE, 0x1F, 10, new Random(i)));
 
         // Master picker opens easy locks on every seed.
         for (int i = 0; i < 20; i++)
-            Assert.Equal(UuDoorPolicy.PickResult.Opened, UuDoorPolicy.Pick(2, 30, new Random(i)));
+            Assert.Equal(UuDoorPolicy.PickResult.Opened, UuDoorPolicy.Pick(2, 30, 10, new Random(i)));
         // Untrained hands never open a hard lock without breaking picks.
         for (int i = 0; i < 20; i++)
-            Assert.True(UuDoorPolicy.Pick(10, 0, new Random(i)) is UuDoorPolicy.PickResult.Held or UuDoorPolicy.PickResult.BrokePick);
+            Assert.True(UuDoorPolicy.Pick(10, 0, 10, new Random(i)) is UuDoorPolicy.PickResult.Held or UuDoorPolicy.PickResult.BrokePick);
     }
 
     [Fact]
