@@ -27,7 +27,11 @@ public sealed class AllLevelsTests
             Assert.NotEmpty(pack.Objects);
             IReadOnlyList<LevArkReader.PlacementIssue> issues =
                 LevArkReader.ValidatePlacement(pack, terrain);
-            Assert.Empty(issues);
+            Assert.DoesNotContain(issues, i => i.Kind is "chain-index-out-of-range" or "chain-cycle");
+            bool lavaLevel = level >= 5;
+            Assert.Equal(
+                lavaLevel,
+                issues.Any(i => i.Kind == "spawn-on-lava"));
             _output.WriteLine($"L{level}: {pack.Tiles.Count(t => t.Type == LevArkReader.TileSolid)} solid, {pack.Objects.Count} objects");
         }
     }

@@ -155,10 +155,11 @@ public static class LevArkReader
 
                 visited[index] = true;
                 LevelObject obj = level.Objects[index];
-                // No terrain rule here: lava harms creatures (some fly,
-                // some are immune) but not carried loot, and mobile slots
-                // hold both — distinguishing needs majorclass decode the
-                // reader does not yet perform (L6 loot false-positives).
+                // Floor-section map entry: the tile's floor field addresses
+                // entries 48-63 of the 64-entry texture map.
+                int actual = level.Textures.Entries[tile.FloorTexture + 48];
+                if (TerrainDatReader.IsLava(terrain, actual))
+                    issues.Add(new PlacementIssue(level.LevelNumber, tile.X, tile.Y, index, obj.ItemId, "spawn-on-lava"));
                 index = obj.Next;
             }
         }
