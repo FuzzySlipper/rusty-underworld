@@ -171,11 +171,10 @@ public sealed class UuSession : IDisposable
             Survival.Drunkenness,
             WorldSeed,
             Anchor,
-            _storedDeltas.Values.Select(ToDeltaDto).ToArray(),
+            _storedDeltas.Values.Append(Dungeon.Unload(Dungeon.CurrentLevel)).Select(ToDeltaDto).ToArray(),
             Automap.Select(kv => new AutomapPageDto(kv.Key, kv.Value.EncodePage())).ToArray(),
             Enumerable.Range(0, Kit.Knowledge.QuestVariables.SlotCount)
                 .Select(slot => new QuestVarDto(slot, Quests.Get(slot)))
-                .Where(q => q.Value != 0)
                 .ToArray(),
             Notes.Levels
                 .SelectMany(level => Notes.Notes(level).Select(note => new NoteDto(level, note.Text, note.X, note.Y)))
@@ -194,6 +193,10 @@ public sealed class UuSession : IDisposable
         Survival.Fatigue = snapshot.Fatigue;
         Survival.Poison = snapshot.Poison;
         Survival.Drunkenness = snapshot.Drunkenness;
+        _storedDeltas.Clear();
+        foreach (UuLevelDeltaDto delta in snapshot.Deltas)
+            _storedDeltas[delta.LevelNumber] = FromDeltaDto(delta);
+        Quests.Clear();
         foreach (QuestVarDto quest in snapshot.QuestVars) Quests.Set(quest.Slot, quest.Value);
         foreach (AutomapPageDto page in snapshot.Automap)
         {
@@ -202,8 +205,16 @@ public sealed class UuSession : IDisposable
             existing.DecodeInto(page.Rle);
         }
 
+        Notes.Clear();
         foreach (NoteDto note in snapshot.Notes) Notes.Place(note.Level, note.Text, note.X, note.Y);
     }
+
+    private static UuLevelDelta FromDeltaDto(UuLevelDeltaDto dto) => new(
+        dto.LevelNumber,
+        dto.RemovedObjects.ToArray(),
+        dto.MovedObjects.ToDictionary(m => m.Index, m => (m.TileX, m.TileY)),
+        dto.OpenedDoors.Select(door => (door.X, door.Y)).ToArray(),
+        dto.Dropped.Select(d => new DroppedPlacement(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray());
 
     private static UuLevelDeltaDto ToDeltaDto(UuLevelDelta delta) => new(
         delta.LevelNumber,

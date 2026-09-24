@@ -16,6 +16,8 @@ public sealed class QuillNotes
 
     public IReadOnlyList<int> Levels => _pages.Keys.ToList();
 
+    public void Clear() => _pages.Clear();
+
     /// <summary>Place a note; returns its index on the page.</summary>
     public int Place(int level, string text, int x, int y)
     {

@@ -53,7 +53,8 @@ public sealed class UuSnapshotTests
         Assert.Equal(1234, revived.WorldSeed);
         Assert.Equal(1, revived.Anchor.Level);
         Assert.Single(revived.Automap);
-        Assert.Single(revived.QuestVars);
+        Assert.Equal(64, revived.QuestVars.Length);
+        Assert.Equal(2, revived.QuestVars[0].Value);
         Assert.Single(revived.Notes);
         Assert.Equal((1f, 2f, 3f), (revived.AvatarPose.X, revived.AvatarPose.Y, revived.AvatarPose.Z));
     }
@@ -72,7 +73,13 @@ public sealed class UuSnapshotTests
         session.RestoreSnapshot(snapshot);
         Assert.Equal((ulong)0, session.Clock.ElapsedTicks);
         Assert.Equal(0, session.Survival.Hunger);
-        Assert.Equal(9, session.Quests.Get(5)); // nonzero quest vars persist (sparse restore)
+        Assert.Equal(0, session.Quests.Get(5)); // full restore rolls back quest writes
         Assert.Equal(34.0, session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current);
+
+        // Double restore is idempotent (notes replace, not append).
+        session.Notes.Place(1, "extra", 0, 0);
+        session.RestoreSnapshot(snapshot);
+        session.RestoreSnapshot(snapshot);
+        Assert.Empty(session.Notes.Notes(1));
     }
 }

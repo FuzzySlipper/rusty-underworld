@@ -5,7 +5,9 @@ namespace AbyssRpg.Host;
 /// <summary>
 /// Save slot scheme over the save store: per-level autosaves, a rolling
 /// ring of quicksaves, and the respawn anchor slot written at level entry.
-/// Death loads the anchor slot; the slot bytes are ruleset snapshots.
+/// The death path loads the anchor slot (wiring rides with the defeat
+/// outcome owner); the slot bytes are ruleset snapshots. The quicksave
+/// cursor is session-scoped: a fresh process restarts the ring at 0.
 /// </summary>
 public sealed class AbyssSaveSlots
 {

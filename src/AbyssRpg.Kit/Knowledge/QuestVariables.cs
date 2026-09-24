@@ -14,6 +14,8 @@ public sealed class QuestVariables
 
     public void Set(int slot, int value) => _slots[Checked(slot)] = value;
 
+    public void Clear() => Array.Clear(_slots);
+
     private static int Checked(int slot) =>
         (uint)slot < SlotCount ? slot : throw new ArgumentOutOfRangeException(nameof(slot));
 }

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using AbyssRpg.Kit.Knowledge;
 
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
 
