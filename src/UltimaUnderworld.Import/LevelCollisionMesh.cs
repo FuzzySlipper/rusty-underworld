@@ -8,14 +8,16 @@ namespace UltimaUnderworld.Import;
 /// every tile becomes one navigation cell (open = walkable). Slopes emit
 /// flat (their steepness rides with a later pass); door tiles emit open
 /// (door blocking rides with door objects); ceilings are not emitted.
-/// Scale constants are Ours (units per tile edge, units per height step)
-/// until playtest calibration; the tile selection structure is donor data.
+/// Scale constants are Ours (units per tile edge, units per height step,
+/// nav level quantum) until playtest calibration; the tile selection
+/// structure is donor data. Diagonal wedge tiles (types 2-5) emit as full
+/// flat quads like slopes — the wedge halves they cover read as floor.
 /// Output shape follows the Engine's spatial content schema (schemaVersion 1
 /// triangle soup + navigation grid, as consumed via SpatialContentArtifact).
 /// </summary>
 public static class LevelCollisionMesh
 {
-    public sealed record MeshParameters(double UnitsPerTile = 8.0, double HeightUnitsPerStep = 1.0);
+    public sealed record MeshParameters(double UnitsPerTile = 8.0, double HeightUnitsPerStep = 1.0, double LevelQuantum = 0.25);
 
     public sealed record NavCell(int Column, int Row, int Level, double SupportHeight, bool Walkable);
 
@@ -33,6 +35,8 @@ public static class LevelCollisionMesh
         if (p.UnitsPerTile <= 0d || !double.IsFinite(p.UnitsPerTile))
             throw new ArgumentOutOfRangeException(nameof(parameters));
         if (p.HeightUnitsPerStep < 0d || !double.IsFinite(p.HeightUnitsPerStep))
+            throw new ArgumentOutOfRangeException(nameof(parameters));
+        if (p.LevelQuantum <= 0d || !double.IsFinite(p.LevelQuantum))
             throw new ArgumentOutOfRangeException(nameof(parameters));
 
         var positions = new List<float[]>();
@@ -67,7 +71,7 @@ public static class LevelCollisionMesh
                 int v1 = Add((float)x1, (float)floorY, (float)z0);
                 int v2 = Add((float)x1, (float)floorY, (float)z1);
                 int v3 = Add((float)x0, (float)floorY, (float)z1);
-                Quad(v0, v2, v1, v3);
+                Quad(v0, v3, v2, v1);
             }
             else
             {
@@ -82,7 +86,7 @@ public static class LevelCollisionMesh
                 int t2 = Add((float)x1, (float)top, (float)z1);
                 int t3 = Add((float)x0, (float)top, (float)z1);
                 Quad(b0, b1, b2, b3); // bottom (harmless, keeps boxes closed)
-                Quad(t0, t2, t1, t3); // top
+                Quad(t0, t3, t2, t1); // top
                 Quad(b0, t0, t1, b1); // sides
                 Quad(b1, t1, t2, b2);
                 Quad(b2, t2, t3, b3);
@@ -91,25 +95,38 @@ public static class LevelCollisionMesh
 
             cells.Add(new NavCell(
                 tile.X, tile.Y,
-                (int)Math.Round(floorY / 0.25),
+                (int)Math.Round(floorY / p.LevelQuantum),
                 floorY,
                 open));
         }
 
+        double minY = double.PositiveInfinity, maxY = double.NegativeInfinity;
+        foreach (float[] v in positions)
+        {
+            if (v[1] < minY) minY = v[1];
+            if (v[1] > maxY) maxY = v[1];
+        }
+
         return new CollisionMesh(
-            [0, 0, 0],
-            [size, p.UnitsPerTile, size],
+            [0, minY, 0],
+            [size, maxY, size],
             positions.ToArray(),
             triangles.ToArray(),
             cells.ToArray());
     }
 
-    /// <summary>Serialize to the Engine's spatial content JSON (triangle soup + nav grid).</summary>
-    public static string ToJson(CollisionMesh mesh, string navId, string meshArtifactId)
+    /// <summary>
+    /// Serialize to the Engine's spatial content JSON (triangle soup +
+    /// nav grid). Triangles emit as nested triplets per the Engine contract;
+    /// config echoes the emission parameters so non-default scales stay
+    /// self-consistent.
+    /// </summary>
+    public static string ToJson(CollisionMesh mesh, string navId, string meshArtifactId, MeshParameters? parameters = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentException.ThrowIfNullOrWhiteSpace(navId);
         ArgumentException.ThrowIfNullOrWhiteSpace(meshArtifactId);
+        MeshParameters p = parameters ?? new MeshParameters();
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
@@ -126,24 +143,34 @@ public static class LevelCollisionMesh
             writer.WriteEndObject();
             writer.WriteStartObject("collision");
             writer.WriteStartArray("positions");
-            foreach (float[] p in mesh.Positions)
+            foreach (float[] vertex in mesh.Positions)
             {
                 writer.WriteStartArray();
-                foreach (float v in p) writer.WriteNumberValue(v);
+                foreach (float v in vertex) writer.WriteNumberValue(v);
                 writer.WriteEndArray();
             }
 
             writer.WriteEndArray();
             writer.WriteStartArray("triangles");
-            foreach (int t in mesh.Triangles) writer.WriteNumberValue(t);
+            if (mesh.Triangles.Length % 3 != 0)
+                throw new InvalidOperationException("Triangle indices must form complete triplets.");
+            for (int i = 0; i < mesh.Triangles.Length; i += 3)
+            {
+                writer.WriteStartArray();
+                writer.WriteNumberValue(mesh.Triangles[i]);
+                writer.WriteNumberValue(mesh.Triangles[i + 1]);
+                writer.WriteNumberValue(mesh.Triangles[i + 2]);
+                writer.WriteEndArray();
+            }
+
             writer.WriteEndArray();
             writer.WriteEndObject();
             writer.WriteStartObject("navigation");
             writer.WriteString("id", navId);
             writer.WriteStartObject("config");
             writer.WriteNumber("schemaVersion", 1);
-            writer.WriteNumber("cellSize", 8.0);
-            writer.WriteNumber("levelQuantum", 0.25);
+            writer.WriteNumber("cellSize", p.UnitsPerTile);
+            writer.WriteNumber("levelQuantum", p.LevelQuantum);
             writer.WriteNumber("maximumSlopeDegrees", 45);
             writer.WriteNumber("requiredHeadroom", 1.8);
             writer.WriteNumber("supportProbeDrop", 0.05);
