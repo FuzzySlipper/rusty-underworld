@@ -76,6 +76,33 @@ public sealed class UuDungeonSessionTests
         Assert.False(restored.IsLive(victim));
     }
 
+    [Fact]
+    public void Entity_admission_materializes_chains_and_abandons_cleanly()
+    {
+        var level = new AdmittedLevel(1,
+            [new AdmittedTile(0, 0, 1, 5), new AdmittedTile(1, 0, 1, 0)],
+            [new AdmittedObject(5, 44, 7), new AdmittedObject(7, 0, 0), new AdmittedObject(9, 45, 0)]);
+        var state = new UuLevelState(level);
+        using var directory = new AbyssRpg.Kit.World.EntityDirectory();
+
+        UuEntityAdmission.Admission admission = UuEntityAdmission.AdmitLevel(directory, level, state);
+        Assert.True(admission.ByIndex.ContainsKey(5)); // item 44, chained
+        Assert.False(admission.ByIndex.ContainsKey(7)); // item 0: empty slot
+        Assert.False(admission.ByIndex.ContainsKey(9)); // unchained: not placed
+        Assert.Equal(
+            new AbyssRpg.Kit.World.DurableIdentityReference(AbyssRpg.Kit.World.DurableIdentityKind.Item, 1029),
+            directory.IdentityOf(admission.ByIndex[5]));
+
+        state.RemoveObject(5);
+        UuEntityAdmission.Admission second = UuEntityAdmission.AdmitLevel(directory, level, state);
+        Assert.False(second.ByIndex.ContainsKey(5)); // removed stays removed
+
+        UuEntityAdmission.AbandonLevel(directory, admission);
+        Assert.False(directory.TryResolve(
+            new AbyssRpg.Kit.World.DurableIdentityReference(AbyssRpg.Kit.World.DurableIdentityKind.Item, 1029), out _));
+        UuEntityAdmission.AbandonLevel(directory, admission); // idempotent
+    }
+
     // Returns null after writing a SKIP notice when operator data is absent.
     private byte[]? RequireDataOrSkip(string relative) =>
         TestData_Optional(relative) is string path ? File.ReadAllBytes(path) : null;
