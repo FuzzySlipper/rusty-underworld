@@ -18,10 +18,10 @@ public sealed class UuConversationVmTests
     private sealed class StubImports : IUuConversationImports
     {
         public readonly List<string> Calls = [];
-        public void Call(string name, UuConversationVm vm)
+        public int Call(string name, UuConversationVm vm)
         {
             Calls.Add(name);
-            vm.Push(0);
+            return 0;
         }
     }
 
@@ -79,6 +79,14 @@ public sealed class UuConversationVmTests
         Assert.Equal(["ask"], imports.Calls);
         // 10/0 guards to 0x7FFF, popped silently.
         Assert.Empty(vm.Transcript);
+    }
+
+    [Fact]
+    public void Unknown_imports_write_zero_over_the_top()
+    {
+        // CALLI with an id no import declares: donor still writes 0 over the top.
+        var vm = Run(Script(22, 7, 20, 0x41, 22, 0, 13, 16, 2, 22, 1, 39, 38, 22, 0, 39, 38));
+        Assert.Equal(["[0:1]"], vm.Transcript); // top became 0, matching PUSHI 0
     }
 
     [Fact]

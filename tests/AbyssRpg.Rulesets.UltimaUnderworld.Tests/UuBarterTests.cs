@@ -38,6 +38,15 @@ public sealed class UuBarterTests
         Assert.Equal(UuBarterPolicy.DemandResult.Yielded, yielded);
         Assert.Equal(-1, shift);
 
+        // Yield at Upset: no step down (donor guard).
+        var (held, noShift) = UuBarterPolicy.Demand(12, 10, 30, 30, 20, 1, 1, 10, 10);
+        Assert.Equal(UuBarterPolicy.DemandResult.Yielded, held);
+        Assert.Equal(0, noShift);
+
+        // Appraisal path: charm 0, player skill; charm>0 callers use offers.
+        int reading = UuBarterPolicy.JudgeValue(50, 30, 0, 30, new Random(2));
+        Assert.Equal(20, reading);
+
         // Weak hero vs strong trader: hostile refusal.
         var (refused, none) = UuBarterPolicy.Demand(0, 1, 5, 30, 200, 2, 8, 40, 40);
         Assert.Equal(UuBarterPolicy.DemandResult.RefusedHostile, refused);

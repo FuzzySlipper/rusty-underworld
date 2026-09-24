@@ -1,13 +1,14 @@
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Conversation;
 
 /// <summary>
-/// Imported-function host for the conversation VM. Implementations pop
-/// their own arguments from the VM stack and push results, matching the
-/// donor calling convention.
+/// Imported-function host for the conversation VM. Implementations PEEK
+/// their arguments (At/Pop-free reads) and return the result; the VM writes
+/// it over the stack top (defaulting 0, including unknown imports),
+/// matching the donor result_register writeback.
 /// </summary>
 public interface IUuConversationImports
 {
-    void Call(string name, UuConversationVm vm);
+    int Call(string name, UuConversationVm vm);
 }
 
 /// <summary>
@@ -86,6 +87,8 @@ public sealed class UuConversationVm
 
     public short Pop()
     {
+        // Lenient underflow (0 via At) where the donor throws: only
+        // reachable by popping deeper than pushed (malformed scripts).
         short value = At(_stackBase + _stackPtr);
         _stackPtr--;
         return value;
@@ -147,16 +150,18 @@ public sealed class UuConversationVm
                     ip = code[ip + 1] - 1;
                     _callLevel++;
                     break;
-                case 20: // CALLI imported
+                case 20: // CALLI imported (donor writeback: result over stack top, default 0)
                 {
                     int id = code[++ip];
+                    int result = 0;
                     foreach (ScriptImport import in _conversation.Imports)
                         if (!import.IsVariable && import.IdOrAddress == id)
                         {
-                            _imports.Call(import.Name, this);
+                            result = _imports.Call(import.Name, this);
                             break;
                         }
 
+                    _memory[_stackBase + _stackPtr] = (short)result;
                     break;
                 }
                 case 21: // RET

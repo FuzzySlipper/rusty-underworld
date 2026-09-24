@@ -30,6 +30,13 @@ public static class UuBarterPolicy
 
     public static int DealBand(int judgedValue) => judgedValue / 5;
 
+    /// <summary>
+    /// Caller contract: map an empty tray to NoDeal without calling, and
+    /// reset patience at each conversation start. Divergence note: the donor
+    /// increments patience even on accepted good deals (an apparent flag
+    /// oversight letting Yes flip to Tired with no swap); this gate counts
+    /// non-deals only, deliberately.
+    /// </summary>
     public static (TradeResult Result, int Patience) Offer(
         int npcValue, int playerValue, int charmSkill, int appraisalSkill,
         int patience, int maxPatience, Random rng)
@@ -58,6 +65,10 @@ public static class UuBarterPolicy
     }
 
     /// <summary>
+    /// Appraisal readings reuse JudgeValue with charm 0 and the player
+    /// Appraise skill over likes-unadjusted values (offer/demand values
+    /// carry likes adjustments and the trader's own appraisal).
+    ///
     /// Demands: player presence (Charm/6 + level + health fraction) against
     /// trader resolve (ask/10 + attitude/2 + level + health fraction).
     /// Yielding costs one attitude step and the tray; refusal means hostility.
@@ -75,8 +86,8 @@ public static class UuBarterPolicy
     {
         int playerScore = charmSkill / 6 + playerLevel + 1 + (2 * playerHp - 1) / Math.Max(1, playerVitality);
         int npcScore = npcAskValue / 10 + attitude / 2 + npcLevel + 1 + (2 * npcHp - 1) / Math.Max(1, npcMaxHp);
-        return playerScore > npcScore
-            ? (DemandResult.Yielded, -1)
-            : (DemandResult.RefusedHostile, 0);
+        if (playerScore <= npcScore) return (DemandResult.RefusedHostile, 0);
+        // Yielding costs a step only above Upset (donor attitude>1 guard).
+        return attitude > 1 ? (DemandResult.Yielded, -1) : (DemandResult.Yielded, 0);
     }
 }
