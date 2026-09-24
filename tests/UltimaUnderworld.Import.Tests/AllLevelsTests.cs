@@ -42,7 +42,8 @@ public sealed class AllLevelsTests
         byte[]? strings = RequireDataOrSkip("UW/DATA/STRINGS.PAK");
         if (strings is null) return;
 
-        StringsPakReader.DecodedStrings decoded = StringsPakReader.Decode(strings);
+        StringsPakReader.DecodedStrings decoded = StringsPakReader.Decode(strings, "UW/DATA/STRINGS.PAK");
+        Assert.Equal("UW1", decoded.Provenance.SourceGame);
         Assert.True(decoded.Blocks.Count >= 7);
         Assert.True(decoded.Blocks.Values.Sum(block => block.Count) > 1000);
     }

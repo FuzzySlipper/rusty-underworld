@@ -17,7 +17,9 @@ public static class StringsPakReader
     private const byte LeafEdge = 255;
     private const char EntryTerminator = '|';
 
-    public sealed record DecodedStrings(IReadOnlyDictionary<int, IReadOnlyList<string>> Blocks)
+    public sealed record DecodedStrings(
+        IReadOnlyDictionary<int, IReadOnlyList<string>> Blocks,
+        UwTableProvenance Provenance)
     {
         public string GetString(int block, int index)
         {
@@ -29,7 +31,7 @@ public static class StringsPakReader
         }
     }
 
-    public static DecodedStrings Decode(ReadOnlySpan<byte> data)
+    public static DecodedStrings Decode(ReadOnlySpan<byte> data, string sourceFile = "UW/DATA/STRINGS.PAK")
     {
         int cursor = 0;
         int nodeCount = ReadU16(data, ref cursor);
@@ -63,7 +65,7 @@ public static class StringsPakReader
             blocks[blockNumber] = DecodeBlock(data, symbols, left, right, nodeCount, address, blockNumber);
         }
 
-        return new DecodedStrings(blocks);
+        return new DecodedStrings(blocks, UwTableProvenance.FromBytes("UW1", sourceFile, data.ToArray()));
     }
 
     private static IReadOnlyList<string> DecodeBlock(
