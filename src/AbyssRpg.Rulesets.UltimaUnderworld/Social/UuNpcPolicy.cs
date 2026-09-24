@@ -48,16 +48,20 @@ public sealed class UuNpcSchedule
 }
 
 /// <summary>
-/// Fear-flight check: a critical fear result against a hurt (hp below a
-/// third), outleveled foe routs it half the time. Donor: damage-response
-/// flee branch. Flee pathfinding rides with movement.
+/// Fear-flight check on a critical attack roll against a hurt (hp below a
+/// third), outleveled foe: routs it half the time, but only when Hostile
+/// or already attacking (donor damage-response gate). Flee pathfinding
+/// rides with movement.
 /// </summary>
 public static class UuFleeCheck
 {
-    public static bool ShouldFlee(bool criticalFear, int hp, int maxHp, int playerLevel, int npcLevel, Random rng)
+    public static bool ShouldFlee(
+        bool criticalHit, int attitude, bool isAttacking,
+        int hp, int maxHp, int playerLevel, int npcLevel, Random rng)
     {
         ArgumentNullException.ThrowIfNull(rng);
-        return criticalFear
+        if (attitude != UuAttitude.Hostile && !isAttacking) return false;
+        return criticalHit
             && hp < maxHp / 3.0
             && playerLevel >= npcLevel
             && rng.NextDouble() < 0.5;

@@ -42,9 +42,11 @@ public sealed class UuNpcTests
     public void Fear_routes_the_hurt_and_outleveled()
     {
         var rng = new Random(11);
-        Assert.True(UuFleeCheck.ShouldFlee(true, 5, 30, 5, 3, rng));
-        Assert.False(UuFleeCheck.ShouldFlee(false, 5, 30, 5, 3, rng));
-        Assert.False(UuFleeCheck.ShouldFlee(true, 20, 30, 5, 3, rng));
-        Assert.False(UuFleeCheck.ShouldFlee(true, 5, 30, 1, 3, rng));
+        Assert.True(UuFleeCheck.ShouldFlee(true, UuAttitude.Hostile, false, 5, 30, 5, 3, rng));
+        Assert.True(UuFleeCheck.ShouldFlee(true, UuAttitude.Mellow, true, 5, 30, 5, 3, rng));
+        Assert.False(UuFleeCheck.ShouldFlee(true, UuAttitude.Mellow, false, 5, 30, 5, 3, rng));
+        Assert.False(UuFleeCheck.ShouldFlee(false, UuAttitude.Hostile, false, 5, 30, 5, 3, rng));
+        Assert.False(UuFleeCheck.ShouldFlee(true, UuAttitude.Hostile, false, 20, 30, 5, 3, rng));
+        Assert.False(UuFleeCheck.ShouldFlee(true, UuAttitude.Hostile, false, 5, 30, 1, 3, rng));
     }
 }
