@@ -1,6 +1,10 @@
 namespace AbyssRpg.Kit.Knowledge;
 
-/// <summary>Quill notes: player-placed map annotations (text + tile position) per level page.</summary>
+/// <summary>
+/// Quill notes: player-placed map annotations per level page. Coordinates
+/// are tile indices (0-63), a deliberate rescaling from the donor's 320x200
+/// map-screen GUI space (float x/y) into the tile grid the automap pages use.
+/// </summary>
 public sealed record MapNote(string Text, int X, int Y);
 
 public sealed class QuillNotes

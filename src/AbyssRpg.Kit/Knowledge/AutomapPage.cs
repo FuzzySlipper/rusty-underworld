@@ -38,7 +38,7 @@ public sealed class AutomapPage
     public static string Encode(bool[] mapped)
     {
         ArgumentNullException.ThrowIfNull(mapped);
-        if (mapped.Length == 0) throw new ArgumentOutOfRangeException(nameof(mapped));
+        if (mapped.Length == 0) return string.Empty; // donor-compatible: no data encodes empty
         var runs = new List<int>();
         bool current = mapped[0];
         int length = 1;
@@ -52,9 +52,18 @@ public sealed class AutomapPage
         return (mapped[0] ? "1" : "0") + ":" + string.Join(",", runs);
     }
 
+    /// <summary>
+    /// An empty document decodes as all-unexplored (donor-compatible: the
+    /// live default of an unsaved page is the empty string).
+    /// </summary>
     public static bool[] Decode(string encoded, int expectedLength)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(encoded);
+        if (string.IsNullOrWhiteSpace(encoded))
+        {
+            if (expectedLength < 0) throw new ArgumentOutOfRangeException(nameof(expectedLength));
+            return new bool[expectedLength];
+        }
+
         string[] head = encoded.Split(':', 2);
         if (head.Length != 2 || (head[0] != "0" && head[0] != "1"))
             throw new ArgumentException("Invalid RLE head.", nameof(encoded));

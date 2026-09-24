@@ -25,6 +25,8 @@ public sealed class KnowledgeStateTests
         Assert.True(revived.IsMapped(10, 10));
 
         Assert.Equal("0:100,5,50", AutomapPage.Encode(Enumerable.Repeat(false, 100).Concat(Enumerable.Repeat(true, 5)).Concat(Enumerable.Repeat(false, 50)).ToArray()));
+        Assert.Equal("", AutomapPage.Encode([]));
+        Assert.All(AutomapPage.Decode("", 4096), mapped => Assert.False(mapped));
         Assert.Throws<ArgumentException>(() => AutomapPage.Decode("bogus", 10));
         Assert.Throws<ArgumentException>(() => AutomapPage.Decode("0:5", 10));
     }
