@@ -84,6 +84,8 @@ product_projects=(
 )
 test_projects=(
   "tests/AbyssRpg.Architecture.Tests/AbyssRpg.Architecture.Tests.csproj"
+  "tests/AbyssRpg.Kit.Tests/AbyssRpg.Kit.Tests.csproj"
+  "tests/AbyssRpg.Rulesets.UltimaUnderworld.Tests/AbyssRpg.Rulesets.UltimaUnderworld.Tests.csproj"
   "tests/UltimaUnderworld.Import.Tests/UltimaUnderworld.Import.Tests.csproj"
 )
 host_project=""
