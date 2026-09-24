@@ -3,7 +3,8 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Magic;
 /// <summary>
 /// Maintained-spell admission gate (max 3): a same-spell cast replaces,
 /// a stronger similar-group cast replaces its weaker kin, otherwise the
-/// lowest-circle effect is evicted. Similar groups are content (donor
+/// lowest-cost effect is evicted (donor code basis; cost anomalies keep raw
+/// costs per the catalog decision). Similar groups are content (donor
 /// similarSpells: shield, stealth, float, light, time).
 /// Donor: Magic.TryCast admission (UW1 maintained-spell rule).
 /// </summary>
@@ -11,7 +12,7 @@ public sealed class UuMaintainedSpells
 {
     public const int MaxMaintained = 3;
 
-    public sealed record MaintainedSpell(int SpellId, string Runes, int Circle);
+    public sealed record MaintainedSpell(int SpellId, string Runes, int Cost);
 
     private static readonly string[][] SimilarGroups =
     [
@@ -27,7 +28,7 @@ public sealed class UuMaintainedSpells
     public IReadOnlyList<MaintainedSpell> Spells => _spells;
 
     /// <summary>Admit a maintained spell; returns the evicted spell, if any.</summary>
-    public MaintainedSpell? Admit(int spellId, string runes, int circle)
+    public MaintainedSpell? Admit(int spellId, string runes, int cost)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runes);
         MaintainedSpell? evicted = null;
@@ -55,12 +56,12 @@ public sealed class UuMaintainedSpells
         {
             int lowest = 0;
             for (int i = 1; i < _spells.Count; i++)
-                if (_spells[i].Circle < _spells[lowest].Circle) lowest = i;
+                if (_spells[i].Cost < _spells[lowest].Cost) lowest = i;
             evicted = _spells[lowest];
             _spells.RemoveAt(lowest);
         }
 
-        _spells.Add(new MaintainedSpell(spellId, runes, circle));
+        _spells.Add(new MaintainedSpell(spellId, runes, cost));
         return evicted;
     }
 

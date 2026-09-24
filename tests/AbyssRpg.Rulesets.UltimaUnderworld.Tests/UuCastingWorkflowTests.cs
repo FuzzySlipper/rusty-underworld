@@ -20,23 +20,23 @@ public sealed class UuCastingWorkflowTests
     public void Maintained_gate_replaces_then_evicts()
     {
         var maintained = new UuMaintainedSpells();
-        Assert.Null(maintained.Admit(1, "IS", 1));
-        Assert.Null(maintained.Admit(2, "VIL", 2));
-        Assert.Null(maintained.Admit(3, "HP", 3));
+        Assert.Null(maintained.Admit(1, "IS", 3));
+        Assert.Null(maintained.Admit(2, "VIL", 9));
+        Assert.Null(maintained.Admit(3, "HP", 15));
 
         // Same spell replaces itself.
-        var same = maintained.Admit(2, "VIL", 2);
+        var same = maintained.Admit(2, "VIL", 9);
         Assert.Equal(2, same!.SpellId);
         Assert.Equal(3, maintained.Spells.Count);
 
         // Stronger similar (IVS outranks IS) replaces the weaker kin.
-        var weaker = maintained.Admit(4, "IVS", 2);
+        var weaker = maintained.Admit(4, "IVS", 12);
         Assert.Equal(1, weaker!.SpellId);
         Assert.DoesNotContain(maintained.Spells, s => s.SpellId == 1);
 
         // Full with no kin: lowest circle (circle 2, spell 4) evicted.
-        var evicted = maintained.Admit(5, "KM", 4);
-        Assert.Equal(2, evicted!.Circle);
+        var evicted = maintained.Admit(5, "KM", 21);
+        Assert.Equal(9, evicted!.Cost);
         Assert.True(maintained.Dismiss(5));
         Assert.False(maintained.Dismiss(99));
     }
