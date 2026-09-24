@@ -1,80 +1,182 @@
-# Rusty Template
+# Rusty Underworld
 
-A minimal Rusty Engine product: C# owns a counter, a DOM button sends an
-`increment` intent, and Engine transports the counter projection to the UI.
-The packaged Engine owns the host, input, update loop, and browser shell.
+Rusty Underworld is the reference repository and proving product for **AbyssRpg**.
 
-## Setup
+AbyssRpg is an opinionated construction kit and reference host for
+dungeon-centric, real-time, first-person systemic RPGs in the Ultima Underworld
+tradition. The dungeon is the durable center of gravity: one continuous,
+tile-mapped underworld whose levels, objects, inhabitants, and schedules persist
+around a single avatar. Combat, magic, conversation, and survival are mechanisms
+for inhabiting and unfolding that place, not a mandatory linear product spine.
 
-The supported runtime pair targets Linux x64. Install the .NET 10 SDK, GitHub
-CLI (`gh`, authenticated for release access), `jq`, `tar`, `unzip`, and standard shell
-utilities. NativeAOT also needs the platform compiler/linker prerequisites
-(Clang and zlib development headers on Linux).
+Ultima Underworld: The Stygian Abyss is the first compiled ruleset,
+compatibility corpus, content source, and game-bundle family. It is not the
+implicit AbyssRpg architecture. Ultima Underworld II shares its engine and
+remains donor context for formats and divergences; it is not a target.
 
-```bash
-./scripts/install-engine.sh
-./scripts/build-csharp.sh
-./scripts/run-csharp.sh --port 8787
-```
+The working formula is: **Engine guarantees. Kit shapes. Ruleset decides.
+Bundle assembles. Host launches.**
 
-Open the URL printed by the host. The Increment button changes the counter.
-The runner delegates to the installed `rusty dev`: CoreCLR loads the product,
-and changes to declared C#, UI, or content inputs rebuild and restart it.
-Runtime options such as `--bind-host`, `--live-debug`, and `--debugger` pass
-through to `rusty dev`.
+> **Current state: setup pass.** This repository owns its shape, its build
+> configuration, its verification script, and its donor research. It contains no
+> C# project, no TypeScript, and no content yet — the directory structure states
+> intended ownership so the first implementation task has an owning home. Do not
+> read the layout below as a description of working code.
 
-The installer downloads and verifies the immutable SDK/runtime pair pinned in
-`Directory.Build.props`. NuGet resolves the SDK from `.runtime/sdk-feed`; the
-runner selects the same version under `.runtime/pairs/`. No Engine source
-checkout is required. Installed artifacts are local, ignored output.
+## Ownership
 
-To adopt the newest published pair deliberately:
+- Rusty Engine guarantees reusable infrastructure and admitted update services.
+- `AbyssRpg.Kit` will define the reusable dungeon-RPG composition grammar and the
+  ordinary mechanisms needed to construct one.
+- `AbyssRpg.Host` will own the product lifecycle, built-in ruleset registry,
+  shipped bundles, launcher, defaults, and session selection.
+- `AbyssRpg.Rulesets.UltimaUnderworld` will own all Ultima Underworld semantics,
+  formulas, identities, runic-magic policy, conversation meaning, presentation
+  meaning, and content interpretation.
+- Content packs will own authored definitions, assets, levels, placements,
+  conversations, and scenario state.
+- `UltimaUnderworld.Import` will own source-format knowledge for the original
+  game's data files and for the donors that document them.
+- `AbyssRpg.Host` is the ordinary product entry. The packaged SDK generates
+  CoreCLR and NativeAOT composition beneath ignored `obj` output.
 
-```bash
-./scripts/install-engine.sh --update
-./scripts/build-csharp.sh
-```
+Code-bearing rulesets are compiled into the product. Content packs, validated
+typed tuning profiles, and game bundles are loaded at runtime. Do not introduce
+dynamic managed plug-in loading, reflection discovery, runtime C# compilation,
+generic command buses, ambient dependency lookup, or a replacement gameplay DSL.
 
-The pin changes only after successful installation. Include
-`Directory.Build.props` in the resulting source change. For an explicit
-NativeAOT fidelity/release check:
+Reusable mechanisms, and mechanisms whose placement is genuinely uncertain, begin
+in `AbyssRpg.Kit`. Ultima Underworld assumptions are forbidden there and
+permitted only in the ruleset, its content packs, its presentation, and
+`UltimaUnderworld.Import`; the Host may name a built-in ruleset only at its
+explicit composition root.
 
-```bash
-./scripts/build-csharp.sh --aot
-```
+Adjustable ruleset values belong in discoverable validated typed tuning handles;
+authored values belong in content packs; algorithmic invariants stay beside their
+algorithms; source-format quirks belong in the importer; and default bundle
+selection belongs in the Host.
 
-## Repository shape
+There is one Rusty Engine-admitted update. AbyssRpg does not create a parallel
+loop, clock, timer, thread, browser authority, or renderer.
 
-| Path | Responsibility |
+## The game family
+
+Ultima Underworld: The Stygian Abyss is the game being recreated, and the only
+target. Ultima Underworld II shares its engine and remains donor context for
+formats and divergences; it is not a target, and no code path may quietly depend
+on its data. What this repository knows about the game is recorded, with
+citations, in [`docs/research/`](docs/research/):
+
+- Single-avatar first-person play in one continuous tile-mapped dungeon —
+  the Stygian Abyss, divided into stories-like levels (manual p. 19) — with
+  free movement, jumping, and swimming rather than a party, an overworld, or
+  separate battle screens.
+- Real-time combat paced by an attack-charge buildup shown on the Power Gem
+  (manual pp. 13, 22): holding prepares a swing whose kind follows press
+  position, resolving on release; missile combat alongside it.
+- Runic magic over 24 runes in 8 circles of 5 spells (manual pp. 26-29, 32):
+  runes collected in the world, carried in a runebag, combined into spells at
+  cast time against a mana reserve; scrolls, wands, and potions as item-borne
+  casting alongside it.
+- A conversation system with real NPC societies: full dialogue trees driven by a
+  conversation VM, barter, and NPC AI with movement, pathfinding, and combat.
+- Object-dense simulation: hundreds of interactable objects per level with
+  physics, containers, weight and encumbrance, food, and light sources — plus a
+  near-complete trap and trigger family, including records the original never uses.
+- Survival pressure: hunger, fatigue, sleep and dreams, light and darkness.
+- Knowledge play: an automap the player annotates, a compass, and quest state
+  carried in game variables the scripts read and write.
+
+The donors are the engine recreation at
+`/home/research/old-games/UnderworldGodot` (Godot 4 + C#, UW1 and UW2) and the
+gameplay-accuracy recreation at `/home/research/old-games/OpenUnderground`
+(Unity 6000, UW1). Their licenses differ and neither of them is a code donor —
+read the donor posture in [`AGENTS.md`](AGENTS.md) before using either of them.
+The operator's own copy of the game is the ISO at
+`/home/research/old-games/game-uu1/game.gog` (ISO 9660 `UW12`, carrying both
+`UW/` and `UW2/` trees); only `UW/` is ever an extraction source. Original game
+data is never committed here.
+
+## Design shape
+
+Two documents fix the shape before implementation starts:
+
+- [Gameplay design](docs/gameplay-design.md) — the loop, every system's shape
+  with a fidelity verdict, the first coherent slice, and the decisions that are
+  expensive to reverse.
+- [Code organization](docs/code-organization.md) — the layering, where new code
+  goes, the Kit and ruleset owner maps, content and import shapes, the UI
+  contract, session modes, and persistence.
+
+## Repository layout
+
+| Path | Holds |
 | --- | --- |
-| `src/RustyTemplate.Game/` | Ordinary safe C# product, counter state, and product metadata |
-| `src/ui/main.js` | DOM presentation and semantic input |
-| `content/` | Product-authored content root |
-| `Directory.Build.props` | Matched Engine SDK/runtime pin |
-| `scripts/` | Install, build/stage, and development commands |
-| `docs/architecture.md` | Current ownership and data flow |
-| `docs/ui.md` | DOM companion contract |
-| `docs/agent-review/` | Reusable review workflow and lane packets |
+| [`AGENTS.md`](AGENTS.md) | The working contract: direction, ownership, boundary rules, donor posture, git and documentation conventions. |
+| [`docs/`](docs/README.md) | Durable documents: the [gameplay design](docs/gameplay-design.md), the [code organization](docs/code-organization.md), the [research notes](docs/research/), and the [review lane model](docs/agent-review/README.md). |
+| [`src/`](src/README.md) | The planned product graph: kit, ruleset, host, importer and its tool, and the product DOM companion. |
+| [`tests/`](tests/README.md) | The planned suites, including the architecture suite that will enforce the ownership laws. |
+| [`content/`](content/README.md) | Loaded content: bundles, authored content packs, and per-level imports produced offline. |
+| [`data/`](data/README.md) | Small checked-in reference tables a person maintains. |
+| `scripts/` | Engine pair installation and pin movement, and `verify.sh`. |
 
-The SDK generates CoreCLR/NativeAOT composition beneath `obj/`. The runtime
-pack supplies the browser shell. Product metadata, input intents, content/UI
-roots, and projection identity live in the ordinary `.csproj`.
+For every task, identify:
 
-## Start a product from this template
+- the owning layer;
+- new assumptions introduced;
+- whether Ultima Underworld vocabulary is permitted;
+- whether the change is code, tuning, content, import, or infrastructure;
+- dependency changes;
+- focused proof for the owning mechanism and ruleset policy.
 
-1. Rename the C# directory/project, namespace, and entry type together. Update
-   the project path in the build/run scripts.
-2. Set the product ID/title and UI projection stream/contract in the project
-   file. Keep the C# stream/contract constants aligned. Define semantic intents
-   there and keep their C#/DOM callers aligned.
-3. Replace the counter domain and DOM UI with the product's behavior. Add
-   authored data under `content/` and load it through Engine services. Keep
-   documentation outside `src/ui/`; every file there is staged as a web asset.
-4. Customize `AGENTS.md` and the architecture owner map for the actual product.
-   Add a Den project or donor contract only if the new project uses one.
-5. Keep the generic review lanes, adding concrete owner pointers and relevant
-   task-specific questions as described in [the review guide](docs/agent-review/README.md).
+## Develop and verify
 
-Read [AGENTS.md](AGENTS.md) before extending the product. Keep instructions
-about current behavior and ownership; exact dependency identities belong in
-configuration, and task status belongs in the task system.
+The product will consume the immutable `Rusty.Engine` package from the installed
+`.runtime/sdk-feed` and the matched `.runtime/runtime-pack`. That pair's identity
+belongs in `Directory.Build.props`, where the install and verify scripts check it;
+do not restate a version or revision here.
+
+Start a clean checkout with the pinned, noninteractive pair install. It validates
+the release checksum, payloads, ABI, package version, and Engine source revision
+before atomically replacing the whole ignored pair:
+
+```bash
+./scripts/install-engine-pair.sh
+```
+
+To take the newest published Engine pair, which is the ordinary way to pick up
+newer Engine state:
+
+```bash
+./scripts/update-engine-pin.sh
+```
+
+It resolves the newest `csharp-sdk` release, rewrites both identities in
+`Directory.Build.props`, and installs the pair. `--check` reports what is
+available without changing anything.
+
+Routine verification:
+
+```bash
+./scripts/verify.sh
+```
+
+Today that verifies the installed pair identity and installs the product UI
+dependencies, then reports plainly that no product project exists to build.
+NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
+first project lands, add it to `product_projects` and its suite to
+`test_projects` in the script — the lists are explicit on purpose, because a
+discovery-based loop silently stops covering a project that moved.
+
+Den serves the product through `.den-serve.json` on port 4177 once the host
+project exists.
+
+## Guidance and proof
+
+Repository-specific instructions are in [`AGENTS.md`](AGENTS.md). The installed
+SDK's C# guidance is the authority on the product/Engine boundary; this repository
+does not restate it.
+
+A check that only compiles is not verification, and a demonstration is not
+completion. Run the smallest proof that answers the changed seam, and state
+plainly what was not run.
