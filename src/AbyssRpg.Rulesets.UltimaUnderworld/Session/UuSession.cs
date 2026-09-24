@@ -34,6 +34,24 @@ public sealed class UuSession : IDisposable
     public UuMovementTuning MovementTuning { get; }
     public PlayerActorState Avatar { get; }
 
+    /// <summary>Survival accumulators ticked by updates.</summary>
+    public Survival.UuSurvivalState Survival { get; } = new();
+
+    /// <summary>Conversation quest/game variables.</summary>
+    public Kit.Knowledge.QuestVariables Quests { get; } = new();
+
+    /// <summary>Automap coverage by level.</summary>
+    public Dictionary<int, Kit.Knowledge.AutomapPage> Automap { get; } = [];
+
+    /// <summary>Quill notes (per-level pages).</summary>
+    public Kit.Knowledge.QuillNotes Notes { get; } = new();
+
+    /// <summary>Planted world seed (respawn identity).</summary>
+    public long WorldSeed { get; }
+
+    /// <summary>Respawn anchor planted at creation.</summary>
+    public UuRespawnAnchor Anchor { get; }
+
     /// <summary>Avatar locomotion medium. Set by survival/spell systems; the product reads it per update.</summary>
     public bool Swimming { get; set; }
 
@@ -49,7 +67,9 @@ public sealed class UuSession : IDisposable
         UuDungeonSession dungeon,
         UuLocomotionPolicy locomotion,
         UuMovementTuning movementTuning,
-        PlayerActorState avatar)
+        PlayerActorState avatar,
+        long worldSeed,
+        UuRespawnAnchor anchor)
     {
         Actors = actors;
         Directory = directory;
@@ -60,6 +80,8 @@ public sealed class UuSession : IDisposable
         Locomotion = locomotion;
         MovementTuning = movementTuning;
         Avatar = avatar;
+        WorldSeed = worldSeed;
+        Anchor = anchor;
     }
 
     public static UuSession NewGame(
@@ -67,7 +89,8 @@ public sealed class UuSession : IDisposable
         UuVitalsPolicy.Vitals vitals,
         AdmittedLevel firstLevel,
         ActorPose spawnPose,
-        UuMovementTuning? tuning = null)
+        UuMovementTuning? tuning = null,
+        long worldSeed = 0)
     {
         ArgumentNullException.ThrowIfNull(choices);
         ArgumentNullException.ThrowIfNull(vitals);
@@ -86,7 +109,9 @@ public sealed class UuSession : IDisposable
             dungeon,
             new UuLocomotionPolicy(movementTuning),
             movementTuning,
-            avatar);
+            avatar,
+            worldSeed,
+            UuRespawnAnchor.FromPose(firstLevel.LevelNumber, spawnPose, worldSeed));
         session._admissions[firstLevel.LevelNumber] =
             UuEntityAdmission.AdmitLevel(directory, firstLevel, dungeon.Current);
         return session;
@@ -124,6 +149,68 @@ public sealed class UuSession : IDisposable
             ItemIdentities.CaptureState(),
             deltas);
     }
+
+    /// <summary>
+    /// Capture the slice snapshot (non-destructive). Avatar pose comes from
+    /// the Host spatial owner. Restoring level deltas rides with
+    /// travel/admission; this restore covers clock, avatar, survival,
+    /// knowledge, and stored deltas.
+    /// </summary>
+    public UuSessionSnapshot CaptureSnapshot(AvatarPoseDto pose)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(pose);
+        return new UuSessionSnapshot(
+            Clock.ElapsedTicks,
+            Dungeon.CurrentLevel,
+            Avatar.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current,
+            Avatar.Stats.GetTrack(Creation.UuAvatarFactory.ManaTrack).Current,
+            Survival.Hunger,
+            Survival.Fatigue,
+            Survival.Poison,
+            Survival.Drunkenness,
+            WorldSeed,
+            Anchor,
+            _storedDeltas.Values.Select(ToDeltaDto).ToArray(),
+            Automap.Select(kv => new AutomapPageDto(kv.Key, kv.Value.EncodePage())).ToArray(),
+            Enumerable.Range(0, Kit.Knowledge.QuestVariables.SlotCount)
+                .Select(slot => new QuestVarDto(slot, Quests.Get(slot)))
+                .Where(q => q.Value != 0)
+                .ToArray(),
+            Notes.Levels
+                .SelectMany(level => Notes.Notes(level).Select(note => new NoteDto(level, note.Text, note.X, note.Y)))
+                .ToArray(),
+            pose);
+    }
+
+    public void RestoreSnapshot(UuSessionSnapshot snapshot)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(snapshot);
+        Clock.Restore(new GameClockSnapshot(snapshot.ClockTicks));
+        Avatar.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current = snapshot.Hp;
+        Avatar.Stats.GetTrack(Creation.UuAvatarFactory.ManaTrack).Current = snapshot.Mana;
+        Survival.Hunger = snapshot.Hunger;
+        Survival.Fatigue = snapshot.Fatigue;
+        Survival.Poison = snapshot.Poison;
+        Survival.Drunkenness = snapshot.Drunkenness;
+        foreach (QuestVarDto quest in snapshot.QuestVars) Quests.Set(quest.Slot, quest.Value);
+        foreach (AutomapPageDto page in snapshot.Automap)
+        {
+            if (!Automap.TryGetValue(page.Level, out Kit.Knowledge.AutomapPage? existing))
+                Automap[page.Level] = existing = new Kit.Knowledge.AutomapPage();
+            existing.DecodeInto(page.Rle);
+        }
+
+        foreach (NoteDto note in snapshot.Notes) Notes.Place(note.Level, note.Text, note.X, note.Y);
+    }
+
+    private static UuLevelDeltaDto ToDeltaDto(UuLevelDelta delta) => new(
+        delta.LevelNumber,
+        delta.RemovedObjects.ToArray(),
+        delta.MovedObjects.Select(kv => new MovedObjectDto(kv.Key, kv.Value.TileX, kv.Value.TileY)).ToArray(),
+        delta.OpenedDoors.Select(door => new DoorDto(door.X, door.Y)).ToArray(),
+        delta.Dropped.Select(d => new DroppedDto(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray());
 
     public void Dispose()
     {

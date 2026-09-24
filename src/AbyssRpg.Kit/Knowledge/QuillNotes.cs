@@ -14,6 +14,8 @@ public sealed class QuillNotes
     public IReadOnlyList<MapNote> Notes(int level) =>
         _pages.TryGetValue(level, out List<MapNote>? notes) ? notes : [];
 
+    public IReadOnlyList<int> Levels => _pages.Keys.ToList();
+
     /// <summary>Place a note; returns its index on the page.</summary>
     public int Place(int level, string text, int x, int y)
     {
