@@ -92,6 +92,10 @@ The donors are the engine recreation at
 gameplay-accuracy recreation at `/home/research/old-games/OpenUnderground`
 (Unity 6000, UW1). Their licenses differ and neither of them is a code donor —
 read the donor posture in [`AGENTS.md`](AGENTS.md) before using either of them.
+The sibling kit at `/home/dev/rusty-dagger` is a third, special source: its
+`WorldRpg.Kit` mechanisms are Engine-native and available for one-time
+bootstrap copying (no provenance tracking) per
+[`docs/research/rusty-dagger-kit-survey.md`](docs/research/rusty-dagger-kit-survey.md).
 The operator's own copy of the game is the ISO at
 `/home/research/old-games/game-uu1/game.gog` (ISO 9660 `UW12`, carrying both
 `UW/` and `UW2/` trees); only `UW/` is ever an extraction source. Original game

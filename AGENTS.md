@@ -28,6 +28,10 @@ may quietly depend on its data.
   `/home/research/old-games/UnderworldGodot`
 - secondary donor reference (UW1 gameplay-accuracy recreation, Unity):
   `/home/research/old-games/OpenUnderground`
+- sibling-kit reference (Engine-native mechanisms, one-time bootstrap source):
+  `/home/dev/rusty-dagger` — see
+  `docs/research/rusty-dagger-kit-survey.md` for the copy map; copy once,
+  rename, and customize with no provenance tracking
 - donor surveys: `docs/research/underworldgodot-survey.md` and
   `docs/research/openunderground-survey.md`
 - experience outline with manual citations: `docs/research/uu1-manual-outline.md`

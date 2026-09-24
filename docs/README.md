@@ -8,7 +8,7 @@ Durable repository documents for Rusty Underworld. Start here.
 | [`../README.md`](../README.md) | What the repository is, its current state, and how to develop and verify it. |
 | [`gameplay-design.md`](gameplay-design.md) | The shape of the game: the loop, every system with a fidelity verdict, the first coherent slice, non-goals, and the decisions that are expensive to reverse. |
 | [`code-organization.md`](code-organization.md) | How the repository expresses that shape: layering, where new code goes, the Kit and ruleset owner maps, content and import shapes, the UI contract, session modes, and persistence. |
-| [`research/`](research/) | Donor surveys and the manual-cited experience outline: what the reference recreations, the shipped manual, and the ISO data say about the game. |
+| [`research/`](research/) | Donor surveys, the manual-cited experience outline, and the sibling-kit bootstrap map: what the reference recreations, the shipped manual, the ISO data, and `WorldRpg.Kit` say about and for the game. |
 | [`underworld-coverage-plan.md`](underworld-coverage-plan.md) | Scope, ownership, work ordering, and review posture for reaching UW1 coverage. |
 | [`underworld-feature-map.md`](underworld-feature-map.md) | Donor structures with point-in-time coverage notes. |
 | [`underworld-task-preparation.md`](underworld-task-preparation.md) | Task-creation packet: ledger, inventories, and proposed slices. |
