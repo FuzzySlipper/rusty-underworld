@@ -8,8 +8,8 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Magic;
 /// flight while maintained (callers set session Flying from effect
 /// presence); Water Walk lets callers treat water as walkable.
 /// Donor numbers: speed x2.0, gravity 9.81→2.5, gate 7.0/level with 10.0
-/// threshold, open radius 3 tiles. Telekinesis range is Ours (3 tiles,
-/// matching the open radius convention).
+/// threshold, open radius 3 tiles, telekinesis range 3 tiles (9.0 world
+/// units at 3.0 per tile: Interaction.cs, Tile.xzScale).
 /// </summary>
 public static class UuMovementSpells
 {
