@@ -27,8 +27,8 @@ public sealed class UuSession : IDisposable
     public ActorsState Actors { get; }
     public EntityDirectory Directory { get; }
     public GameClock Clock { get; }
-    public DurableIdentityAllocator ActorIdentities { get; }
-    public DurableIdentityAllocator ItemIdentities { get; }
+    public DurableIdentityAllocator ActorIdentities { get; private set; }
+    public DurableIdentityAllocator ItemIdentities { get; private set; }
     public UuDungeonSession Dungeon { get; }
     public UuLocomotionPolicy Locomotion { get; }
     public UuMovementTuning MovementTuning { get; }
@@ -136,20 +136,6 @@ public sealed class UuSession : IDisposable
         _admissions[target.LevelNumber] = UuEntityAdmission.AdmitLevel(Directory, target, state);
     }
 
-    public UuSaveData CaptureSave()
-    {
-        ThrowIfDisposed();
-        var deltas = new Dictionary<int, UuLevelDelta>(_storedDeltas)
-        {
-            [Dungeon.CurrentLevel] = Dungeon.Unload(Dungeon.CurrentLevel),
-        };
-        return new UuSaveData(
-            Clock.Capture(),
-            ActorIdentities.CaptureState(),
-            ItemIdentities.CaptureState(),
-            deltas);
-    }
-
     /// <summary>
     /// Capture the slice snapshot (non-destructive). Avatar pose comes from
     /// the Host spatial owner. Restoring level deltas rides with
@@ -179,7 +165,9 @@ public sealed class UuSession : IDisposable
             Notes.Levels
                 .SelectMany(level => Notes.Notes(level).Select(note => new NoteDto(level, note.Text, note.X, note.Y)))
                 .ToArray(),
-            pose);
+            pose,
+            ActorIdentities.CaptureState().Kinds,
+            ItemIdentities.CaptureState().Kinds);
     }
 
     public void RestoreSnapshot(UuSessionSnapshot snapshot)
@@ -207,6 +195,10 @@ public sealed class UuSession : IDisposable
 
         Notes.Clear();
         foreach (NoteDto note in snapshot.Notes) Notes.Place(note.Level, note.Text, note.X, note.Y);
+        // Identity allocators ride with the slice: without them a restored
+        // session would re-issue identities the snapshot still references.
+        ActorIdentities = DurableIdentityAllocator.Restore(new DurableIdentityState(snapshot.ActorIdentities));
+        ItemIdentities = DurableIdentityAllocator.Restore(new DurableIdentityState(snapshot.ItemIdentities));
     }
 
     private static UuLevelDelta FromDeltaDto(UuLevelDeltaDto dto) => new(
@@ -234,9 +226,3 @@ public sealed class UuSession : IDisposable
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 }
 
-/// <summary>Persistable session record. The Host save owner stores it (UW-T25).</summary>
-public sealed record UuSaveData(
-    GameClockSnapshot Clock,
-    DurableIdentityState ActorIdentities,
-    DurableIdentityState ItemIdentities,
-    Dictionary<int, UuLevelDelta> LevelDeltas);

@@ -1,10 +1,19 @@
 # Task index (proposed slices)
 
-Proposed implementation tasks derived from the ledger. These are planning
-records, not created work items: no task system holds them yet. IDs are
-stable (`UW-T01…`); create real tasks from these rows rather than
-re-surveying. Order follows the coverage plan's dependency evidence; tasks
+Implementation tasks derived from the ledger. IDs are stable (`UW-T01…`)
+and each has a Den record (`rusty-underworld`) carrying status, delivery
+hashes, and review evidence; Den is the durable status source, this file the
+scope source. Order follows the coverage plan's dependency evidence; tasks
 within a wave are independent unless prerequisites say otherwise.
+
+## Delivery status (waves 0–5)
+
+Waves 0–5 tasks (UW-T01…UW-T38) carry Den records with per-task delivery
+commits. Single schema, no versions: saves persist one current snapshot;
+reviews reconcile as follow-up commits on the same task series. Known
+receivers: trap-executor conditional continuations (from T30), death-path
+anchor loading (from T25, routed in T34), trigger RunTrigger executor
+(from T30).
 
 ## Wave 0 — composition and identity (unblocks everything)
 

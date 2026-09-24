@@ -53,6 +53,8 @@ public sealed class UuSnapshotTests
         Assert.Equal(1234, revived.WorldSeed);
         Assert.Equal(1, revived.Anchor.Level);
         Assert.Single(revived.Automap);
+        Assert.NotEmpty(revived.ActorIdentities);
+        Assert.NotEmpty(revived.ItemIdentities);
         Assert.Equal(64, revived.QuestVars.Length);
         Assert.Equal(2, revived.QuestVars[0].Value);
         Assert.Single(revived.Notes);
@@ -70,7 +72,10 @@ public sealed class UuSnapshotTests
         session.Quests.Set(5, 9);
         session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = 5.0;
 
+        ulong before = session.ActorIdentities.NextIdentity(AbyssRpg.Kit.World.DurableIdentityKind.Actor);
+        session.ActorIdentities.Allocate(AbyssRpg.Kit.World.DurableIdentityKind.Actor);
         session.RestoreSnapshot(snapshot);
+        Assert.Equal(before, session.ActorIdentities.NextIdentity(AbyssRpg.Kit.World.DurableIdentityKind.Actor));
         Assert.Equal((ulong)0, session.Clock.ElapsedTicks);
         Assert.Equal(0, session.Survival.Hunger);
         Assert.Equal(0, session.Quests.Get(5)); // full restore rolls back quest writes

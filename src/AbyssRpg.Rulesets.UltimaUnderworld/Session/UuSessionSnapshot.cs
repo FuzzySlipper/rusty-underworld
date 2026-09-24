@@ -30,7 +30,9 @@ public sealed record UuSessionSnapshot(
     AutomapPageDto[] Automap,
     QuestVarDto[] QuestVars,
     NoteDto[] Notes,
-    AvatarPoseDto AvatarPose);
+    AvatarPoseDto AvatarPose,
+    AbyssRpg.Kit.World.KindAllocatorState[] ActorIdentities,
+    AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities);
 
 public sealed record UuLevelDeltaDto(
     int LevelNumber,
@@ -49,6 +51,8 @@ public sealed record AvatarPoseDto(float X, float Y, float Z, float YawRadians);
 
 [JsonSourceGenerationOptions(WriteIndented = false)]
 [JsonSerializable(typeof(UuSessionSnapshot))]
+[JsonSerializable(typeof(AbyssRpg.Kit.World.KindAllocatorState))]
+[JsonSerializable(typeof(AbyssRpg.Kit.World.DurableIdentityKind))]
 internal partial class UuSessionSnapshotJsonContext : JsonSerializerContext;
 
 public static class UuSessionSnapshotCodec

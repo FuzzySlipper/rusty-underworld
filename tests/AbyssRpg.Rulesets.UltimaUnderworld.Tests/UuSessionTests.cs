@@ -62,11 +62,11 @@ public sealed class UuSessionTests
         Assert.False(session.Dungeon.Current.IsLive(5));
         Assert.Equal((ulong)150, session.Clock.ElapsedTicks);
 
-        UuSaveData save = session.CaptureSave();
-        Assert.Equal((ulong)150, save.Clock.ElapsedTicks);
-        Assert.True(save.LevelDeltas[1].RemovedObjects.Contains(5));
-        Assert.NotEmpty(save.ActorIdentities.Kinds);
-        Assert.NotEmpty(save.ItemIdentities.Kinds);
-        Assert.Throws<ObjectDisposedException>(() => { session.Dispose(); session.CaptureSave(); });
+        Session.UuSessionSnapshot snap = session.CaptureSnapshot(new Session.AvatarPoseDto(0, 0, 0, 0f));
+        Assert.Equal((ulong)150, snap.ClockTicks);
+        Assert.Contains(snap.Deltas, d => d.LevelNumber == 1 && d.RemovedObjects.Contains(5));
+        Assert.NotEmpty(snap.ActorIdentities);
+        Assert.NotEmpty(snap.ItemIdentities);
+        Assert.Throws<ObjectDisposedException>(() => { session.Dispose(); session.CaptureSnapshot(new Session.AvatarPoseDto(0, 0, 0, 0f)); });
     }
 }
