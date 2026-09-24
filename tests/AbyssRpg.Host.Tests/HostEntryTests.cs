@@ -56,5 +56,8 @@ public sealed class HostEntryTests
 
         store.Delete("slot0");
         Assert.False(store.Load("slot0").Present);
+
+        Assert.Throws<ArgumentException>(() => store.Save("bad", new AbyssSaveEnvelope("", [1])));
+        Assert.Throws<ArgumentException>(() => store.Save("bad", new AbyssSaveEnvelope("r", [])));
     }
 }

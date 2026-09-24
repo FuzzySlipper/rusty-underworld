@@ -45,8 +45,15 @@ public sealed class AbyssSaveStore : IDisposable
         }
     }
 
-    public PersistenceSaveReceipt Save(string key, AbyssSaveEnvelope value, PersistenceRevisionGuard guard = PersistenceRevisionGuard.Any, ulong expectedRevision = 0) =>
-        _state.Save(key, PersistedEnvelope.From(value ?? throw new ArgumentNullException(nameof(value))), guard, expectedRevision);
+    public PersistenceSaveReceipt Save(string key, AbyssSaveEnvelope value, PersistenceRevisionGuard guard = PersistenceRevisionGuard.Any, ulong expectedRevision = 0)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (string.IsNullOrWhiteSpace(value.Ruleset))
+            throw new ArgumentException("The save ruleset is required.", nameof(value));
+        if (value.Payload is null || value.Payload.Length == 0)
+            throw new ArgumentException("The save payload is required.", nameof(value));
+        return _state.Save(key, PersistedEnvelope.From(value), guard, expectedRevision);
+    }
 
     public void Delete(string key) => _state.Delete(key);
 
