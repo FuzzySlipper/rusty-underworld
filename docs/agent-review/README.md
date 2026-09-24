@@ -22,6 +22,7 @@ when the active task or review workflow calls for them.
 | [Error and boundary paths](lanes/error-and-boundary-paths.md) | Changed input admission, parsing, resource lifetime, or failure paths |
 | [Runtime trust](lanes/runtime-trust.md) | Added validation, guards, snapshots, or recovery machinery |
 | [Test claims](lanes/test-claims.md) | New tests or claims that checks establish behavior |
+| [Donor fidelity](lanes/donor-fidelity.md) | Ruleset/import behavior claiming Ultima Underworld precedent |
 
 Choose distinct questions. Do not run every lane by default, demand a fixed
 reviewer count, or turn optional interactive testing into a universal gate.
