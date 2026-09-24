@@ -146,6 +146,55 @@ public sealed class HostEntryTests
             .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
     }
 
+    [Fact]
+    public void Product_update_publishes_the_hud_snapshot()
+    {
+        var ui = UiDouble.Create();
+        var engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: EngineSpatialDouble.Create().Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service);
+        using var product = new AbyssProduct(engine, BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        using var session = TestSession();
+        product.AttachSession(session);
+        using var spatialSession = new AbyssSpatialSession(
+            engine,
+            new AbyssRpg.Kit.Controls.SpatialContentArtifact("spatial/test", new ContentSha256(1, 2, 3, 4), 1),
+            new AbyssRpg.Kit.Controls.SpatialTuning(.5d, 8, 8, 1),
+            new AbyssRpg.Kit.Controls.PlayerControlState(new AbyssRpg.Kit.Controls.WorldPoint(0, 10, 0), 0f, 0f));
+        product.AttachSpatialSession(spatialSession);
+        product.Start();
+
+        // No fall this time: apex at spawn height means no landing injury.
+        spatialSession.Player.Restore(
+            new AbyssRpg.Kit.Controls.WorldPoint(0, 10, 0),
+            FallMotion(peakY: 4f));
+        product.Update(SixtyHzUpdate(1));
+
+        Assert.Equal(1, ui.OpenCalls); // stream opens once, lazily
+        Assert.NotNull(ui.LastProjection);
+        Assert.Equal(34.0, HudNumber(ui.LastProjection!.Value, "maxHp"));
+        Assert.Equal(34.0, HudNumber(ui.LastProjection!.Value, "hp"));
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(1, ui.OpenCalls);
+    }
+
+    private static double HudNumber(UiProjection projection, string field)
+    {
+        Rusty.Engine.UiValue built = projection.Value;
+        Rusty.Engine.StructuredValueNode root = built.Nodes.Span[(int)built.Root];
+        for (uint i = 0; i < root.ChildCount; i++)
+        {
+            Rusty.Engine.StructuredValueNode node = built.Nodes.Span[(int)built.Edges.Span[(int)(root.FirstEdge + i)]];
+            string name = System.Text.Encoding.UTF8.GetString(
+                built.Utf8.Span.Slice((int)node.KeyOffset, (int)node.KeyLen));
+            if (name == field) return node.NumberValue;
+        }
+
+        throw new KeyNotFoundException($"HUD field '{field}' missing.");
+    }
+
     private static Rusty.Engine.CharacterMotion FallMotion(float peakY) => new(
         ControlledVelocity: System.Numerics.Vector3.Zero,
         ExternalVelocity: System.Numerics.Vector3.Zero,

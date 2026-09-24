@@ -70,17 +70,20 @@ internal class EngineContextFake : DispatchProxy
     private IPersistenceService? _persistence;
     private ISpatialService? _spatial;
     private IContentService? _content;
+    private IUiService? _ui;
 
     public static IEngineContext Create(
         IPersistenceService? persistence = null,
         ISpatialService? spatial = null,
-        IContentService? content = null)
+        IContentService? content = null,
+        IUiService? ui = null)
     {
         IEngineContext context = DispatchProxy.Create<IEngineContext, EngineContextFake>();
         var fake = (EngineContextFake)(object)context;
         fake._persistence = persistence;
         fake._spatial = spatial;
         fake._content = content;
+        fake._ui = ui;
         return context;
     }
 
@@ -89,6 +92,7 @@ internal class EngineContextFake : DispatchProxy
         "get_Persistence" => _persistence ?? throw new NotSupportedException(method?.Name),
         "get_Spatial" => _spatial ?? throw new NotSupportedException(method?.Name),
         "get_Content" => _content ?? throw new NotSupportedException(method?.Name),
+        "get_Ui" => _ui ?? throw new NotSupportedException(method?.Name),
         _ => throw new NotSupportedException(method?.Name),
     };
 }
@@ -155,4 +159,38 @@ internal class EngineSpatialDouble : DispatchProxy
         ExternalMotion = new CharacterExternalMotionConfig(1f, 0f, 40f, 70f, 1f, 400f),
         Solver = new CharacterSolverConfig(4, 7, 3, 24, 1, 8f, 48),
     };
+}
+
+internal class UiDouble : DispatchProxy
+{
+    internal IUiService Service { get; private set; } = null!;
+    internal UiProjection? LastProjection { get; private set; }
+    internal int OpenCalls { get; private set; }
+
+    internal static UiDouble Create()
+    {
+        IUiService service = DispatchProxy.Create<IUiService, UiDouble>();
+        UiDouble result = (UiDouble)(object)service;
+        result.Service = service;
+        return result;
+    }
+
+    protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
+    {
+        nameof(IUiService.OpenStream) => Open(),
+        nameof(IUiService.PublishProjection) => Publish((UiProjection)arguments![0]!),
+        _ => throw new NotSupportedException(method?.Name),
+    };
+
+    private UiStream Open()
+    {
+        OpenCalls++;
+        return new UiStream(new UiStreamHandle(1), static () => { });
+    }
+
+    private object? Publish(UiProjection projection)
+    {
+        LastProjection = projection;
+        return null;
+    }
 }

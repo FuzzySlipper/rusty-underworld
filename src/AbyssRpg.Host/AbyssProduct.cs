@@ -16,8 +16,11 @@ public sealed class AbyssProduct : IEngineProduct
 
     private readonly AbyssSaveStore _store;
     private readonly AbyssProductLifecycle _lifecycle = new();
+    private readonly IEngineContext _context;
     private UuSession? _session;
     private AbyssSpatialSession? _spatial;
+    private UiStream? _hud;
+    private ulong _hudSequence;
     private double _tickCarry;
     private bool _shutdown;
     private bool _disposed;
@@ -37,6 +40,7 @@ public sealed class AbyssProduct : IEngineProduct
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(selection);
         Selection = selection;
+        _context = context;
         _store = new AbyssSaveStore(context, "abyssrpg.saves");
     }
 
@@ -100,6 +104,8 @@ public sealed class AbyssProduct : IEngineProduct
         _session = null;
         _spatial?.Dispose();
         _spatial = null;
+        _hud?.Dispose();
+        _hud = null;
         _store.Dispose();
     }
 
@@ -128,7 +134,39 @@ public sealed class AbyssProduct : IEngineProduct
                     .Spend(step.FallDamage);
         }
 
+        PublishHud();
         return ProductUpdateResult.None;
+    }
+
+    /// <summary>
+    /// Publish the HUD snapshot. The stream opens lazily so headless
+    /// operation never requires a UI service. Charge reads empty until
+    /// attack state integrates; the outcome line rides with presentation.
+    /// </summary>
+    private void PublishHud()
+    {
+        if (_session is null) return;
+        IUiService ui;
+        try
+        {
+            ui = _context.Ui;
+        }
+        catch (NotSupportedException)
+        {
+            return;
+        }
+
+        _hud ??= ui.OpenStream(new UiStreamRequest("abyss.hud", "abyss.ui.snapshot.v1"));
+        var builder = new AbyssRpg.Kit.Presentation.UiValueBuilder();
+        var values = AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuHudProjection.Read(
+            _session.Avatar.Stats,
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack,
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.ManaTrack,
+            chargeFraction: 0f,
+            yawRadians: _spatial?.Player.YawRadians ?? 0f,
+            outcome: "");
+        uint root = AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuHudProjection.WriteUi(builder, values);
+        ui.PublishProjection(new UiProjection(_hud, ++_hudSequence, builder.Build(root)));
     }
 
     public void Dispose()
