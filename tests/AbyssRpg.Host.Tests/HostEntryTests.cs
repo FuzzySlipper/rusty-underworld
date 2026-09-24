@@ -130,14 +130,36 @@ public sealed class HostEntryTests
         product.AttachSpatialSession(spatialSession);
         product.Start();
 
+        // The avatar spawns mid-air: restore the continuation apex so the
+        // landing reads as a 6-foot fall (spawners own this Restore).
+        spatialSession.Player.Restore(
+            new AbyssRpg.Kit.Controls.WorldPoint(0, 10, 0),
+            FallMotion(peakY: 10f));
+
         for (ulong step = 1; step <= 60; step++) product.Update(SixtyHzUpdate(step));
 
         Assert.Equal((ulong)255, session.Clock.ElapsedTicks);
         Assert.Equal(4f, spatialSession.Player.Position!.Value.Y);
+
+        // The 6-foot landing injured the avatar: 34 max HP minus 16.
+        Assert.Equal(18.0, session.Avatar.Stats
+            .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
     }
 
-    private static ProductUpdate SixtyHzUpdate(ulong step) => new(
-        new ProductUpdateFacts(
+    private static Rusty.Engine.CharacterMotion FallMotion(float peakY) => new(
+        ControlledVelocity: System.Numerics.Vector3.Zero,
+        ExternalVelocity: System.Numerics.Vector3.Zero,
+        Grounded: false,
+        Stance: Rusty.Engine.CharacterStance.Standing,
+        JumpBufferRemaining: 0f, CoyoteRemaining: 0f, LandingLockoutRemaining: 0f,
+        SupportEntityPresent: false, SupportEntity: 0,
+        SupportLocalAnchor: System.Numerics.Vector3.Zero,
+        SupportPreviousTranslation: System.Numerics.Vector3.Zero,
+        SupportPreviousRotation: System.Numerics.Quaternion.Identity,
+        SupportPointVelocity: System.Numerics.Vector3.Zero,
+        FallOriginY: peakY, PeakY: peakY, LastCommandSequence: 0, CollisionWorldHash: 0);
+
+    private static ProductUpdate SixtyHzUpdate(ulong step) => new(        new ProductUpdateFacts(
             ProductUpdateMode.Realtime, ProductLifecycleState.Running,
             step, step, step, step, 60, 1, 0, 1d / 60d),
         ReadOnlySpan<ProductInputEvent>.Empty);

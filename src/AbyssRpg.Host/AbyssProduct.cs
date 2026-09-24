@@ -118,9 +118,14 @@ public sealed class AbyssProduct : IEngineProduct
         {
             var state = new AbyssRpg.Kit.Controls.ProductUpdateState((float)seconds);
             foreach (ProductInputEvent input in update.Input) state.Add(input);
-            _spatial.StepLocomotion(
+            AbyssSpatialSession.LocomotionStepResult step = _spatial.StepLocomotion(
                 _session.Locomotion, update.Input, state, _session.MovementTuning,
                 canMove: true, _session.Swimming, _session.Flying);
+            // Landing injuries land on the avatar's health track. Defeat
+            // itself rides with the defeat outcome owner.
+            if (step.FallDamage > 0f)
+                _session.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack)
+                    .Spend(step.FallDamage);
         }
 
         return ProductUpdateResult.None;
