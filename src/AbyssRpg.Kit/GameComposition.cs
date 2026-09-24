@@ -20,6 +20,7 @@ public sealed class ContentPack
     {
         Id = value.Id; Ruleset = value.Ruleset;
         Dependencies = Freeze(value.Dependencies); PayloadPath = value.PayloadPath; _payload = payload;
+        Provenance = value.Provenance;
     }
     public ContentPackId Id { get; }
     public RulesetId Ruleset { get; }
@@ -27,8 +28,13 @@ public sealed class ContentPack
     public string PayloadPath { get; }
     /// <summary>The immutable payload admitted with this composition.</summary>
     public ReadOnlyMemory<byte> Payload => _payload;
+    /// <summary>Where the payload came from, when the descriptor says. Rulesets decide what sources they accept.</summary>
+    public ContentPackProvenance? Provenance { get; }
     private static IReadOnlyList<T> Freeze<T>(IEnumerable<T> values) => Array.AsReadOnly(values.ToArray());
 }
+
+/// <summary>Opaque payload origin carried from the pack descriptor. Kit never interprets it.</summary>
+public sealed record ContentPackProvenance(string Source, string Origin, string Sha256);
 
 public sealed class TuningProfile
 {
@@ -110,7 +116,7 @@ public sealed class GameCompositionResolution
 public static class GameCompositionResolver
 {
     private const int DiagnosticLimit = 32;
-    private const string BundleKind = "worldrpg.game-bundle", PackKind = "worldrpg.content-pack", TuningKind = "worldrpg.tuning-profile";
+    private const string BundleKind = "abyssrpg.game-bundle", PackKind = "abyssrpg.content-pack", TuningKind = "abyssrpg.tuning-profile";
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static GameCompositionResolution Resolve(ProductContent content, GameBundleId requestedBundle)
@@ -191,7 +197,14 @@ public static class GameCompositionResolver
     {
         List<ContentPackReference> dependencies = References(Array(root, "dependencies"));
         if (dependencies.GroupBy(reference => reference.Id).Any(group => group.Count() > 1)) throw new InvalidOperationException("Content pack declares a dependency more than once.");
-        return new(new(Id(root, "id")), new(Id(root, "ruleset")), dependencies.ToArray(), FilePath(root, "payload"));
+        ContentPackProvenance? provenance = null;
+        if (root.TryGetProperty("provenance", out JsonElement provenanceElement))
+        {
+            if (provenanceElement.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("'provenance' must be an object.");
+            provenance = new(String(provenanceElement, "source"), String(provenanceElement, "origin"), String(provenanceElement, "sha256"));
+        }
+
+        return new(new(Id(root, "id")), new(Id(root, "ruleset")), dependencies.ToArray(), FilePath(root, "payload"), provenance);
     }
 
     private static TuningDescriptor Tuning(JsonElement root) => new(new(Id(root, "id")), new(Id(root, "ruleset")), FilePath(root, "payload"));
@@ -242,7 +255,7 @@ public static class GameCompositionResolver
     private static void Error(List<CompositionDiagnostic> diagnostics, string message) { if (diagnostics.Count < DiagnosticLimit) diagnostics.Add(new("error", message)); else if (diagnostics.Count == DiagnosticLimit) diagnostics.Add(new("error", "Composition diagnostics were truncated.")); }
 
     private enum VisitState { Visiting, Done }
-    internal sealed record ContentPackDescriptor(ContentPackId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> Dependencies, string PayloadPath);
+    internal sealed record ContentPackDescriptor(ContentPackId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> Dependencies, string PayloadPath, ContentPackProvenance? Provenance);
     internal sealed record TuningDescriptor(TuningProfileId Id, RulesetId Ruleset, string PayloadPath);
     private sealed record GameBundleDescriptor(GameBundleId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> ContentPacks, TuningProfileReference Tuning);
 }
