@@ -30,6 +30,7 @@ public sealed class UuCreationFlow
         bool IsFemale,
         bool IsLeftHanded,
         int ClassIndex,
+        int[] Attributes,
         int[] Skills,
         int Portrait,
         int Difficulty,
@@ -48,10 +49,8 @@ public sealed class UuCreationFlow
     public int Difficulty { get; private set; } = -1;
     public string Name { get; private set; } = "";
 
-    private readonly int[] _classSkillChoices = new int[6];
     private readonly int[] _offeredSkills = new int[18];
     private int _arrayPtr;
-    private bool _rolledClassBase;
 
     public UuCreationFlow(CreationTables tables, Random rng)
     {
@@ -59,7 +58,6 @@ public sealed class UuCreationFlow
         ArgumentNullException.ThrowIfNull(rng);
         _tables = tables;
         _rng = rng;
-        Array.Fill(_classSkillChoices, UuSkillRolls.FreePickSentinel);
         Array.Fill(_offeredSkills, -1);
     }
 
@@ -101,47 +99,54 @@ public sealed class UuCreationFlow
     }
 
     /// <summary>
-    /// Advances the skill walk. Returns the skill indices the player must
-    /// choose from (empty when a step assigns automatically), or null when no
-    /// choices remain.
+    /// Advances the skill walk. Consecutive automatic records are consumed
+    /// inside the call; it returns the next player options, or null when the
+    /// walk is exhausted (five picks or end of table).
     /// </summary>
     public int[]? OfferSkillChoices()
     {
         RequireStage(Stage.Skills);
-        int record = SeekChoiceRecord();
-        if (record < 0 || _arrayPtr >= 5) return null;
-
-        byte[] table = _tables.ChoiceTable;
-        switch (table[record])
+        Array.Fill(_offeredSkills, -1);
+        // Bounded by the table itself: each pass consumes one record.
+        for (int pass = 0; pass <= _tables.ChoiceTable.Length; pass++)
         {
-            case 0:
-                _classSkillChoices[_arrayPtr] = UuSkillRolls.FreePickSentinel;
-                _arrayPtr++;
-                if (!_rolledClassBase)
-                {
-                    RollClassBaseSkills();
-                    _rolledClassBase = true;
-                }
+            int record = SeekChoiceRecord();
+            if (record < 0 || _arrayPtr >= 5) return null;
 
-                return Array.Empty<int>();
-            case 1:
-                _classSkillChoices[_arrayPtr] = table[record + 1];
-                RollSkill(table[record + 1]);
-                _arrayPtr++;
-                return Array.Empty<int>();
-            default:
+            byte[] table = _tables.ChoiceTable;
+            switch (table[record])
             {
-                int count = table[record];
-                var options = new int[count];
-                for (int i = 0; i < count; i++)
+                // Case 0 (free-pick sentinel) never occurs in the shipped
+                // table (record-type census of SKILLS.DAT[32..]: no zeroes),
+                // but the slot is honored so the walk cannot stall.
+                case 0:
+                    _arrayPtr++;
+                    break;
+                // Case 1 (fixed skill) rolls exactly once, here. The donor
+                // batches these into a base-skills pass; rolling at record
+                // time gives each auto one application either way.
+                case 1:
+                    RollSkill(table[record + 1]);
+                    _arrayPtr++;
+                    break;
+                default:
                 {
-                    options[i] = table[record + 1 + i];
-                    _offeredSkills[i] = options[i];
-                }
+                    int count = table[record];
+                    var options = new int[count];
+                    for (int i = 0; i < count; i++)
+                    {
+                        options[i] = table[record + 1 + i];
+                        _offeredSkills[i] = options[i];
+                    }
 
-                return options;
+                    return options;
+                }
             }
         }
+
+        // Unreachable: every pass consumes a record or returns, and passes
+        // outnumber records. Present so the walk stays a bounded for-loop.
+        return null;
     }
 
     public void SubmitSkillChoice(int optionIndex)
@@ -173,7 +178,9 @@ public sealed class UuCreationFlow
     public void SubmitName(string name)
     {
         RequireStage(Stage.Name);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        // The original stores typed input raw, empty allowed; the UI task
+        // decides prompting, so creation trims but never rejects.
+        ArgumentNullException.ThrowIfNull(name);
         Name = name.Trim();
         Current = Stage.Confirm;
     }
@@ -193,16 +200,14 @@ public sealed class UuCreationFlow
             Portrait = fresh.Portrait;
             Difficulty = fresh.Difficulty;
             Name = fresh.Name;
-            Array.Fill(_classSkillChoices, UuSkillRolls.FreePickSentinel);
-            Array.Fill(_offeredSkills, -1);
+                Array.Fill(_offeredSkills, -1);
             _arrayPtr = 0;
-            _rolledClassBase = false;
             Current = Stage.Gender;
             return null;
         }
 
         Current = Stage.Complete;
-        return new CreationResult(IsFemale, IsLeftHanded, ClassIndex, (int[])Skills.Clone(), Portrait, Difficulty, Name);
+        return new CreationResult(IsFemale, IsLeftHanded, ClassIndex, (int[])Attributes.Clone(), (int[])Skills.Clone(), Portrait, Difficulty, Name);
     }
 
     /// <summary>Moves past the skill stage once the walk is exhausted.</summary>
@@ -210,14 +215,6 @@ public sealed class UuCreationFlow
     {
         RequireStage(Stage.Skills);
         Current = Stage.Portrait;
-    }
-
-    private void RollClassBaseSkills()
-    {
-        foreach (int skill in _classSkillChoices)
-        {
-            if (skill != UuSkillRolls.FreePickSentinel) RollSkill(skill);
-        }
     }
 
     private void RollSkill(int skill)

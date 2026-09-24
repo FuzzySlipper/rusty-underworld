@@ -33,17 +33,15 @@ public sealed class UuCreationTests
 
         int[]? offered = flow.OfferSkillChoices();
         Assert.NotNull(offered);
-        Assert.Empty(offered); // case 1: fixed skill assigned automatically
-        offered = flow.OfferSkillChoices();
-        Assert.NotNull(offered);
-        Assert.Equal(2, offered!.Length);
+        Assert.Equal(2, offered!.Length); // case-1 auto consumed inside the call
+        Assert.True(flow.Skills[7] > 0);
         flow.SubmitSkillChoice(0);
         Assert.Throws<ArgumentOutOfRangeException>(() => flow.SubmitSkillChoice(9));
         flow.FinishSkills();
 
         flow.SubmitPortrait(2);
         flow.SubmitDifficulty(1);
-        Assert.Throws<ArgumentException>(() => flow.SubmitName("  "));
+        Assert.Throws<ArgumentNullException>(() => flow.SubmitName(null!));
         flow.SubmitName("Avatar");
         UuCreationFlow.CreationResult? result = flow.Confirm(true);
         Assert.NotNull(result);
@@ -66,6 +64,21 @@ public sealed class UuCreationTests
         flow.SubmitName("X");
         Assert.Null(flow.Confirm(false));
         Assert.Equal(UuCreationFlow.Stage.Gender, flow.Current);
+    }
+
+    [Fact]
+    public void Stale_offer_slots_reject_after_a_smaller_offer()
+    {
+        var tables = new CreationTables(Tables.Classes, [3, 1, 2, 3, 2, 4, 5]);
+        var flow = new UuCreationFlow(tables, new Random(7));
+        flow.SubmitGender(0);
+        flow.SubmitHandedness(0);
+        flow.SubmitClass(0);
+        Assert.Equal(3, flow.OfferSkillChoices()!.Length);
+        flow.SubmitSkillChoice(2);
+        Assert.Equal(2, flow.OfferSkillChoices()!.Length);
+        Assert.Throws<ArgumentOutOfRangeException>(() => flow.SubmitSkillChoice(2));
+        flow.SubmitSkillChoice(1);
     }
 
     [Fact]
@@ -111,5 +124,11 @@ public sealed class UuCreationTests
         Assert.NotNull(player.Inventory);
         Assert.NotNull(player.Equipment);
         Assert.Equal(1L, player.DurableId);
+
+        // Creation rolls are readable back from the entity (review F5).
+        Assert.Equal(flow.Attributes[0], player.Stats.GetStat(StatId.Parse("abyss.strength")).BaseValue);
+        Assert.Equal(result.Skills[7], player.Stats.GetStat(StatId.Parse("abyss.skill.7")).BaseValue);
+        Assert.Equal(vitals.MaxHp, player.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Maximum.Value);
+        Assert.Equal(vitals.MaxHp, player.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current);
     }
 }

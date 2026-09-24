@@ -16,5 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/AbyssRpg.Rulesets.UltimaUnderworld/AbyssRpg.Rulesets.UltimaUnderworld.csproj" />
+    <!-- Test-only bridge: maps Import packs into runtime shapes. Runtime projects must never reference Import. -->
+    <ProjectReference Include="../../src/UltimaUnderworld.Import/UltimaUnderworld.Import.csproj" />
   </ItemGroup>
 </Project>
