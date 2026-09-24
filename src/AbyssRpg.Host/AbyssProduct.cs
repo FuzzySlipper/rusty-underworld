@@ -17,6 +17,7 @@ public sealed class AbyssProduct : IEngineProduct
     private readonly AbyssSaveStore _store;
     private readonly AbyssProductLifecycle _lifecycle = new();
     private UuSession? _session;
+    private AbyssSpatialSession? _spatial;
     private double _tickCarry;
     private bool _shutdown;
     private bool _disposed;
@@ -50,6 +51,14 @@ public sealed class AbyssProduct : IEngineProduct
         _tickCarry = 0;
     }
 
+    /// <summary>Attach (or replace) the spatial session locomotion steps through.</summary>
+    public void AttachSpatialSession(AbyssSpatialSession? spatial)
+    {
+        ThrowIfShutdown();
+        _spatial?.Dispose();
+        _spatial = spatial;
+    }
+
     public void Start()
     {
         ThrowIfShutdown();
@@ -77,6 +86,8 @@ public sealed class AbyssProduct : IEngineProduct
         ThrowIfShutdown();
         _session?.Dispose();
         _session = null;
+        _spatial?.Dispose();
+        _spatial = null;
         _tickCarry = 0;
         _lifecycle.Stop();
     }
@@ -87,6 +98,8 @@ public sealed class AbyssProduct : IEngineProduct
         _shutdown = true;
         _session?.Dispose();
         _session = null;
+        _spatial?.Dispose();
+        _spatial = null;
         _store.Dispose();
     }
 
@@ -101,6 +114,15 @@ public sealed class AbyssProduct : IEngineProduct
         ulong whole = (ulong)_tickCarry;
         _tickCarry -= whole;
         if (whole > 0) _session.Clock.Advance(whole);
+        if (_spatial is not null)
+        {
+            var state = new AbyssRpg.Kit.Controls.ProductUpdateState((float)seconds);
+            foreach (ProductInputEvent input in update.Input) state.Add(input);
+            _spatial.StepLocomotion(
+                _session.Locomotion, update.Input, state, _session.MovementTuning,
+                canMove: true, _session.Swimming, _session.Flying);
+        }
+
         return ProductUpdateResult.None;
     }
 

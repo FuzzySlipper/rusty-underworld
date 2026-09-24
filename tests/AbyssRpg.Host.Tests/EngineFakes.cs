@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Reflection;
 using Rusty.Engine;
 
@@ -89,5 +90,69 @@ internal class EngineContextFake : DispatchProxy
         "get_Spatial" => _spatial ?? throw new NotSupportedException(method?.Name),
         "get_Content" => _content ?? throw new NotSupportedException(method?.Name),
         _ => throw new NotSupportedException(method?.Name),
+    };
+}
+
+internal class SpatialContentDouble : DispatchProxy
+{
+    internal IContentService Service { get; private set; } = null!;
+
+    internal static SpatialContentDouble Create()
+    {
+        IContentService service = DispatchProxy.Create<IContentService, SpatialContentDouble>();
+        SpatialContentDouble result = (SpatialContentDouble)(object)service;
+        result.Service = service;
+        return result;
+    }
+
+    protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
+    {
+        nameof(IContentService.ResolveReference) => new ContentReference(new ContentReferenceHandle(1), static () => { }),
+        _ => throw new NotSupportedException(method?.Name),
+    };
+}
+
+internal class EngineSpatialDouble : DispatchProxy
+{
+    internal ISpatialService Service { get; private set; } = null!;
+
+    internal static EngineSpatialDouble Create()
+    {
+        ISpatialService service = DispatchProxy.Create<ISpatialService, EngineSpatialDouble>();
+        EngineSpatialDouble result = (EngineSpatialDouble)(object)service;
+        result.Service = service;
+        return result;
+    }
+
+    protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
+    {
+        nameof(ISpatialService.DefaultCharacterControllerConfig) => RepresentativeConfig(),
+        nameof(ISpatialService.ValidateCharacterControllerConfig) => null,
+        nameof(ISpatialService.CreateSession) => new SpatialSession(new SpatialSessionHandle(1), static () => { }),
+        nameof(ISpatialService.ReplaceContentArtifact) => new SpatialContentArtifactReplaceReceipt(),
+        nameof(ISpatialService.ProposeCharacterStep) => Step((CharacterStepRequest)arguments![0]!),
+        _ => throw new NotSupportedException(method?.Name),
+    };
+
+    private static CharacterStepReceipt Step(CharacterStepRequest request) => default(CharacterStepReceipt) with
+    {
+        Generation = 1,
+        Transform = new Transform(new Vector3(1, 4, 0), Quaternion.Identity, Vector3.One),
+        Motion = request.Motion with { Grounded = true, LastCommandSequence = request.Command.Sequence },
+        Displacement = new Vector3(1, 0, 0),
+    };
+
+    private static CharacterControllerConfig RepresentativeConfig() => default(CharacterControllerConfig) with
+    {
+        Shape = new CharacterShapeConfig(2.2f, 1.3f, .45f, .03f, .02f),
+        Ground = new CharacterGroundConfig(6f, 5f, 4f, 31f, 42f, 7f, 3f, 2f),
+        Air = new CharacterAirConfig(4f, 10f, 1f, 4f, 1f, 0f),
+        Vertical = new CharacterVerticalConfig(18f, 48f, 46f, 6f, .4f),
+        Jump = new CharacterJumpConfig(.2f, .15f, 0f, false),
+        Surface = new CharacterSurfaceConfig(.9f, .02f, 16f, 9f, .35f, .04f, .2f, 8f, .2f),
+        Recovery = new CharacterRecoveryConfig(.7f, 18f, .002f, .003f),
+        Platform = new CharacterPlatformConfig(true, true, true, .8f, 0f, .03f),
+        ExternalMotion = new CharacterExternalMotionConfig(1f, 0f, 40f, 70f, 1f, 400f),
+        Solver = new CharacterSolverConfig(4, 7, 3, 24, 1, 8f, 48),
     };
 }

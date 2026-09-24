@@ -31,7 +31,14 @@ public sealed class UuSession : IDisposable
     public DurableIdentityAllocator ItemIdentities { get; }
     public UuDungeonSession Dungeon { get; }
     public UuLocomotionPolicy Locomotion { get; }
+    public UuMovementTuning MovementTuning { get; }
     public PlayerActorState Avatar { get; }
+
+    /// <summary>Avatar locomotion medium. Set by survival/spell systems; the product reads it per update.</summary>
+    public bool Swimming { get; set; }
+
+    /// <summary>Avatar flight. Set by spell/item systems; the product reads it per update.</summary>
+    public bool Flying { get; set; }
 
     private UuSession(
         ActorsState actors,
@@ -41,6 +48,7 @@ public sealed class UuSession : IDisposable
         DurableIdentityAllocator itemIdentities,
         UuDungeonSession dungeon,
         UuLocomotionPolicy locomotion,
+        UuMovementTuning movementTuning,
         PlayerActorState avatar)
     {
         Actors = actors;
@@ -50,6 +58,7 @@ public sealed class UuSession : IDisposable
         ItemIdentities = itemIdentities;
         Dungeon = dungeon;
         Locomotion = locomotion;
+        MovementTuning = movementTuning;
         Avatar = avatar;
     }
 
@@ -69,12 +78,14 @@ public sealed class UuSession : IDisposable
         var clock = new GameClock();
         PlayerActorState avatar = UuAvatarFactory.CreateAvatar(actors, spawnPose, choices, vitals);
         var dungeon = new UuDungeonSession(clock, new UuLevelState(firstLevel));
+        var movementTuning = tuning ?? UuMovementTuning.Default;
         var session = new UuSession(
             actors, directory, clock,
             UuIdentityPolicy.NewGameActorAllocator(),
             UuIdentityPolicy.NewGameItemAllocator(),
             dungeon,
-            new UuLocomotionPolicy(tuning ?? UuMovementTuning.Default),
+            new UuLocomotionPolicy(movementTuning),
+            movementTuning,
             avatar);
         session._admissions[firstLevel.LevelNumber] =
             UuEntityAdmission.AdmitLevel(directory, firstLevel, dungeon.Current);

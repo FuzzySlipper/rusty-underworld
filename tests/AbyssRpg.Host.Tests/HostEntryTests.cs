@@ -112,6 +112,30 @@ public sealed class HostEntryTests
         Assert.Equal(first.Revision, store.Load("slot").Revision);
     }
 
+    [Fact]
+    public void Product_update_steps_locomotion_through_the_spatial_session()
+    {
+        var engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: EngineSpatialDouble.Create().Service,
+            content: SpatialContentDouble.Create().Service);
+        using var product = new AbyssProduct(engine, BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        using var session = TestSession();
+        product.AttachSession(session);
+        using var spatialSession = new AbyssSpatialSession(
+            engine,
+            new AbyssRpg.Kit.Controls.SpatialContentArtifact("spatial/test", new ContentSha256(1, 2, 3, 4), 1),
+            new AbyssRpg.Kit.Controls.SpatialTuning(.5d, 8, 8, 1),
+            new AbyssRpg.Kit.Controls.PlayerControlState(new AbyssRpg.Kit.Controls.WorldPoint(0, 10, 0), 0f, 0f));
+        product.AttachSpatialSession(spatialSession);
+        product.Start();
+
+        for (ulong step = 1; step <= 60; step++) product.Update(SixtyHzUpdate(step));
+
+        Assert.Equal((ulong)255, session.Clock.ElapsedTicks);
+        Assert.Equal(4f, spatialSession.Player.Position!.Value.Y);
+    }
+
     private static ProductUpdate SixtyHzUpdate(ulong step) => new(
         new ProductUpdateFacts(
             ProductUpdateMode.Realtime, ProductLifecycleState.Running,
