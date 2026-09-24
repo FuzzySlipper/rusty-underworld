@@ -39,6 +39,29 @@ public sealed class HostEntryTests
     }
 
     [Fact]
+    public void Admitted_updates_advance_the_session_clock_and_pause_admits_nothing()
+    {
+        IEngineContext engine = EngineContextFake.Create(new InMemoryPersistenceService());
+        using var product = new AbyssProduct(engine, BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+
+        // No session yet: updates are admitted but move nothing.
+        product.Start();
+        Assert.Equal(ProductUpdateResult.None, product.Update(SixtyHzUpdate(1)));
+
+        using var session = TestSession();
+        product.AttachSession(session);
+        for (ulong step = 2; step < 62; step++) product.Update(SixtyHzUpdate(step));
+        Assert.Equal((ulong)255, session.Clock.ElapsedTicks); // 60 updates at 255 ticks/s
+
+        product.Pause();
+        product.Update(SixtyHzUpdate(62));
+        Assert.Equal((ulong)255, session.Clock.ElapsedTicks);
+        product.Resume();
+        product.Update(SixtyHzUpdate(63));
+        Assert.True(session.Clock.ElapsedTicks > 255);
+    }
+
+    [Fact]
     public void Save_envelope_round_trips_over_engine_persistence()
     {
         IEngineContext engine = EngineContextFake.Create(new InMemoryPersistenceService());
@@ -87,5 +110,34 @@ public sealed class HostEntryTests
         Assert.Equal(Rusty.Engine.PersistenceSaveOutcome.RevisionConflict, conflict.Outcome);
         Assert.Equal(first.Revision, conflict.Revision);
         Assert.Equal(first.Revision, store.Load("slot").Revision);
+    }
+
+    private static ProductUpdate SixtyHzUpdate(ulong step) => new(
+        new ProductUpdateFacts(
+            ProductUpdateMode.Realtime, ProductLifecycleState.Running,
+            step, step, step, step, 60, 1, 0, 1d / 60d),
+        ReadOnlySpan<ProductInputEvent>.Empty);
+
+    private static AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSession TestSession()
+    {
+        var tables = new AbyssRpg.Rulesets.UltimaUnderworld.Creation.CreationTables(
+            [new(20, 16, 12, 12)], [1, 7, 2, 11, 12]);
+        var flow = new AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuCreationFlow(tables, new Random(7));
+        flow.SubmitGender(0);
+        flow.SubmitHandedness(1);
+        flow.SubmitClass(0);
+        flow.OfferSkillChoices();
+        flow.SubmitSkillChoice(0);
+        flow.FinishSkills();
+        flow.SubmitPortrait(1);
+        flow.SubmitDifficulty(0);
+        flow.SubmitName("Avatar");
+        var choices = flow.Confirm(true)!;
+        var vitals = AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuVitalsPolicy.Recalculate(
+            choices.Attributes[0], 1, 0, choices.Attributes[2]);
+        var level = new AbyssRpg.Rulesets.UltimaUnderworld.Dungeon.AdmittedLevel(1, [], []);
+        return AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSession.NewGame(
+            choices, vitals, level,
+            new AbyssRpg.Kit.Actors.ActorPose(new AbyssRpg.Kit.Controls.WorldPoint(0, 0, 0), 0f));
     }
 }
