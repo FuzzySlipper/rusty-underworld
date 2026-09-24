@@ -25,11 +25,18 @@ public sealed class UuRuneShelf
         return indices.All(i => (uint)i < UuRuneCatalog.Count && _owned[i]);
     }
 
-    /// <summary>Lay an owned runestone on the shelf. Unowned stones cannot be shelved.</summary>
+    /// <summary>Maximum runes on the shelf (longest real spell is 3).</summary>
+    public const int MaxShelfRunes = 3;
+
+    /// <summary>
+    /// Lay an owned runestone on the shelf. Unowned stones cannot be shelved;
+    /// a full shelf silently refuses (donor behavior at every placement site).
+    /// </summary>
     public void Place(int index)
     {
         if ((uint)index >= UuRuneCatalog.Count) throw new ArgumentOutOfRangeException(nameof(index));
         if (!_owned[index]) throw new InvalidOperationException($"Runestone {UuRuneCatalog.Names[index]} is not owned.");
+        if (_shelf.Count >= MaxShelfRunes) return;
         _shelf.Add(index);
     }
 

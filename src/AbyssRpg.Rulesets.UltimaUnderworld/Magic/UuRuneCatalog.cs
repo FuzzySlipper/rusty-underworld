@@ -24,6 +24,8 @@ public static class UuRuneCatalog
 
     public static int Index(char letter)
     {
+        // The donor has no X rune (A-W map 0-22, Y maps 23); X rejects.
+        if (letter == 'X') throw new ArgumentOutOfRangeException(nameof(letter));
         int mapped = letter == 'Y' ? 23 : letter - 'A';
         if ((uint)mapped >= Count) throw new ArgumentOutOfRangeException(nameof(letter));
         return mapped;

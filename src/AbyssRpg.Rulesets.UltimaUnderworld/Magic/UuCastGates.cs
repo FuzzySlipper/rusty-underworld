@@ -28,6 +28,18 @@ public static class UuCastGates
         ? throw new ArgumentOutOfRangeException(nameof(circle))
         : checked(circle * 3);
 
+    /// <summary>Circle derivation from a spell cost (integer division, donor SSpell.circle).</summary>
+    public static int CircleForCost(int cost) => cost < 0
+        ? throw new ArgumentOutOfRangeException(nameof(cost))
+        : cost / 3;
+
+    /// <summary>
+    /// Shelves with fewer than 2 runes never reach the gates (the donor
+    /// returns silently); only 2-3-rune shelves that match no spell report
+    /// NotASpell.
+    /// </summary>
+    public static bool CanAttemptCast(int shelfCount) => shelfCount > 1;
+
     public static bool LevelReaches(int characterLevel, int circle) =>
         (characterLevel + 1) / 2 >= circle;
 
@@ -37,6 +49,9 @@ public static class UuCastGates
         : mana < ManaCost(circle) ? GateResult.NotEnoughMana
         : delayed ? GateResult.StillDelayed
         : GateResult.Cast;
+    // NOTE: no-magic zones (level-7 orb, level 9) reject with the mana
+    // message in the donor; zone availability rides with a future
+    // magic-zone task owning level position state.
 
     public static GateResult ResolveRoll(UuStrikeResolution.StrikeResult roll) => roll switch
     {

@@ -14,6 +14,7 @@ public sealed class UuMagicGateTests
         Assert.Equal(23, UuRuneCatalog.Index('Y'));
         Assert.Equal("KM", UuRuneCatalog.SpellLetters([10, 12])); // index 10 -> K, 12 -> M
         Assert.Throws<ArgumentOutOfRangeException>(() => UuRuneCatalog.Letter(24));
+        Assert.Throws<ArgumentOutOfRangeException>(() => UuRuneCatalog.Index('X')); // no X rune
         Assert.Throws<ArgumentOutOfRangeException>(() => UuRuneCatalog.Index('Z'));
     }
 
@@ -28,6 +29,11 @@ public sealed class UuMagicGateTests
         shelf.Place(10);
         shelf.Place(12);
         Assert.Equal([10, 12], shelf.Shelf);
+        shelf.AddRunestone(0);
+        shelf.Place(0);
+        shelf.AddRunestone(1);
+        shelf.Place(1); // shelf full at 3: silently refuses the 4th
+        Assert.Equal([10, 12, 0], shelf.Shelf);
         Assert.Throws<InvalidOperationException>(() => shelf.Place(11));
         Assert.Throws<ArgumentOutOfRangeException>(() => shelf.AddRunestone(24));
         shelf.Clear();
@@ -40,6 +46,10 @@ public sealed class UuMagicGateTests
         Assert.Equal(3, UuCastGates.ManaCost(1));
         Assert.Equal(24, UuCastGates.ManaCost(8));
         Assert.Throws<ArgumentOutOfRangeException>(() => UuCastGates.ManaCost(0));
+        Assert.Equal(1, UuCastGates.CircleForCost(3));
+        Assert.Equal(8, UuCastGates.CircleForCost(24));
+        Assert.False(UuCastGates.CanAttemptCast(1));
+        Assert.True(UuCastGates.CanAttemptCast(2));
 
         Assert.Equal(UuCastGates.GateResult.NotASpell, UuCastGates.CheckGates(false, 10, 1, 99, false));
         Assert.Equal(UuCastGates.GateResult.LevelTooLow, UuCastGates.CheckGates(true, 1, 2, 99, false));
