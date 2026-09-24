@@ -17,10 +17,10 @@ are the task source when tracking starts.
 
 | Location | Size | Role |
 | --- | --- | --- |
-| `src/WorldRpg.Kit/` (excl. `obj/`, `bin/`) | 27 files, ~4,770 lines | Reusable world-RPG mechanisms; Engine-only dependency |
+| `src/WorldRpg.Kit/` (excl. `obj/`, `bin/`) | 31 .cs files (32 incl. csproj), ~4,770 lines | Reusable world-RPG mechanisms; Engine-only dependency |
 | `src/WorldRpg.Rulesets.Daggerfall/Modules/` | 16 files, ~3,360 lines | Dagger policy in modules (a **migration fact**, not a boundary — see §2) |
-| `src/Daggerfall.Import/` | 122 files | Arena2/DFU decoders — UW-irrelevant except pipeline shape |
-| `tests/WorldRpg.Architecture.Tests/` | 1 file, 184 lines | Ownership laws as executable tests |
+| `src/Daggerfall.Import/` | 122 .cs files (123 incl. csproj) | Arena2/DFU decoders — UW-irrelevant except pipeline shape |
+| `tests/WorldRpg.Architecture.Tests/` | 1 source file, 184 lines | Ownership laws as executable tests |
 | `tests/WorldRpg.Rulesets.Canary.Tests/` | Canary minimal-ruleset smoke test | Kit/host seam validation pattern |
 
 `WorldRpg.Kit.csproj` references **only** `Rusty.Engine`
@@ -177,7 +177,7 @@ reshape for UW) · **SKIP** (do not copy; reason given).
 
 | Dagger location | Why not | Take instead |
 | --- | --- | --- |
-| `Daggerfall.Import/` (122 files) | Arena2 formats; zero UW overlap | Pipeline shape only: format readers → normalization → publication + `.Tool` separation + provenance records (our `UltimaUnderworld.Import`) |
+| `Daggerfall.Import/` (122 .cs files) | Arena2 formats; zero UW overlap | Pipeline shape only: format readers → normalization → publication + `.Tool` separation + provenance records (our `UltimaUnderworld.Import`) |
 | `Modules/*` (all 16 files) | Dagger policy, incl. 555-line combat rules + 542-line corpse loot | The seam shape: 21-line policy files over Kit machinery |
 | `DaggerActorFactory`, `DaggerSession*`, `DaggerfallSavePayload` | Dagger session/save meaning | Our Avatar factory/session/payload per code-organization map |
 | `WorldRpg.Host` (`WorldRpgProduct`, `BuiltInRulesets`, save store) | Dagger selection/lifecycle | Our Host; imitate the built-in-seam + envelope pattern |
