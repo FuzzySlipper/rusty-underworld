@@ -6,14 +6,24 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Tests;
 public sealed class UuTrapTests
 {
     [Fact]
-    public void Classifies_uw1_kinds_and_door_traps()
+    public void Classifies_uw1_kinds()
     {
         Assert.Equal(UuTrapDispatch.TrapKind.Damage, UuTrapDispatch.Classify(6, 0, 0));
         Assert.Equal(UuTrapDispatch.TrapKind.Hack, UuTrapDispatch.Classify(6, 0, 3));
         Assert.Equal(UuTrapDispatch.TrapKind.Pit, UuTrapDispatch.Classify(6, 0, 4));
-        Assert.Equal(UuTrapDispatch.TrapKind.Door, UuTrapDispatch.Classify(6, 1, 0));
+        Assert.Equal(UuTrapDispatch.TrapKind.Door, UuTrapDispatch.Classify(6, 0, 8));
+        Assert.Equal(UuTrapDispatch.TrapKind.Ward, UuTrapDispatch.Classify(6, 0, 9));
+        Assert.Equal(UuTrapDispatch.TrapKind.Tell, UuTrapDispatch.Classify(6, 0, 0xA));
+        Assert.Equal(UuTrapDispatch.TrapKind.DeleteObject, UuTrapDispatch.Classify(6, 0, 0xB));
+        Assert.Equal(UuTrapDispatch.TrapKind.Inventory, UuTrapDispatch.Classify(6, 0, 0xC));
+        Assert.Equal(UuTrapDispatch.TrapKind.SetVariable, UuTrapDispatch.Classify(6, 0, 0xD));
+        Assert.Equal(UuTrapDispatch.TrapKind.CheckVariable, UuTrapDispatch.Classify(6, 0, 0xE));
+        Assert.Equal(UuTrapDispatch.TrapKind.Null, UuTrapDispatch.Classify(6, 0, 0xF));
+        Assert.Equal(UuTrapDispatch.TrapKind.TextString, UuTrapDispatch.Classify(6, 1, 0));
+        Assert.Equal(UuTrapDispatch.TrapKind.TriggerLeg, UuTrapDispatch.Classify(6, 2, 0));
+        Assert.Equal(UuTrapDispatch.TrapKind.TriggerLeg, UuTrapDispatch.Classify(6, 3, 5));
         Assert.Equal(UuTrapDispatch.TrapKind.Unknown, UuTrapDispatch.Classify(5, 0, 0));
-        Assert.Equal(UuTrapDispatch.TrapKind.Unknown, UuTrapDispatch.Classify(6, 0, 99));
+        Assert.Equal(UuTrapDispatch.TrapKind.Unknown, UuTrapDispatch.Classify(6, 0, 0x10));
 
         Assert.Equal(UuTrapDispatch.DoorTrapAction.Open, UuTrapDispatch.DoorAction(1));
         Assert.Equal(UuTrapDispatch.DoorTrapAction.Close, UuTrapDispatch.DoorAction(2));
@@ -22,21 +32,36 @@ public sealed class UuTrapTests
     }
 
     [Fact]
-    public void Chains_fire_in_link_order_with_cycle_guard()
+    public void Chains_branch_stop_and_continue()
     {
-        var traps = new Dictionary<int, (UuTrapDispatch.TrapKind, int)>
+        var traps = new Dictionary<int, UuTrapDispatch.ChainNode>
         {
-            [1] = (UuTrapDispatch.TrapKind.Damage, 2),
-            [2] = (UuTrapDispatch.TrapKind.Door, 3),
-            [3] = (UuTrapDispatch.TrapKind.Teleport, 0),
+            [1] = new(UuTrapDispatch.TrapKind.Damage, 2),
+            [2] = new(UuTrapDispatch.TrapKind.CheckVariable, 3, 4),
+            [3] = new(UuTrapDispatch.TrapKind.Teleport, 0),
+            [4] = new(UuTrapDispatch.TrapKind.Door, 0),
         };
-        var fired = UuTrapDispatch.FireChain(i => traps[i], 1);
-        Assert.Equal(
-            [UuTrapDispatch.TrapKind.Damage, UuTrapDispatch.TrapKind.Door, UuTrapDispatch.TrapKind.Teleport],
-            fired);
+        UuTrapDispatch.ChainNode Resolve(int i) => traps[i];
 
-        traps[3] = (UuTrapDispatch.TrapKind.Teleport, 1); // cycle
-        Assert.Equal(3, UuTrapDispatch.FireChain(i => traps[i], 1).Count);
-        Assert.Empty(UuTrapDispatch.FireChain(i => traps[i], 0));
+        // True branch follows the link.
+        Assert.Equal(
+            [UuTrapDispatch.TrapKind.Damage, UuTrapDispatch.TrapKind.CheckVariable, UuTrapDispatch.TrapKind.Teleport],
+            UuTrapDispatch.FireChain(Resolve, 1, _ => true));
+        // False branch takes the alt link.
+        Assert.Equal(
+            [UuTrapDispatch.TrapKind.Damage, UuTrapDispatch.TrapKind.CheckVariable, UuTrapDispatch.TrapKind.Door],
+            UuTrapDispatch.FireChain(Resolve, 1, _ => false));
+
+        // Create/delete always stop, even with a nonzero link.
+        var terminal = new Dictionary<int, UuTrapDispatch.ChainNode>
+        {
+            [1] = new(UuTrapDispatch.TrapKind.CreateObject, 2),
+            [2] = new(UuTrapDispatch.TrapKind.Damage, 0),
+        };
+        Assert.Equal([UuTrapDispatch.TrapKind.CreateObject], UuTrapDispatch.FireChain(i => terminal[i], 1));
+
+        // Cycles stop.
+        traps[4] = new(UuTrapDispatch.TrapKind.Door, 1);
+        Assert.Equal(3, UuTrapDispatch.FireChain(Resolve, 1, _ => false).Count);
     }
 }
