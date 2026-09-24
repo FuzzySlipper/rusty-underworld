@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Routine repository verification for rusty-crawler.
+# Routine repository verification for rusty-underworld.
 #
 # This pass checked in the repository shape and no product code, so the script
 # currently proves the installed Engine pair identity and the product UI
@@ -18,7 +18,7 @@ for argument in "$@"; do
     --aot) aot=true ;;
     -h|--help)
       echo "usage: scripts/verify.sh [--aot]"
-      echo "  no arguments  pair identity, UI dependencies, product build, suites and CoreCLR staging"
+      echo "  no arguments  pair identity, UI dependencies, product build, suites and CoreCLR staging (when projects exist)"
       echo "  --aot         also run the NativeAOT fidelity publish"
       exit 0
       ;;
@@ -66,8 +66,8 @@ jq -e --arg package_version "$pair_version" --arg source_revision "$pair_source_
 # tests are checked here even while no product project exists, because the UI
 # toolchain is what the first project will consume.
 npm ci
-if compgen -G "tests/PartyRpg.Ui.Tests/*.test.mjs" > /dev/null; then
-  node --test tests/PartyRpg.Ui.Tests/*.test.mjs
+if compgen -G "tests/AbyssRpg.Ui.Tests/*.test.mjs" > /dev/null; then
+  node --test tests/AbyssRpg.Ui.Tests/*.test.mjs
 else
   echo "No product UI tests are checked in yet."
 fi
