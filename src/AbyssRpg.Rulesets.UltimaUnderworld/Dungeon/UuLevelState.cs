@@ -53,11 +53,25 @@ public sealed class UuLevelState
         else OpenedDoors.Remove((tileX, tileY));
     }
 
+    /// <summary>Drops and throws placed back on the level (take reverses).</summary>
+    public List<DroppedPlacement> Dropped { get; } = [];
+
+    public void Drop(DroppedPlacement placement)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        if (placement.TileX < 0 || placement.TileX >= 64 || placement.TileY < 0 || placement.TileY >= 64)
+            throw new ArgumentOutOfRangeException("Tile is outside the 64x64 map.");
+        Dropped.Add(placement);
+    }
+
+    public bool Lift(DroppedPlacement placement) => Dropped.Remove(placement);
+
     public UuLevelDelta CaptureDelta() => new(
         LevelNumber,
         RemovedObjects.ToArray(),
         MovedObjects.ToDictionary(e => e.Key, e => e.Value),
-        OpenedDoors.ToArray());
+        OpenedDoors.ToArray(),
+        Dropped.ToArray());
 
     public void ApplyDelta(UuLevelDelta delta)
     {
@@ -67,12 +81,17 @@ public sealed class UuLevelState
         RemovedObjects.UnionWith(delta.RemovedObjects);
         foreach (var move in delta.MovedObjects) MovedObjects[move.Key] = move.Value;
         foreach (var door in delta.OpenedDoors) OpenedDoors.Add(door);
+        Dropped.AddRange(delta.Dropped);
     }
 }
+
+/// <summary>A dropped or thrown object resting on a tile (identity included).</summary>
+public sealed record DroppedPlacement(int TileX, int TileY, int ItemId, int Quality, int Quantity, ulong IdentityValue);
 
 /// <summary>Persistable per-level change record. The Host save owner stores these (UW-T25).</summary>
 public sealed record UuLevelDelta(
     int LevelNumber,
     int[] RemovedObjects,
     Dictionary<int, (int TileX, int TileY)> MovedObjects,
-    (int X, int Y)[] OpenedDoors);
+    (int X, int Y)[] OpenedDoors,
+    DroppedPlacement[] Dropped);
