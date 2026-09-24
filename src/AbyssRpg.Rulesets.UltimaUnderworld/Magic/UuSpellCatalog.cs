@@ -32,8 +32,7 @@ public static class UuSpellCatalog
     }
 
     public static readonly IReadOnlyList<SpellEntry> Circles1To4 =
-    [
-        new("IMY", "Create Food", 3, -1, 0, 259, Family.Other, false),
+    [        new("IMY", "Create Food", 3, -1, 0, 259, Family.Other, false),
         new("UP", "Leap", 6, 0, 60, 261, Family.Other, false),
         new("IL", "Light", 3, 17, 1500, 256, Family.Light, false),
         new("OJ", "Magic Arrow", 3, -1, 0, 258, Family.Damage, true),
@@ -58,6 +57,35 @@ public static class UuSpellCatalog
         new("YP", "Water Walk", 9, 3, 180, 274, Family.Other, false),
     ];
 
+    public static readonly IReadOnlyList<SpellEntry> Circles5To8 =
+    [
+        new("AN", "Cure Poison", 15, -1, 0, 285, Family.Heal, false),
+        new("PF", "Fireball", 15, -1, 0, 280, Family.Damage, true),
+        new("HP", "Levitate", 15, 2, 60, 276, Family.Other, false),
+        new("GSP", "Missile Protection", 15, 9, 60, 283, Family.Protection, false),
+        new("OWY", "Name Enchantment", 15, -1, 0, 282, Family.Other, true),
+        new("EY", "Open", 15, -1, 0, 284, Family.Other, true),
+        new("ACM", "Smite Undead", 15, -1, 0, 281, Family.Damage, false),
+        new("VIL", "Daylight", 18, 20, 300, 290, Family.Light, false),
+        new("VRP", "Gate Travel", 18, -1, 0, 288, Family.Other, false),
+        new("VIM", "Greater Heal", 18, -1, 0, 286, Family.Heal, false),
+        new("AEP", "Paralyze", 18, -1, 0, 289, Family.Other, false),
+        new("VOG", "Sheet Lightning", 18, -1, 0, 287, Family.Damage, false),
+        new("OPY", "Telekinesis", 18, 14, 30, 291, Family.Other, false),
+        new("IMR", "Ally", 21, -1, 0, 293, Family.Other, false),
+        new("VHP", "Fly", 21, 4, 30, 292, Family.Other, false),
+        new("VSL", "Invisibility", 21, 8, 120, 295, Family.Protection, false),
+        new("VAW", "Confusion", 21, -1, 0, 296, Family.Other, false),
+        new("OAQ", "Reveal", 21, -1, 0, 297, Family.Other, false),
+        new("KM", "Summon Monster", 21, -1, 0, 294, Family.Other, false),
+        new("VKC", "Armageddon", 24, -1, 0, 303, Family.Damage, false),
+        new("FH", "Flame Wind", 24, -1, 0, 301, Family.Damage, false),
+        new("AT", "Freeze Time", 24, 11, 30, 302, Family.Other, false),
+        new("IVS", "Iron Flesh", 24, 18, 120, 298, Family.Protection, false),
+        new("OPW", "Roaming Sight", 24, 19, 30, 300, Family.Other, false),
+        new("VPY", "Tremor", 24, -1, 0, 299, Family.Other, false),
+    ];
+
     public static SpellEntry? FindByRunes(string runes) =>
-        Circles1To4.FirstOrDefault(spell => spell.Runes == runes);
+        Circles1To4.Concat(Circles5To8).FirstOrDefault(spell => spell.Runes == runes);
 }
