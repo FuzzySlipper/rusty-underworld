@@ -1,5 +1,7 @@
 using AbyssRpg.Rulesets.UltimaUnderworld.Movement;
+using Rusty.Engine;
 using Rusty.Engine.Input;
+using System.Text;
 using Xunit;
 
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Tests;
@@ -12,6 +14,7 @@ public sealed class UuLocomotionTests
         Assert.Equal(FpsInputBindings.Standard.ForwardKey, UuLocomotionPolicy.UuBindings.ForwardKey);
         Assert.Equal(FpsInputBindings.Standard.JumpKey, UuLocomotionPolicy.UuBindings.JumpKey);
         Assert.Equal(FpsInputBindings.Standard.SprintKey, UuLocomotionPolicy.UuBindings.SprintKey);
+        Assert.Equal(KeyboardControl.KeyQ, UuLocomotionPolicy.UuBindings.CrouchKey);
     }
 
     [Fact]
@@ -34,6 +37,43 @@ public sealed class UuLocomotionTests
         Assert.Null(controls.VerticalVelocity);
         Assert.Throws<ArgumentOutOfRangeException>(() => policy.BeginStep([], 0f, true, false, false));
     }
+
+    [Fact]
+    public void Driven_input_maps_run_swim_and_fly()
+    {
+        var policy = new UuLocomotionPolicy(UuMovementTuning.Default);
+
+        var (runControls, run) = policy.BeginStep(
+            [Key(KeyboardControl.ShiftLeft), Key(KeyboardControl.KeyW)], 0.016f, canMove: true, swimming: false, flying: false);
+        Assert.True(run.Running);
+        Assert.Equal(UuMovementTuning.Default.RunSpeed, runControls.ForwardSpeed);
+
+        var (swimControls, swim) = policy.BeginStep(
+            [Key(KeyboardControl.KeyW)], 0.016f, canMove: true, swimming: true, flying: false);
+        Assert.True(swim.Swimming);
+        Assert.False(swim.JumpRequested);
+        Assert.False(swimControls.JumpPressed);
+        Assert.Equal(UuMovementTuning.Default.SwimSpeed, swimControls.ForwardSpeed);
+
+        var (flyUp, up) = policy.BeginStep(
+            [Key(KeyboardControl.Space)], 0.016f, canMove: true, swimming: false, flying: true);
+        Assert.Equal(UuMovementTuning.Default.FlySpeed, up.Ascend);
+        Assert.Equal(UuMovementTuning.Default.FlySpeed, flyUp.VerticalVelocity);
+        Assert.False(up.JumpRequested);
+
+        var policy2 = new UuLocomotionPolicy(UuMovementTuning.Default);
+        var (flyDown, down) = policy2.BeginStep(
+            [Key(KeyboardControl.KeyQ)], 0.016f, canMove: true, swimming: false, flying: true);
+        Assert.Equal(-UuMovementTuning.Default.FlySpeed, down.Ascend);
+        Assert.Equal(-UuMovementTuning.Default.FlySpeed, flyDown.VerticalVelocity);
+    }
+
+    private static ProductInputEvent Key(KeyboardControl key) => new(
+        InputEventKind.Key, InputEdge.Pressed, InputDevice.None, InputChannel.None, InputAxis.None, key,
+        PointerButton.None, ControllerButton.None, ControllerAxis.None, InputClearReason.None,
+        InputValueKind.None, InputPhase.None, InputProvenance.None, default, default, default,
+        0F, 0F, ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty,
+        Encoding.UTF8.GetBytes(""), ReadOnlyMemory<byte>.Empty, ReadOnlyMemory<byte>.Empty);
 
     [Fact]
     public void Hazards_follow_documented_structure()
