@@ -22,7 +22,7 @@ note, not a roadmap promise.
 - It deliberately excludes authored content payloads (conversation text, level
   data, textures) except for the code that loads, interprets, or presents them.
 - Donor file counts for scale: Godot `src/traps` 61, `src/objects` ~70,
-  `src/conversation_functions` ~57, `src/loaders` 27, `src/magic` 15,
+  `src/conversation/conversation_functions/` 56, `src/loaders` 27, `src/magic` 15,
   `src/player` 15 (+chargen), `src/World` 14, `src/ui` 33; OU
   `Assets/Game/Scripts` 167 (+28 in subfolders).
 - rusty-underworld was assessed from checked planning documents only
@@ -147,5 +147,67 @@ missing safe Engine contract is an upstream request and an honest stop.
 | Tile geometry | Godot `tilemaprender.cs` (64×64 @1.2 m, 32 heights @0.15 m; SOLID/OPEN/DIAG) | Tile constants and scale. | Absent — planned import geometry; Engine-owned presentation |
 | Textures | Godot `textureloader.cs` (W64/F32, split 210) | Wall/floor texture rows. | Absent — planned importer output as Engine content |
 | Lighting/shading | Godot palette lighting + cycling (`PALS/SHADES/LIGHT.DAT`); OU torch/eye-glow ranges | Palette tables, light ranges. | Absent — planned media + Engine rendering |
-| Level transitions/persist
-...[truncated 6151 chars]
+| Level transitions/persistence | Godot `worlds.cs`, level persistence; OU autosave-per-level | Transition edges with cost; unloaded levels keep kills/takes/doors. | Absent — planned explicit transition ops + cross-side save |
+| Secrets | Manual p. 12 (Look-at-wall + Search; NPC hints); OU L3 lever evidence | Secret doors as discovery events into knowledge. | Absent — planned discovery notifications |
+
+## 7. Conversation, barter, attitude
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| Conversation VM | Godot `src/conversation/conversationvm.cs` (710 lines; 42 opcodes) + support files | Stack VM over CNV.ARK dialogue with teleports and temp-talkers. | Absent — planned ruleset-owned interpretation, never a port |
+| Imported functions | Godot `src/conversation/conversation_functions/` (56 files: ask/menus, barter, inventory, quest vars, world effects) | Barter, inventory, quest, and world-effect dialogue verbs. | Absent — planned ruleset function policy over Kit owners |
+| Barter/appraisal | Manual pp. 24–25 (offers, trade dots, Appraise reading, gifts, demands); Godot `conversationtrade` | Real-inventory trade with trader patience/profit/valuations. | Absent — planned transaction over the item owners |
+| Attitude/memory | Manual p. 24 (remember treatment; anger turns violent); Godot `set_attitude`, `set_likes_dislikes` | Treatment memory, intimidation, demands, faction consequences. | Absent — planned attitude policy + quest owner effects |
+| Doors/moongates | Godot `src/objects/` door/moongate; OU `Door.cs`, `Moongate.cs` | Lock/pick/bash/open semantics; gate-travel endpoints. | Absent — planned stateful door objects |
+
+## 8. Traps, triggers, physics
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| Vanilla dispatch | Godot `src/traps/trap.cs` (6-0 sixteen + 6-1 nine entries) | Damage/teleport/arrow/do-hack/pit/terrain/spell/spawn/door/ward/vars. | Absent — planned UW1-reachable interpretation (UW2 branches excluded) |
+| Do/hack family | Godot `src/traps/hack_trap.cs` (8 do + 29 hack qualities) | Talking doors, platforms, quake, endgame; UW2 world-script hooks. | Absent — planned UW1 qualities; UW2-only as documentation |
+| Trigger codes | Godot `src/objectdata/triggerobjectdat.cs` (MOVE…PRESSURE_RELEASE + UW1/UW2 splits) | Verb/tile/door/weight/clock trigger kinds. | Absent — planned content records; splits resolved at import |
+| Wall controls | OU `SwitchBase.cs`/`Lever.cs` + L3/L4 evidence | Wall-face addressed switches; blocked-door reopen. | Absent — planned addressing rule from the start |
+| SCD/xclock note | Godot `src/scd/` + `timers.cs` (UW2-only) | Scheduled-event engine off xclocks. | Excluded — UW2-only; UW1 vars live in area-11 tasks |
+| Object physics | Godot `src/physics/` (13) + mostly-complete physics; OU barrel/chest sims | Shove/block/projectile flight/landing. | Absent — planned coordination over Engine physics |
+
+## 9. Interface surfaces
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| HUD | Manual p. 3 (view, panel, scroll, compass, shelf, gem, flasks); Godot stats/HP/mana/compass UI | One adventure screen with charge, vitals, and status. | Absent — planned projection + semantic actions (adapted layout) |
+| Panels | Manual pp. 6–18 (inventory, stats, options, save slots I–IV) | Inventory/paperdoll/stats/options/save screens as values. | Absent — planned per-screen values over Kit owners |
+| Runebag/casting UI | Manual p. 11 (alphabetical panel, shelf, clear); OU panel-closes-on-cast | Shelf state, red/blue targeting cursors, save-carried runes. | Absent — planned shelf projection + cast intents |
+| Conversation UI | Manual pp. 14–15, 24 (portrait, scrolls, barter areas, MORE paging) | Options, barter areas, appraisal reads, farewell lines. | Absent — planned dialogue/barter projections |
+| Map UI | Manual pp. 7–8 (quill notes, eraser, dog-ears); OU map screen | Coverage blocks, notes, level pages. | Absent — planned knowledge projections |
+
+## 10. Audio
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| XMI music | Godot `xmimusic.cs` + 4 synth engines (ROM-gated) | Realtime theme synthesis. | Excluded (synth port) — ordinary imported audio over Engine Audio |
+| VOC speech | Godot `vocloader.cs` → speech streams | Speech/SFX file playback. | Absent — planned admitted speech files |
+| Track slots | OU restored exploring/combat/warning/victory/automap slots | Contextual music states. | Absent — planned selection logic over Engine Audio |
+| SFX routing | Godot TVFX-vs-VOC routing (id ≤99/≥100) | ID-based effect routing. | Absent — planned routing policy |
+
+## 11. Saves
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| Write path | Godot `src/savegame/SaveGame.cs` (slots 1–4, `SlotTransaction`) | Atomic slot replace with DOS-compat guards. | Absent — planned current-schema snapshot/restore |
+| PLAYER.DAT layout | Godot `PlayerDatWriter.cs` (UW1 XOR 1..210) | Default record + obfuscation range. | Orientation only — informs schema; no format code in runtime |
+| LEV.ARK writing | Godot `LevArkWriter.cs` (visited levels) | Per-level capture. | Orientation only — visited-level capture design |
+| Variables | Godot `BGlobalWriter.cs` + `playerdatquest.cs` | Globals, quest vars, xclocks, moonstone, visited flags. | Absent — planned quest-variable save meaning |
+| DESC text | Godot `SaveDescription.cs` (plain ASCII) | Slot descriptions. | Absent — planned description entry |
+| Autosave/quicksave | OU per-level autosave + 5 rolling quicksaves | Explicit convenience saves. | Adapted (ours) — planned Host save UX |
+
+## 12. Bootstrap, options, miscellany
+
+| Feature | Donor code ref | Description | rusty-underworld coverage |
+|---|---|---|---|
+| Bootstrap | Godot `main.cs` + `Launch.tscn`; OU `GameDirectoryDialog` + `LooseData` | Scene bootstrap and data-dir setup. | Excluded — Host/ruleset composition + pair installer instead |
+| Corruption guards | OU locked-file + unpack-once fixes | Install validation. | Excluded — import-time validation instead |
+| Cheat/debug | Godot tilde cheat; OU `Cheats.cs`, `DebugTeleport.cs` | Runestone/mana/skill grants, teleports. | Excluded — creation flow + diagnostics instead |
+| Control bindings | Godot README controls; OU `CONTROLS.md` (gamepad + KB/mouse) | Verified bindings incl. handedness swap. | Adapted — planned intents over Engine input |
+| Options | Godot options menu; manual Detail/sound toggles | Sound/music/detail/pause. | Adapted — planned Host options |
+| Portraits | OU tidied portraits; Godot `HEADS.GR`/`CHARHEAD.GR` | NPC/avatar portraiture. | Adapted — attributed art direction, not asset ports |

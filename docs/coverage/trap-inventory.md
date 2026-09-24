@@ -72,7 +72,7 @@ only).
 
 `a_hack_trap_*` (29): blyskup (q25 — name only), castleschedule (q36 — name
 only), changegoal (q62, UW2 — effectiveness unverified per comment),
-changegoaltarget (q43 — name only), classitem (q10, UW2-only), coward (q30,
+changegoaltarget (q43, UW2-only — name only), classitem (q10, UW2-only), coward (q30,
 pits of carnage — name only), floorcollapse (q17, UW2-only), forcefield
 (q11, UW2-only), gemrotate (q54, UW2-only — name only), gemteleport (q55,
 UW2-only — exact effect unverified), godry (q34 — name only), graffiti (q24,

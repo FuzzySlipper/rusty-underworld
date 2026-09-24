@@ -1,93 +1,94 @@
 # Magic inventory
 
-Status: inventory baseline, not tasks. Every spell name, formula, behavior,
-skill description, and rune gloss below was transcribed verbatim from the
-printed Player's Guide (`Ultima_Underworld-Manual.pdf` pp. 28–30, 32, extracted
-with `pdftotext -layout`; printed page numbers cited). Nothing is reconstructed
-or inferred. Donor dispatch knowledge is cited to
+Status: inventory baseline, not tasks. Spell names, formulas, and behavior
+statements were transcribed verbatim from the printed Player's Guide
+(`Ultima_Underworld-Manual.pdf` pp. 28–29, extracted with `pdftotext -layout`;
+printed page numbers cited). Skill entries (§4) are condensed from the p. 30
+list — substance checked, wording mine. Rune glosses (§2) are verbatim from
+p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited to
 [`underworldgodot-survey.md`](../research/underworldgodot-survey.md) (§N).
 
 ## 1. Grimoire — 8 circles × 5 spells
 
 ### 1st Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Create Food | In Mani Ylem | Causes a fine bounty of food to appear (permanent spell). |
-| Light | In Lor | Illuminates a darkened area (duration spell). |
-| Magic Arrow | Ort Jux | Fires a magic arrow at your opponent (targeted spell). |
-| Resist Blows | Bet In Sanct | Has the same effect as wearing a suit of head-to-toe armor (duration spell). |
-| Stealth | Sanct Hur | Briefly prevents you from making any noise, making it less likely that creatures will notice you (duration spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-01 Create Food | In Mani Ylem | Causes a fine bounty of food to appear (permanent spell). |
+| M-02 Light | In Lor | Illuminates a darkened area (duration spell). |
+| M-03 Magic Arrow | Ort Jux | Fires a magic arrow at your opponent (targeted spell). |
+| M-04 Resist Blows | Bet In Sanct | Has the same effect as wearing a suit of head-to-toe armor (duration spell). |
+| M-05 Stealth | Sanct Hur | Briefly prevents you from making any noise, making it less likely that creatures will notice you (duration spell). |
 
 ### 2nd Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Cause Fear | Quas Corp | May cause an opponent to lose heart and flee (instantaneous spell). |
-| Detect Monster | Wis Mani | Reveals the presence of hidden or unperceived enemies (instantaneous spell). |
-| Lesser Heal | In Bet Mani | Heals your minor wounds (instantaneous spell). |
-| Rune of Warding | In Jux | Places an enchantment in an area which will report if anything disturbs it (permanent spell, until disturbed). |
-| Slow Fall | Rel Des Por | Briefly allows you to float in the air like a feather (duration spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-06 Cause Fear | Quas Corp | May cause an opponent to lose heart and flee (instantaneous spell). |
+| M-07 Detect Monster | Wis Mani | Reveals the presence of hidden or unperceived enemies (instantaneous spell). |
+| M-08 Lesser Heal | In Bet Mani | Heals your minor wounds (instantaneous spell). |
+| M-09 Rune of Warding | In Jux | Places an enchantment in an area which will report if anything disturbs it (permanent spell, until disturbed). |
+| M-10 Slow Fall | Rel Des Por | Briefly allows you to float in the air like a feather (duration spell). |
 
 ### 3rd Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Conceal | Bet Sanct Lor | Briefly obscures you, so you might remain unseen (duration spell). |
-| Lightning | Ort Grav | Hurls a bolt of arcane energy at your opponent (targeted spell). |
-| Night Vision | Quas Lor | Allows you to see without benefit of torch or candle (duration spell). |
-| Speed | Rel Tym Por | Slows down your enemies relative to your speed (duration spell). |
-| Strengthen Door | Sanct Jux | Spikes a door (permanent spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-11 Conceal | Bet Sanct Lor | Briefly obscures you, so you might remain unseen (duration spell). |
+| M-12 Lightning | Ort Grav | Hurls a bolt of arcane energy at your opponent (targeted spell). |
+| M-13 Night Vision | Quas Lor | Allows you to see without benefit of torch or candle (duration spell). |
+| M-14 Speed | Rel Tym Por | Slows down your enemies relative to your speed (duration spell). |
+| M-15 Strengthen Door | Sanct Jux | Spikes a door (permanent spell). |
 
 ### 4th Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Heal | In Mani | Heals you of grievous wounds (permanent spell). |
-| Levitate | Hur Por | Briefly allows you to rise vertically into the air (duration spell). |
-| Poison | Nox Mani | Poisons your opponent with toxic venom (permanent spell). |
-| Remove Trap | An Jux | Negates the targeted snare (targeted spell). |
-| Resist Fire | Sanct Flam | Briefly grants a partial resistance to damage from flame (duration spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-16 Heal | In Mani | Heals you of grievous wounds (permanent spell). |
+| M-17 Levitate | Hur Por | Briefly allows you to rise vertically into the air (duration spell). |
+| M-18 Poison | Nox Mani | Poisons your opponent with toxic venom (permanent spell). |
+| M-19 Remove Trap | An Jux | Negates the targeted snare (targeted spell). |
+| M-20 Resist Fire | Sanct Flam | Briefly grants a partial resistance to damage from flame (duration spell). |
 
 ### 5th Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Cure Poison | An Nox | Acts as an antidote to any poison (permanent spell). |
-| Fireball | Por Flam | Hurls a mighty flaming missile at your opponent (targeted spell). |
-| Missile Protection | Grav Sanct Por | Renders you invulnerable to missiles (duration spell). |
-| Name Enchantment | Ort Wis Ylem | Reveals the true nature of the object on which you cast the spell (permanent spell). |
-| Open | Ex Ylem | Unlocks a locked door or chest (permanent spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-21 Cure Poison | An Nox | Acts as an antidote to any poison (permanent spell). |
+| M-22 Fireball | Por Flam | Hurls a mighty flaming missile at your opponent (targeted spell). |
+| M-23 Missile Protection | Grav Sanct Por | Renders you invulnerable to missiles (duration spell). |
+| M-24 Name Enchantment | Ort Wis Ylem | Reveals the true nature of the object on which you cast the spell (permanent spell). |
+| M-25 Open | Ex Ylem | Unlocks a locked door or chest (permanent spell). |
 
 ### 6th Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Daylight | Vas In Lor | Provides bright illumination for extended periods of time (duration spell). |
-| Gate Travel | Vas Rel Por | Allows you to travel instantly to a moonstone (instantaneous spell). |
-| Greater Heal | Vas In Mani | Brings you back to your original vigor (full Vitality) (permanent spell). |
-| Paralyze | An Ex Por | Prevents target from moving (instantaneous spell). |
-| Telekinesis | Ort Por Ylem | Allows you to pick up a single item and use it from a distance (duration spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-26 Daylight | Vas In Lor | Provides bright illumination for extended periods of time (duration spell). |
+| M-27 Gate Travel | Vas Rel Por | Allows you to travel instantly to a moonstone (instantaneous spell). |
+| M-28 Greater Heal | Vas In Mani | Brings you back to your original vigor (full Vitality) (permanent spell). |
+| M-29 Paralyze | An Ex Por | Prevents target from moving (instantaneous spell). |
+| M-30 Telekinesis | Ort Por Ylem | Allows you to pick up a single item and use it from a distance (duration spell). |
 
 ### 7th Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Ally | In Mani Rel | Causes the ensorcelled being to fight the last enemy he or she saw you attack (permanent spell). |
-| Confusion | Vas An Wis | Causes foes to act as if drunk (instantaneous spell). |
-| Fly | Vas Hur Por | Allows you to fly through the air for a time, and then glide gently to the ground (duration spell). |
-| Invisibility | Vas Sanct Lor | Causes you to become nearly impossible to see (duration spell). |
-| Reveal | Ort An Quas | Reveals hidden objects and concealed exits from current location (instantaneous spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-31 Ally | In Mani Rel | Causes the ensorcelled being to fight the last enemy he or she saw you attack (permanent spell). |
+| M-32 Confusion | Vas An Wis | Causes foes to act as if drunk (instantaneous spell). |
+| M-33 Fly | Vas Hur Por | Allows you to fly through the air for a time, and then glide gently to the ground (duration spell). |
+| M-34 Invisibility | Vas Sanct Lor | Causes you to become nearly impossible to see (duration spell). |
+| M-35 Reveal | Ort An Quas | Reveals hidden objects and concealed exits from current location (instantaneous spell). |
 
 ### 8th Circle
 
-| Spell | Formula | Behavior |
-| --- | --- | --- |
-| Flame Wind | Flam Hur | Casts multiple flaming missiles into the area (instantaneous spell). |
-| Freeze Time | An Tym | Stops the flow of time for all but you (duration spell). |
-| Iron Flesh | In Vas Sanct | Greatly increases your resistance to damage (duration spell). |
-| Roaming Sight | Ort Por Wis | Allows you to see the world from a bird's-eye view (duration spell). |
-| Tremor | Vas Por Ylem | Causes the ground to quake and rocks to burst (instantaneous spell). |
+| ID | Spell | Formula | Behavior |
+| --- | --- | --- | --- |
+| M-36 Flame Wind | Flam Hur | Casts multiple flaming missiles into the area (instantaneous spell). |
+| M-37 Freeze Time | An Tym | Stops the flow of time for all but you (duration spell). |
+| M-38 Iron Flesh | In Vas Sanct | Greatly increases your resistance to damage (duration spell). |
+| M-39 Roaming Sight | Ort Por Wis | Allows you to see the world from a bird's-eye view (duration spell). |
+| M-40 Tremor | Vas Por Ylem | Causes the ground to quake and rocks to burst (instantaneous spell). |
 
 Grimoire-adjacent manual facts: Night Vision / Daylight / Light substitute for
 torches and candles (pp. 6, 10–11); Create Food answers hunger (p. 19); flying
@@ -98,14 +99,14 @@ destroy nearby valuables (Flame Wind warning, p. 27).
 
 | Rune | Gloss | Rune | Gloss | Rune | Gloss | Rune | Gloss |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| AN | Negate | IN | Cause | QUAS | Illusion | UUS | Raise |
-| BET | Small | JUX | Harm | REL | Change | VAS | Great |
-| CORP | Death | KAL | Summon | SANCT | Protection | WIS | Knowledge |
-| DES | Down | LOR | Light | TYM | Time | YLEM | Matter |
-| EX | Freedom | MANI | Life | — | — | — | — |
-| FLAM | Flame | NOX | Poison | — | — | — | — |
-| GRAV | Energy | ORT | Magic | — | — | — | — |
-| HUR | Wind | POR | Movement | — | — | — | — |
+| R-01 AN | Negate | R-09 IN | Cause | R-17 QUAS | Illusion | R-21 UUS | Raise |
+| R-02 BET | Small | R-10 JUX | Harm | R-18 REL | Change | R-22 VAS | Great |
+| R-03 CORP | Death | R-11 KAL | Summon | R-19 SANCT | Protection | R-23 WIS | Knowledge |
+| R-04 DES | Down | R-12 LOR | Light | R-20 TYM | Time | R-24 YLEM | Matter |
+| R-05 EX | Freedom | R-13 MANI | Life | — | — | — | — |
+| R-06 FLAM | Flame | R-14 NOX | Poison | — | — | — | — |
+| R-07 GRAV | Energy | R-15 ORT | Magic | — | — | — | — |
+| R-08 HUR | Wind | R-16 POR | Movement | — | — | — | — |
 
 Rune-bag facts (pp. 10–11, 21, 27): stones never leave the rune bag once in;
 the bag opens an alphabetical panel where blanks mean missing; the Rune Shelf
@@ -133,20 +134,30 @@ persists so spells can be pre-buffed; the bottom symbol clears the shelf.
 
 ## 4. Skill list with governing attributes (p. 30)
 
-Acrobat (DX) — move with grace; reduces fall/collision damage. Appraise (DX) —
-perceive goods' value; aids barter evaluation. Attack (ST) — general fighting;
-bonus to hit. Axe (ST) — axes; defense + bonus to hit with axes. Casting
-(INT) — improves cast success. Charm (DX) — making friends; better barter
-deals. Defense (ST) — penalty to foes trying to strike. Lore (INT) — identify
-items; accuracy of Look information. Mace (ST) — blunt weapons; defense +
-bonus to hit with mace/cudgel. Mana (INT) — increases maximum Mana. Missile
-(ST) — bows/crossbows/slings; increases missile damage. Picklock (DX) —
-lockpick use on doors/chests. Repair (DX) — anvil repair success. Search
-(DX) — detect hidden doors and traps; applied automatically on Look. Sneak
-(DX) — move quietly automatically. Swimming (DX) — postpones drowning. Sword
-(ST) — swords/daggers; defense + bonus to hit. Track (DX) — perceive animal
-tracks; tells when creatures are near. Traps (DX) — disarm found traps.
-Unarmed (ST) — bonus to hit and damage with fists.
+Condensed from the printed list — substance checked, wording mine.
+
+| ID | Skill | Attr | Role |
+| --- | --- | --- | --- |
+| S-01 | Acrobat | DX | Move with grace; reduces fall/collision damage |
+| S-02 | Appraise | DX | Perceive goods' value; aids barter evaluation |
+| S-03 | Attack | ST | General fighting; bonus to hit |
+| S-04 | Axe | ST | Axes; defense + bonus to hit with axes |
+| S-05 | Casting | INT | Improves cast success |
+| S-06 | Charm | DX | Making friends; better barter deals |
+| S-07 | Defense | ST | Penalty to foes trying to strike |
+| S-08 | Lore | INT | Identify items; accuracy of Look information |
+| S-09 | Mace | ST | Blunt weapons; defense + bonus to hit |
+| S-10 | Mana | INT | Increases maximum Mana |
+| S-11 | Missile | ST | Bows/crossbows/slings; increases missile damage |
+| S-12 | Picklock | DX | Lockpick use on doors/chests |
+| S-13 | Repair | DX | Anvil repair success |
+| S-14 | Search | DX | Detect hidden doors/traps; auto-applied on Look |
+| S-15 | Sneak | DX | Move quietly automatically |
+| S-16 | Swimming | DX | Postpones drowning |
+| S-17 | Sword | ST | Swords/daggers; defense + bonus to hit |
+| S-18 | Track | DX | Perceive tracks; tells when creatures are near |
+| S-19 | Traps | DX | Disarm found traps |
+| S-20 | Unarmed | ST | Bonus to hit and damage with fists |
 
 ## 5. Godot spell-dispatch mapping (survey §6)
 
@@ -169,9 +180,9 @@ hook; `src/magic/spellcasting_objects.cs` gates enchanted-equipment casting
 | 9 | Curse (with on-equip path) | `spellcasting_class_9.cs` |
 | 10 | Mana boost | `spellcasting_class_10.cs` |
 | 11 | Misc/special (speed, portal) | `spellcasting_class_11.cs` |
-| 12 | "Not castable here" | `spellcasting_class_12.cs` |
+| 12 | "Not castable here" (debug-print + break inline in `spellcasting.cs`, no class file) |
 | 13 | Misc (Altaras wand, mind blast, …) | `spellcasting_class_13.cs` |
-| 14 | Cutscene | (file span per survey) |
+| 14 | Cutscene (via `cutsplayer.PlayCutscene`, no class file) |
 
 UW2-only branches (donor context, never extraction sources): the UW2
 projectile table (major 5), the UW2 summon branch (major 8), UW2

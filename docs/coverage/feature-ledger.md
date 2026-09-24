@@ -142,3 +142,8 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 | T-W0…W8 | Minorclass-1 (`trap-inventory.md` §1b) | implement W0; rest excluded (UW2-gated) |
 | T-D* | Do/hack qualities (`trap-inventory.md` §2) | implement UW1 qualities; UW2-only excluded |
 | C-01…C-12 | Source families (`content-scope.md`) | implement per family; UW2/UNDEROM1/donor-data excluded |
+
+ID ordering rules: M-01…M-40 run §1 table order (1st circle first); R-01…R-24
+run §2 table order row-major; S-01…S-20 run §4 table order; T-Vxx is the
+minorclass-0 classindex in hex, T-Wx the minorclass-1 index, T-Dnn the do/hack
+`quality` number; C-01…C-12 run the content-scope table top-to-bottom.
