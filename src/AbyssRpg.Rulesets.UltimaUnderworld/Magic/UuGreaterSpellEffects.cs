@@ -19,10 +19,14 @@ public static class UuGreaterSpellEffects
     public const int RevealRadiusTiles = 2;
     public const double TremorRadiusMeters = 6.0;
 
+    /// <summary>
+    /// Donor-effective range is 14-17: the call passes (14,18) but Unity
+    /// int rolls exclude the top.
+    /// </summary>
     public static int FlameWindDamage(Random rng)
     {
         ArgumentNullException.ThrowIfNull(rng);
-        return rng.Next(FlameWindMinDamage, FlameWindMaxDamage + 1);
+        return rng.Next(FlameWindMinDamage, FlameWindMaxDamage);
     }
 
     public static int GreaterHealAmount(int vitality) => vitality;

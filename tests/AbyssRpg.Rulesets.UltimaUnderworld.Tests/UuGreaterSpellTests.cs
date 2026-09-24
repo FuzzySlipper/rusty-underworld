@@ -23,7 +23,7 @@ public sealed class UuGreaterSpellTests
     {
         var rng = new Random(6);
         for (int i = 0; i < 30; i++)
-            Assert.InRange(UuGreaterSpellEffects.FlameWindDamage(rng), 14, 18);
+            Assert.InRange(UuGreaterSpellEffects.FlameWindDamage(rng), 14, 17);
         Assert.Equal(40, UuGreaterSpellEffects.GreaterHealAmount(40));
         Assert.Equal(0, UuGreaterSpellEffects.CurePoisonResult());
         Assert.Equal(3.0, UuGreaterSpellEffects.MindEffectRadiusTiles);
