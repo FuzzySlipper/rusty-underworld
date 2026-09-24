@@ -35,6 +35,15 @@ public sealed class CollisionMeshTests
         Assert.Contains("\"schemaVersion\":1", json);
         Assert.Contains("\"walkable\":true", json);
         _output.WriteLine($"L1: {solid} solid, {open} open, {mesh.Positions.Length} verts, {mesh.Triangles.Length / 3} tris");
+
+        // Independent read-back: the emitted document parses and carries
+        // the same counts through the JSON layer.
+        using var parsed = System.Text.Json.JsonDocument.Parse(json);
+        System.Text.Json.JsonElement root = parsed.RootElement;
+        Assert.Equal(1, root.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal(mesh.Positions.Length, root.GetProperty("collision").GetProperty("positions").GetArrayLength());
+        Assert.Equal(mesh.Triangles.Length, root.GetProperty("collision").GetProperty("triangles").GetArrayLength());
+        Assert.Equal(4096, root.GetProperty("navigation").GetProperty("cells").GetArrayLength());
     }
 
     [Fact]
