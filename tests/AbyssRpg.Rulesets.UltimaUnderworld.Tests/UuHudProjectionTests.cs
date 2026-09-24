@@ -54,4 +54,28 @@ public sealed class UuHudProjectionTests
         Assert.NotEqual(0u, root);
         Assert.Throws<ArgumentOutOfRangeException>(() => builder.Build(root + 100));
     }
+
+    [Fact]
+    public void Ui_mapping_carries_the_eight_named_fields()
+    {
+        UuHudValues values = UuHudProjection.Read(
+            AvatarStats(), TrackId.Parse("abyss.defeat"), TrackId.Parse("abyss.mana"), 0.5f, 0f, "Hi.");
+        var builder = new UiValueBuilder();
+        Rusty.Engine.UiValue built = builder.Build(UuHudProjection.WriteUi(builder, values));
+
+        Rusty.Engine.StructuredValueNode root = built.Nodes.Span[(int)built.Root];
+        Assert.Equal(Rusty.Engine.StructuredValueKind.Object, root.Kind);
+        Assert.Equal(8u, root.ChildCount);
+        var names = new List<string>();
+        for (uint i = 0; i < root.ChildCount; i++)
+        {
+            Rusty.Engine.StructuredValueNode field = built.Nodes.Span[(int)built.Edges.Span[(int)(root.FirstEdge + i)]];
+            names.Add(System.Text.Encoding.UTF8.GetString(
+                built.Utf8.Span.Slice((int)field.KeyOffset, (int)field.KeyLen)));
+        }
+
+        Assert.Equal(
+            ["hp", "maxHp", "mana", "maxMana", "charge", "yawRadians", "wind", "outcome"],
+            names);
+    }
 }
