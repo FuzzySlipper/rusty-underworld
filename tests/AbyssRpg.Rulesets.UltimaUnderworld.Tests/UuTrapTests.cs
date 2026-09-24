@@ -60,6 +60,9 @@ public sealed class UuTrapTests
         };
         Assert.Equal([UuTrapDispatch.TrapKind.CreateObject], UuTrapDispatch.FireChain(i => terminal[i], 1));
 
+        terminal[1] = new(UuTrapDispatch.TrapKind.DeleteObject, 2);
+        Assert.Equal([UuTrapDispatch.TrapKind.DeleteObject], UuTrapDispatch.FireChain(i => terminal[i], 1));
+
         // Cycles stop.
         traps[4] = new(UuTrapDispatch.TrapKind.Door, 1);
         Assert.Equal(3, UuTrapDispatch.FireChain(Resolve, 1, _ => false).Count);
