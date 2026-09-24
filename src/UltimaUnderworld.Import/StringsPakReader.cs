@@ -5,8 +5,9 @@ namespace UltimaUnderworld.Import;
 /// Layout: u16 node count, then that many 4-byte nodes (symbol, parent,
 /// left, right); u16 block count, then per block (u16 block number, u32
 /// data address). Each block holds a u16 entry count, an entry-offset table,
-/// then MSB-first Huffman bits decoded from the last node as root; a leaf is
-/// a node whose left AND right are both 255, and the '|' leaf ends an entry.
+/// then MSB-first Huffman bits decoded from the last node as root; the walk
+/// ends when either edge of the current node is 255 (matching the donor),
+/// and the '|' leaf ends an entry.
 /// Behavior reference: UnderworldGodot src/utility/StringLoader.cs
 /// (GameStrings.LoadStringsPak); no code is shared with the donor. UW2
 /// archives are never read here.

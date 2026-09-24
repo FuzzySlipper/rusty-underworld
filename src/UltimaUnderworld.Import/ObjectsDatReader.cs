@@ -19,7 +19,7 @@ public static class ObjectsDatReader
     public const int RangedRecordSize = 3;
 
     public const int ArmourOffset = 0xB2;
-    public const int ArmourCount = 64;
+    public const int ArmourCount = 32;
     public const int ArmourRecordSize = 4;
 
     public const int CritterOffset = 0x132;
@@ -50,6 +50,8 @@ public static class ObjectsDatReader
     public sealed record RangedRow(int Damage, int AmmoType, int RangedWeaponType);
     public sealed record ArmourRow(int Protection, int Durability, int Unknown, int Slot);
     public sealed record CritterRow(int Level, byte[] Raw);
+    // Donors disagree on bytes +1/+2 (Godot reads one u16 object mask,
+    // OU reads mask byte + slots byte); the reader follows OU's 3-byte split.
     public sealed record ContainerRow(int CapacityTenthStones, int ObjectsMask, int Slots);
     public sealed record LightRow(int Brightness, int Duration);
     public sealed record AnimationRow(int Type, int Unknown, int StartFrame, int FrameCount);
@@ -111,7 +113,9 @@ public static class ObjectsDatReader
         for (int i = 0; i < LightCount; i++)
         {
             int at = LightOffset + (i * LightRecordSize);
-            lights[i] = new LightRow(data[at], data[at + 1]);
+            // Byte order per both donors (Godot lightsourceobjectdat,
+            // OU ObjectsData reader): duration first, brightness second.
+            lights[i] = new LightRow(Brightness: data[at + 1], Duration: data[at]);
         }
 
         var food = new int[FoodCount];

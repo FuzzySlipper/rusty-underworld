@@ -23,5 +23,31 @@ internal static class TestData
         return path;
     }
 
-    public static bool Exists(string relative) => File.Exists(Path.Combine(Root(), relative));
+    public static bool Exists(string relative)
+    {
+        try
+        {
+            return File.Exists(Path.Combine(Root(), relative));
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    // Absence is reported loudly, never as a silent pass: xunit v2 has no
+    // dynamic-skip API (SkipException exposes no usable constructor), so the
+    // gate writes a SKIP line to test output and the test returns. A machine
+    // without operator data shows Passed-with-SKIP-notices, and the log names
+    // every file it did not check.
+    public static string? Optional(string relative, Xunit.Abstractions.ITestOutputHelper output)
+    {
+        if (!Exists(relative))
+        {
+            output.WriteLine($"SKIP: operator UW1 file missing, nothing checked: {relative}");
+            return null;
+        }
+
+        return Find(relative);
+    }
 }
