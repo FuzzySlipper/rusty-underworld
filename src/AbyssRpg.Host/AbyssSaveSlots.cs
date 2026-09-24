@@ -13,6 +13,7 @@ public sealed class AbyssSaveSlots
 {
     public const int QuicksaveCount = 3;
     public const string AnchorKey = "anchor";
+    public const string AutosavePrefix = "autosave/";
 
     private readonly AbyssSaveStore _store;
     private int _quicksaveNext;
@@ -22,7 +23,7 @@ public sealed class AbyssSaveSlots
         _store = store ?? throw new ArgumentNullException(nameof(store));
     }
 
-    public static string AutosaveKey(int level) => $"autosave/level-{level}";
+    public static string AutosaveKey(int level) => $"{AutosavePrefix}level-{level}";
 
     public static string QuicksaveKey(int index) =>
         (uint)index < QuicksaveCount

@@ -13,6 +13,8 @@ public sealed class UuMusicTests
         Assert.Equal(UuMusicPolicy.Track.Victory, UuMusicPolicy.Select(UuMusicPolicy.Situation.Victory, 0));
         Assert.Equal(UuMusicPolicy.Track.Death, UuMusicPolicy.Select(UuMusicPolicy.Situation.Death, 0));
         Assert.Equal(UuMusicPolicy.Track.Automap, UuMusicPolicy.Select(UuMusicPolicy.Situation.Automap, 0));
+        Assert.Equal(UuMusicPolicy.Track.Injured, UuMusicPolicy.Select(UuMusicPolicy.Situation.Injured, 0));
+        Assert.Equal(UuMusicPolicy.Track.LevelUp, UuMusicPolicy.Select(UuMusicPolicy.Situation.LevelUp, 0));
         Assert.Equal(UuMusicPolicy.Track.ExploringA, UuMusicPolicy.Select(UuMusicPolicy.Situation.Exploring, 0));
         Assert.Equal(UuMusicPolicy.Track.ExploringD, UuMusicPolicy.Select(UuMusicPolicy.Situation.Exploring, 7));
 
