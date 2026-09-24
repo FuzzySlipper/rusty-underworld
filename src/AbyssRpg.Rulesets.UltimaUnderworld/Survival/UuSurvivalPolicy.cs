@@ -34,12 +34,17 @@ public sealed record SurvivalTickResult(int HungerDamage, int FatigueDamage, int
 
 public static class UuSurvivalPolicy
 {
-    public static SurvivalTickResult Tick(UuSurvivalState state, double seconds, Random rng)
+    /// <summary>
+    /// Poison protection (resistance spell family) triples both poison
+    /// timers: wear-off quickens, injury slows. Donor PlayerObject rates.
+    /// </summary>
+    public static SurvivalTickResult Tick(UuSurvivalState state, double seconds, Random rng, bool hasPoisonProtection = false)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(rng);
         if (!double.IsFinite(seconds) || seconds < 0d)
             throw new ArgumentOutOfRangeException(nameof(seconds));
+        double protection = hasPoisonProtection ? 3.0 : 1.0;
 
         int hungerDamage = 0, fatigueDamage = 0, poisonDamage = 0;
 
@@ -79,14 +84,14 @@ public static class UuSurvivalPolicy
 
         if (state.Poison > 0)
         {
-            state.PoisonTimer -= seconds;
+            state.PoisonTimer -= seconds * protection;
             if (state.PoisonTimer <= 0d)
             {
                 state.Poison--;
                 state.PoisonTimer = 25.0 + rng.NextDouble() * 10.0;
             }
 
-            state.PoisonDamageTimer -= seconds;
+            state.PoisonDamageTimer -= seconds / protection;
             if (state.PoisonDamageTimer <= 0d)
             {
                 poisonDamage = Combat.UuStrikeResolution.RollDamage(Math.Max(1, state.Poison), rng);

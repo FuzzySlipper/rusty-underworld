@@ -36,13 +36,18 @@ public static class UuRestPolicy
         : PoisonRating(poison) >= RefusePoisonRating ? SleepPermission.TooPoisoned
         : SleepPermission.Allowed;
 
-    public sealed record SleepOutcome(int Fatigue, int Heal, int HungerGain, bool Rested);
+    public sealed record SleepOutcome(int Fatigue, int Heal, int Hunger, bool Rested);
 
+    /// <summary>
+    /// The 8-hour outcome carries the resultant hunger already clamped to
+    /// the cap (donor applies min(hunger+80, 255)); callers store Hunger.
+    /// </summary>
     public static SleepOutcome Sleep(int hunger, int poison, int vitality)
     {
         bool uneasy = hunger >= UuSurvivalState.StarvingAt || PoisonRating(poison) >= UneasyPoisonRating;
+        int rested = Math.Min(hunger + SleepHungerGain, UuSurvivalState.HungerCap);
         return uneasy
-            ? new SleepOutcome(UneasyFatigue, 0, SleepHungerGain, false)
-            : new SleepOutcome(0, vitality / 2, SleepHungerGain, true);
+            ? new SleepOutcome(UneasyFatigue, 0, rested, false)
+            : new SleepOutcome(0, vitality / 2, rested, true);
     }
 }

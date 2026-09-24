@@ -37,6 +37,12 @@ public sealed class UuSurvivalTests
         Assert.Equal(2, state.Poison);
         Assert.True(hit.PoisonDamage >= 1);
         Assert.Equal(1, state.Drunkenness);
+
+        // Protection triples both poison timers: wear quickens, injury slows.
+        var warded = new UuSurvivalState { Poison = 3, PoisonTimer = 30.0, PoisonDamageTimer = 17.5 };
+        SurvivalTickResult wardedHit = UuSurvivalPolicy.Tick(warded, 10.0, new Random(3), hasPoisonProtection: true);
+        Assert.Equal(2, warded.Poison); // 10s x3 exhausts the 30s wear timer
+        Assert.Equal(0, wardedHit.PoisonDamage); // 10s /3 leaves the damage timer alive
     }
 
     [Fact]
@@ -48,10 +54,10 @@ public sealed class UuSurvivalTests
         Assert.Equal(UuRestPolicy.SleepPermission.Allowed, UuRestPolicy.CanSleep(false, false, 17));
 
         UuRestPolicy.SleepOutcome rested = UuRestPolicy.Sleep(100, 0, 20);
-        Assert.Equal((0, 10, 80, true), (rested.Fatigue, rested.Heal, rested.HungerGain, rested.Rested));
+        Assert.Equal((0, 10, 180, true), (rested.Fatigue, rested.Heal, rested.Hunger, rested.Rested));
 
         UuRestPolicy.SleepOutcome uneasy = UuRestPolicy.Sleep(230, 0, 20);
-        Assert.Equal((10, 0, 80, false), (uneasy.Fatigue, uneasy.Heal, uneasy.HungerGain, uneasy.Rested));
+        Assert.Equal((10, 0, 255, false), (uneasy.Fatigue, uneasy.Heal, uneasy.Hunger, uneasy.Rested));
 
         UuRestPolicy.SleepOutcome poisoned = UuRestPolicy.Sleep(100, 12, 20);
         Assert.False(poisoned.Rested);
