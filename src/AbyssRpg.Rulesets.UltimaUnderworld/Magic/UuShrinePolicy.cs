@@ -45,20 +45,23 @@ public static class UuShrinePolicy
 }
 
 /// <summary>
-/// Silver seed/tree: planting needs an open tile off level 9 and records
-/// the tree; rebirth at the tree is allowed while planted (and off level 9).
-/// Death without a tree resurrects at the T25 anchor slot instead.
-/// Donor: silverseed.cs planting/rebirth gates.
+/// Silver seed/tree: planting needs an open, fitting tile with growing
+/// terrain off level 9 (caller supplies terrain/fit reads); the tree is
+/// recorded on plant. Rebirth at the tree needs only the planted state
+/// (Godot playertdatdeath.cs:40; OU gates death-time level 9 too —
+/// disagreement recorded, primary donor followed; planting lives in
+/// silverseed.cs, rebirth in playertdatdeath.cs:38-65).
+/// Death without a tree resurrects at the T25 anchor slot instead — the
+/// anchor leg is task-owned (both donors game-over there).
 /// </summary>
 public static class UuSeedPolicy
 {
     public const int ForbiddenLevel = 9;
 
-    public static bool CanPlant(int level, bool tileOpen) =>
-        level != ForbiddenLevel && tileOpen;
+    public static bool CanPlant(int level, bool tileOpen, bool terrainGrows, bool fits) =>
+        level != ForbiddenLevel && tileOpen && terrainGrows && fits;
 
-    public static bool RebirthAvailable(bool planted, int level) =>
-        planted && level != ForbiddenLevel;
+    public static bool RebirthAvailable(bool planted) => planted;
 }
 
 /// <summary>

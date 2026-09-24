@@ -12,6 +12,10 @@ public sealed class UuShrineTests
         Assert.Equal(UuShrinePolicy.MantraKind.SingleSkill, UuShrinePolicy.Classify(0));
         Assert.Equal(UuShrinePolicy.MantraKind.SingleSkill, UuShrinePolicy.Classify(19));
         Assert.Equal(UuShrinePolicy.MantraKind.QuestSecret, UuShrinePolicy.Classify(20));
+        Assert.Equal(UuShrinePolicy.MantraKind.QuestSecret, UuShrinePolicy.Classify(21));
+        Assert.Equal(UuShrinePolicy.MantraKind.Group, UuShrinePolicy.Classify(25));
+        Assert.Equal(UuShrinePolicy.MantraKind.Unknown, UuShrinePolicy.Classify(-1));
+        Assert.False(UuShrinePolicy.RequiresSkillPoint(22));
         Assert.Equal(UuShrinePolicy.MantraKind.Unused, UuShrinePolicy.Classify(22));
         Assert.Equal(UuShrinePolicy.MantraKind.Group, UuShrinePolicy.Classify(23));
         Assert.Equal(UuShrinePolicy.MantraKind.Unknown, UuShrinePolicy.Classify(26));
@@ -27,12 +31,13 @@ public sealed class UuShrineTests
     [Fact]
     public void Seeds_plant_and_death_routes()
     {
-        Assert.True(UuSeedPolicy.CanPlant(3, true));
-        Assert.False(UuSeedPolicy.CanPlant(9, true));
-        Assert.False(UuSeedPolicy.CanPlant(3, false));
-        Assert.True(UuSeedPolicy.RebirthAvailable(true, 3));
-        Assert.False(UuSeedPolicy.RebirthAvailable(true, 9));
-        Assert.False(UuSeedPolicy.RebirthAvailable(false, 3));
+        Assert.True(UuSeedPolicy.CanPlant(3, true, true, true));
+        Assert.False(UuSeedPolicy.CanPlant(9, true, true, true));
+        Assert.False(UuSeedPolicy.CanPlant(3, false, true, true));
+        Assert.False(UuSeedPolicy.CanPlant(3, true, false, true));
+        Assert.False(UuSeedPolicy.CanPlant(3, true, true, false));
+        Assert.True(UuSeedPolicy.RebirthAvailable(true));
+        Assert.False(UuSeedPolicy.RebirthAvailable(false));
 
         Assert.Equal(UuDeathPolicy.Respawn.AtTree, UuDeathPolicy.Route(true));
         Assert.Equal(UuDeathPolicy.Respawn.AtAnchor, UuDeathPolicy.Route(false));
