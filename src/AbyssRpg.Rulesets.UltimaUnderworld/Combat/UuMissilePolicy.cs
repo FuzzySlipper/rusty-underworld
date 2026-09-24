@@ -11,6 +11,15 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 /// GetAttackScore (Missile-alone roll), shared damage routine
 /// (UW.EXE 0x2527e/0x259e7). No code shared. Ammunition item ids and the
 /// fixed difficulty are content/tuning (Approximate until verified).
+///
+/// DELIBERATE DIVERGENCE (task-mandated): the donor scales a player-owned
+/// physical missile's table damage by Missile skill — (192 + 8*Missile)/256
+/// with crit adjustments off a Missile-vs-10 roll, gated on the 0xC0 marker
+/// byte that keeps skill out of spell damage (Projectile.GetMaxDamage,
+/// Assets/Game/Scripts/Projectile.cs:254-286; ObjectsData.cs:41-44,
+/// UW.EXE 0x2b2e6). UW-T16 acceptance requires NO skill/level projectile
+/// bonuses, so the policy omits the scale and its 0xC0/owner gates, and
+/// RollShot crits do not feed damage. Revisit only if a task reinstates it.
 /// </summary>
 public static class UuMissilePolicy
 {

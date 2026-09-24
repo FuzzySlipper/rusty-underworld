@@ -47,6 +47,14 @@ public sealed class ObjectTableTests
 
         Assert.Equal(64, tables.Critters.Count);
         Assert.Equal(1, tables.Critters[0].Level);
+        Assert.Equal(5, tables.Critters[0].AvgHp);
+        Assert.Equal(7, tables.Critters[0].Dexterity);
+        Assert.Equal(3, tables.Critters[0].Speed);
+        Assert.Equal(1, tables.Critters[0].Faction);
+        Assert.Equal(20, tables.Critters[10].AvgHp);
+        Assert.Equal(3, tables.Critters[10].CorpseIndex);
+        Assert.False(tables.Critters[10].IsSwimmer);
+        Assert.False(tables.Critters[10].IsFlier);
         Assert.Equal(48, tables.Critters[0].Raw.Length);
 
         Assert.Equal(16, tables.Containers.Count);

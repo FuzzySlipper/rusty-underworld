@@ -7,7 +7,7 @@ using AbyssRpg.Kit.Facts;
 
 namespace AbyssRpg.Kit.Ai;
 
-public enum PursuitState { Idle, Chase, Attack, Dead }
+public enum PursuitState { Idle, Chase, Attack, Retreat, Dead }
 
 /// <summary>Entity-local memory for one actor's current pursuit decision.</summary>
 public sealed class PursuitMemoryComponent

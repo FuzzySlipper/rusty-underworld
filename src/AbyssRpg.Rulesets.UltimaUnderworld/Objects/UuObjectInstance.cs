@@ -13,12 +13,18 @@ public sealed record UuObjectInstance(
     int ItemId,
     int Quality,
     int Quantity,
-    bool IsQuant)
+    bool IsQuant,
+    bool CanBePickedUp)
 {
-    /// <summary>Major class is the top two bits of the item id; class 1 is NPCs.</summary>
+    /// <summary>Major class is bits 6+ of the item id; class 1 is NPCs.</summary>
     public int MajorClass => ItemId >> 6;
 
-    public bool CanBeTaken => MajorClass != 1;
+    /// <summary>
+    /// Interim take gate: NPCs never, plus the per-item COMOBJ pickup flag.
+    /// Donor pickup also checks weight and a single item override; weight
+    /// rides with the lift gate (UW-T12), content overrides with UW-T35.
+    /// </summary>
+    public bool CanBeTaken => MajorClass != 1 && CanBePickedUp;
 }
 
 /// <summary>
@@ -48,18 +54,25 @@ public static class UuObjectVerbs
     }
 
     /// <summary>
-    /// Split count off an instance (the how-many flow). Returns the taken
-    /// part; the original keeps the remainder.
+    /// Split count off an instance (the how-many flow). The kept part retains
+    /// the source identity; the taken part is a new object and MUST carry a
+    /// distinct, caller-minted identity (the donor spawns a new object for
+    /// the split part). Returns the taken part; the original keeps the
+    /// remainder.
     /// </summary>
-    public static (UuObjectInstance Kept, UuObjectInstance Taken) Split(UuObjectInstance source, int count)
+    public static (UuObjectInstance Kept, UuObjectInstance Taken) Split(
+        UuObjectInstance source, int count, DurableIdentityReference takenIdentity)
     {
         ArgumentNullException.ThrowIfNull(source);
         if (!source.IsQuant)
             throw new InvalidOperationException($"Item {source.ItemId} does not stack.");
         if (count <= 0 || count >= source.Quantity)
             throw new ArgumentOutOfRangeException(nameof(count), $"Split count must be within 1-{source.Quantity - 1}.");
+        takenIdentity.Validate();
+        if (takenIdentity.Equals(source.Identity))
+            throw new ArgumentException("The split part needs a distinct identity.", nameof(takenIdentity));
         return (
             source with { Quantity = source.Quantity - count },
-            source with { Quantity = count });
+            source with { Identity = takenIdentity, Quantity = count });
     }
 }

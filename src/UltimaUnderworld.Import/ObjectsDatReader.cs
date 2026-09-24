@@ -49,7 +49,18 @@ public static class ObjectsDatReader
     public sealed record WeaponRow(int Slash, int Bash, int Stab, int MinCharge, int ChargeSpeed, int MaxCharge, int Skill, int Durability);
     public sealed record RangedRow(int Damage, int AmmoType, int RangedWeaponType);
     public sealed record ArmourRow(int Protection, int Durability, int Unknown, int Slot);
-    public sealed record CritterRow(int Level, byte[] Raw);
+    public sealed record CritterRow(
+        int Level,
+        int AvgHp,
+        int Strength,
+        int Dexterity,
+        int Intelligence,
+        int CorpseIndex,
+        bool IsSwimmer,
+        bool IsFlier,
+        int Speed,
+        int Faction,
+        byte[] Raw);
     // Donors disagree on bytes +1/+2 (Godot reads one u16 object mask,
     // OU reads mask byte + slots byte); the reader follows OU's 3-byte split.
     public sealed record ContainerRow(int CapacityTenthStones, int ObjectsMask, int Slots);
@@ -99,7 +110,21 @@ public static class ObjectsDatReader
         for (int i = 0; i < CritterCount; i++)
         {
             int at = CritterOffset + (i * CritterRecordSize);
-            critters[i] = new CritterRow(data[at], data.Slice(at, CritterRecordSize).ToArray());
+            // Layout per critterobjectdat: level +0; avg HP +4; STR/DEX/INT
+            // +5/+6/+7; flags +A (corpse bits 2-4, swimmer bit 6, flier bit 7);
+            // speed +C; faction low 6 bits of +9.
+            critters[i] = new CritterRow(
+                Level: data[at],
+                AvgHp: data[at + 4],
+                Strength: data[at + 5],
+                Dexterity: data[at + 6],
+                Intelligence: data[at + 7],
+                CorpseIndex: (data[at + 0xA] >> 2) & 0x7,
+                IsSwimmer: ((data[at + 0xA] >> 6) & 1) == 1,
+                IsFlier: ((data[at + 0xA] >> 7) & 1) == 1,
+                Speed: data[at + 0xC],
+                Faction: data[at + 9] & 0x3F,
+                Raw: data.Slice(at, CritterRecordSize).ToArray());
         }
 
         var containers = new ContainerRow[ContainerCount];
