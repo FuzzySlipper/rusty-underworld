@@ -23,6 +23,14 @@ public sealed class AbyssProduct : IEngineProduct
 
     public BuiltInSelection Selection { get; }
 
+    /// <summary>Engine composition entry: default built-in selection.</summary>
+    public AbyssProduct(ProductCreateContext context)
+        : this(
+            context?.Engine ?? throw new ArgumentNullException(nameof(context)),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld))
+    {
+    }
+
     public AbyssProduct(IEngineContext context, BuiltInSelection selection)
     {
         ArgumentNullException.ThrowIfNull(context);
