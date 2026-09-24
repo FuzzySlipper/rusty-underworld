@@ -123,7 +123,7 @@ not move ruleset vocabulary into it merely by renaming it.
 
 `AbyssRpg.Kit` must not contain Ultima Underworld vocabulary. The forbidden set
 includes the game and ruleset names (`UltimaUnderworld`, `Ultima`, `Underworld`,
-`Stygian`, `Abyss` as a place name, `UW1`, `UW2`), world and level names from the
+`Stygian`, `Abyss` as a place name, `UW1`, `UW2`, `UU1`), world and level names from the
 game, its attribute/skill/rune/spell/object/critter names, donor project names
 (`UnderworldGodot`, `OpenUnderground`, `UnityUnderground`), and source file
 names (`.ARK`, `.GR`, `.BYT`, `.TR`, `.PAK`, `.DAT` basenames such as `LEV`,
