@@ -67,17 +67,27 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
 internal class EngineContextFake : DispatchProxy
 {
     private IPersistenceService? _persistence;
+    private ISpatialService? _spatial;
+    private IContentService? _content;
 
-    public static IEngineContext Create(IPersistenceService persistence)
+    public static IEngineContext Create(
+        IPersistenceService? persistence = null,
+        ISpatialService? spatial = null,
+        IContentService? content = null)
     {
         IEngineContext context = DispatchProxy.Create<IEngineContext, EngineContextFake>();
-        ((EngineContextFake)(object)context)._persistence = persistence;
+        var fake = (EngineContextFake)(object)context;
+        fake._persistence = persistence;
+        fake._spatial = spatial;
+        fake._content = content;
         return context;
     }
 
     protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
     {
-        "get_Persistence" => _persistence ?? throw new InvalidOperationException("Persistence not set."),
+        "get_Persistence" => _persistence ?? throw new NotSupportedException(method?.Name),
+        "get_Spatial" => _spatial ?? throw new NotSupportedException(method?.Name),
+        "get_Content" => _content ?? throw new NotSupportedException(method?.Name),
         _ => throw new NotSupportedException(method?.Name),
     };
 }
