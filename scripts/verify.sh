@@ -84,6 +84,7 @@ product_projects=(
 )
 test_projects=(
   "tests/AbyssRpg.Architecture.Tests/AbyssRpg.Architecture.Tests.csproj"
+  "tests/UltimaUnderworld.Import.Tests/UltimaUnderworld.Import.Tests.csproj"
 )
 host_project=""
 # Stays empty until UW-T01 lands a stageable Host entry; staging and --aot
