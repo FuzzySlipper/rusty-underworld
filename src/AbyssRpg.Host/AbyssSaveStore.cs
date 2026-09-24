@@ -39,6 +39,10 @@ public sealed class AbyssSaveStore : IDisposable
         {
             throw new AbyssSaveFormatException("The persisted AbyssRpg save contains invalid data.", error);
         }
+        catch (InvalidOperationException error) when (error is not AbyssSaveFormatException)
+        {
+            throw new AbyssSaveFormatException("The persisted AbyssRpg save contains invalid data.", error);
+        }
     }
 
     public PersistenceSaveReceipt Save(string key, AbyssSaveEnvelope value, PersistenceRevisionGuard guard = PersistenceRevisionGuard.Any, ulong expectedRevision = 0) =>
