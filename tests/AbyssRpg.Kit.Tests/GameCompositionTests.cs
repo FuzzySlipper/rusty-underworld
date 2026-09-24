@@ -46,6 +46,16 @@ public sealed class GameCompositionTests
     }
 
     [Fact]
+    public void Provenance_is_optional()
+    {
+        GameCompositionResolution resolution = GameCompositionResolver.Resolve(
+            Composition(BundleWithPack(provenance: "")), new GameBundleId("test.bundle"));
+
+        Assert.True(resolution.IsResolved);
+        Assert.Null(resolution.RequireComposition().RequireContentPack(new ContentPackId("test.pack")).Provenance);
+    }
+
+    [Fact]
     public void Rejects_unknown_kinds_and_missing_packs()
     {
         GameCompositionResolution wrongKind = GameCompositionResolver.Resolve(
