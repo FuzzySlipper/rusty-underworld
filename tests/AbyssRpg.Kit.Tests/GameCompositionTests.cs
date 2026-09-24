@@ -70,4 +70,27 @@ public sealed class GameCompositionTests
             "{\"kind\":\"abyssrpg.content-pack\",\"id\":\"test.pack\",\"ruleset\":\"other\",\"dependencies\":[],\"payload\":\"payload/pack.bin\"}");
         Assert.False(GameCompositionResolver.Resolve(Composition(files), new GameBundleId("test.bundle")).IsResolved);
     }
+
+    [Fact]
+    public void Orders_dependencies_before_dependents_and_rejects_cycles()
+    {
+        ProductContentFile[] files = BundleWithPack();
+        files[0] = File("bundles/test.bundle.json",
+            "{\"kind\":\"abyssrpg.game-bundle\",\"id\":\"test.bundle\",\"ruleset\":\"test.ruleset\",\"contentPacks\":[{\"id\":\"test.top\"}],\"tuning\":{\"id\":\"test.tuning\"}}");
+        files[1] = File("packs/test.pack.json",
+            "{\"kind\":\"abyssrpg.content-pack\",\"id\":\"test.pack\",\"ruleset\":\"test.ruleset\",\"dependencies\":[],\"payload\":\"payload/pack.bin\"}");
+        var top = File("packs/test.top.pack.json",
+            "{\"kind\":\"abyssrpg.content-pack\",\"id\":\"test.top\",\"ruleset\":\"test.ruleset\",\"dependencies\":[{\"id\":\"test.pack\"}],\"payload\":\"payload/pack.bin\"}");
+        GameCompositionResolution ordered = GameCompositionResolver.Resolve(
+            Composition([.. files, top]), new GameBundleId("test.bundle"));
+        Assert.True(ordered.IsResolved);
+        Assert.Equal(["test.pack", "test.top"],
+            ordered.RequireComposition().ContentPacks.Select(p => p.Id.Value));
+
+        // Cycle: top depends on pack, pack depends on top.
+        files[1] = File("packs/test.pack.json",
+            "{\"kind\":\"abyssrpg.content-pack\",\"id\":\"test.pack\",\"ruleset\":\"test.ruleset\",\"dependencies\":[{\"id\":\"test.top\"}],\"payload\":\"payload/pack.bin\"}");
+        Assert.False(GameCompositionResolver.Resolve(
+            Composition([.. files, top]), new GameBundleId("test.bundle")).IsResolved);
+    }
 }
