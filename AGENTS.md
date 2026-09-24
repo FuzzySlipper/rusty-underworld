@@ -313,3 +313,24 @@ used for backup and change tracking, so there is no push-approval ceremony and n
 blast-radius review. Keep each commit scoped to the work that produced it, and
 leave unrelated dirty files alone. `AGENTS.md` is intentionally tracked despite
 its `.gitignore` rule; stage it with `git add -f AGENTS.md`.
+
+## Task workflow (Den + commits)
+
+Den (`rusty-underworld`) is the durable status record; Git is the evidence.
+For every task, follow this loop:
+
+1. **Start:** move the Den task to `in_progress` when work begins.
+2. **Commit per task:** commit and push the task's work (plus its review
+   reconciliations) with the task ID in the message, e.g.
+   `UW-T06: ...`. One task, one commit series — never batch unrelated tasks.
+3. **Attach the commit:** when the task reaches `done` (or `review`/`blocked`),
+   append `Delivered in: <hash> (...)` to the task description, naming what
+   each commit carried, plus any explicit remainder and its receiving task.
+   A task without a commit hash is not done.
+4. **Status updates:** post short evidence messages on the task for review
+   verdicts, scope decisions, and deferred remainders, so later searches
+   recover *why*, not just *what*.
+
+Keep descriptions free of pinned versions and commit revisions *of other
+things*; the delivery hashes above are the exception — they are the task's
+own audit trail, not prose pins.
