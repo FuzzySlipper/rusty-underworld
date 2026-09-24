@@ -3,7 +3,7 @@ namespace AbyssRpg.Kit.Time;
 /// <summary>
 /// One product game-time counter advanced only inside Engine-admitted updates
 /// or explicit rest operations. Ticks are opaque: the ruleset defines what a
-/// tick means (UW: 15,300 ticks per game minute). No wall clock, no thread,
+/// tick means (e.g. ticks per game minute). No wall clock, no thread,
 /// no second loop — callers pass elapsed ticks explicitly.
 /// </summary>
 public sealed class GameClock

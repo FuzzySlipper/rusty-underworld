@@ -2,17 +2,18 @@ namespace UltimaUnderworld.Import;
 
 /// <summary>
 /// Reads UW1 palette/light tables as fixed-size raw records: PALS.DAT holds
-/// 24 palettes of 256 bytes, LIGHT.DAT 16 tables of 256 bytes, SHADES.DAT a
-/// 96-byte shading table. Palette *meaning* (cycles, fades) is presentation
-/// policy for a later media task; the importer only guarantees shape.
+/// 8 palettes of 768 bytes (256 × 3-byte RGB triplets), LIGHT.DAT 16 tables
+/// of 256 bytes, SHADES.DAT a 96-byte shading table. Palette *meaning*
+/// (cycles, fades) is presentation policy for a later media task; the
+/// importer only guarantees shape.
 /// Texture art (W64.TR/F32.TR) is out of scope here — see UW-T35.
 /// Sizes observed from the shipped files; layout reference:
 /// UnderworldGodot palette/shade/light loading.
 /// </summary>
 public static class PaletteTableReader
 {
-    public const int PaletteCount = 24;
-    public const int PaletteSize = 256;
+    public const int PaletteCount = 8;
+    public const int PaletteSize = 768;
     public const int LightTableCount = 16;
     public const int LightTableSize = 256;
     public const int ShadesLength = 96;

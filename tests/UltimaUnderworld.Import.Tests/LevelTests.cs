@@ -46,19 +46,26 @@ public sealed class LevelTests
     }
 
     [Fact]
-    public void Shipped_levels_have_no_lava_spawns_or_broken_chains()
+    public void Shipped_lava_levels_report_spawns_and_upper_levels_are_clean()
     {
         byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
         byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
         if (archive is null || terrain is null) return;
 
-        // Independently verified: no shipped floor tile maps to lava terrain,
-        // so the donor's lava-spawn bug class lives in loader behavior, not
-        // shipped coordinates. This guards our future placement code.
-        for (int level = 1; level <= 9; level++)
+        // Donor-model census of lava-floor tiles per level (L1-L9):
+        // 0,0,0,0,168,736,315,1529,49. Levels 1-3 have no lava floors at all;
+        // levels 5+ do, so the validator must fire there and stay quiet above.
+        for (int level = 1; level <= 3; level++)
         {
             var pack = LevArkReader.ReadLevel(archive, level, terrain);
             Assert.Empty(LevArkReader.ValidatePlacement(pack, terrain));
+        }
+
+        for (int level = 5; level <= 9; level++)
+        {
+            var pack = LevArkReader.ReadLevel(archive, level, terrain);
+            var issues = LevArkReader.ValidatePlacement(pack, terrain);
+            Assert.Contains(issues, i => i.Kind == "spawn-on-lava");
         }
     }
 
@@ -71,9 +78,11 @@ public sealed class LevelTests
 
         var pack = LevArkReader.ReadLevel(archive, 1, terrain);
         LevArkReader.Tile anchor = pack.Tiles.First(t => t.ObjectHead == 0 && t.Type == LevArkReader.TileOpen);
-        int actual = pack.Textures.Entries[anchor.FloorTexture];
+        int actual = pack.Textures.Entries[anchor.FloorTexture + 48];
         byte[] lavaTerrain = (byte[])terrain.Clone();
-        lavaTerrain[TerrainDatReader.Uw1TerrainBase + actual] = 0x20;
+        int wordAt = (TerrainDatReader.Uw1TerrainBase + actual) * 2;
+        lavaTerrain[wordAt] = 0x20;
+        lavaTerrain[wordAt + 1] = 0x00;
 
         // Plant object 1 on the anchor tile through a synthetic head.
         var tiles = pack.Tiles.ToArray();
@@ -93,8 +102,9 @@ public sealed class LevelTests
         if (pals is null || light is null || shades is null) return;
 
         var tables = PaletteTableReader.Read(pals, light, shades);
-        Assert.Equal(24, tables.Palettes.Count);
-        Assert.Equal(new byte[] { 0, 0, 1, 0 }, tables.Palettes[0][..4]);
+        Assert.Equal(8, tables.Palettes.Count);
+        Assert.Equal(768, tables.Palettes[0].Length);
+        Assert.Equal(new byte[] { 0, 0, 1 }, tables.Palettes[0][..3]);
         Assert.Equal(16, tables.Light.Count);
         Assert.Equal(new byte[] { 0, 1, 2, 3 }, tables.Light[0][..4]);
         Assert.Equal(96, tables.Shades.Length);
