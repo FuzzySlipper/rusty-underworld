@@ -58,18 +58,29 @@ reshape for UW) · **SKIP** (do not copy; reason given).
   exactly this for level/object/NPC identity (coverage A2, UW-T03).
   `DurableIdentityKind.Actor` fits the single-avatar + critters model.
 
-### Actors — COPY core, ADAPT player
+### Actors — ADAPT (player construction is unfinished in Kit)
 
-- `Actors/ActorsState.cs` (138): factory over canonical Engine entities
-  (`StatsComponent`, `TargetingComponent`, `AttackState`,
-  `EffectsComponent`, `ActorVitals`) with durable lookup. COPY — delete
-  nothing; UW critter construction rides the same `Construct` path.
-- `CreatePlayer` enforces a single player (`"The session already has a
-  player."`) — ADAPT into the Avatar owner: one avatar is the UW design, so
-  keep the enforcement, add UW creation inputs.
+- `Actors/ActorsState.cs` (138): COPY the `Construct` core (canonical Engine
+  entity + stats/targeting/attack/effects/vitals) and the durable lookup
+  (`Get`/`TryGet`/identity map). But ADAPT avatar construction: `Construct`
+  never attaches `ActorBody`, `InventoryComponent`, or `EquipmentComponent`,
+  and `CreatePlayer` adds only `ProgressionState` — while `PlayerActorState`
+  exposes `Inventory`/`Equipment` accessors over components that do not exist
+  and carries no pose/position (only `ActorState` has them). In Dagger the
+  completing code lives in the NOT-copied `DaggerActorFactory` layer, so a
+  verbatim copy yields an avatar that cannot stand in the dungeon or be
+  equipped. The UW factory must attach pose + inventory + equipment (or unify
+  the two facades), replicating that finishing work for UW slots.
+- Consciously keep or remove the player-special-cases the split creates:
+  `AttackExecution.cs:40,110` (defeat check, actor enumeration) and
+  `TargetingService.cs:34,44,54` (current-target state) branch on the player
+  because `All` (an `ActorBody` query the player never appears in) and
+  `TryGet` (requires `ActorBody`, so the player is unresolvable) exclude it.
+  Single-avatar UW keeps the enforcement ("already has a player") but must
+  decide each branch deliberately.
 - `Actors/ActorNavigationCoordinator.cs` (79) + `Actors/PassiveTrackRecovery.cs`
-  (73): COPY — navigation coordination and Ellison-free recovery ticking fit
-  UW schedules and rest recovery.
+  (73): COPY — navigation coordination and recovery ticking fit UW schedules
+  and rest recovery.
 
 ### Facts — COPY
 
@@ -90,11 +101,16 @@ reshape for UW) · **SKIP** (do not copy; reason given).
 - SKIP `Modules/Combat/DaggerCombatRules.cs` (555) and siblings — Dagger
   formulas. Imitate the seam: one `*TargetingPolicy` file per domain.
 
-### Targeting — COPY
+### Targeting — COPY for avatar-aim (observer is avatar-only)
 
 - `Targeting/TargetingService.cs` (58) + `Targeting/InteractionTargetingService.cs`
   (209): COPY — Engine perception + explicit ruleset policy is precisely the
   UW targeting design (melee aim, Look/Get/Use detection, missile paths).
+- Caveat: `Select` observes solely from `actors.Player` and filters
+  candidates through `TryGet`, which requires `ActorBody` — so the avatar
+  can never be returned as a target. Fine for UW avatar aim, but
+  critter-vs-avatar AI selection must NOT reuse this path; route it through
+  pursuit-style explicit targets instead.
 
 ### Inventory — COPY core, ADAPT slots
 
@@ -104,8 +120,11 @@ reshape for UW) · **SKIP** (do not copy; reason given).
   and barter transfers all ride these operations (UW-T11/T12/T28).
 - `Inventory/MechanicsInventoryContainerCoordinator.cs` (395): COPY for the
   same reason (corpse/chest/bag containers share one lifecycle).
-- `Inventory/InventoryGridLayout.cs` (51): SKIP unless the DOM UI needs it —
-  UW drag semantics differ (donor has no drag-and-drop); decide at UI time.
+- `Inventory/InventoryGridLayout.cs` (51): COPY — "Presentation positions
+  only" slot bookkeeping (reconcile/move-swap/place-displace + revision) with
+  no Dagger content. UW1 interaction IS drag-based (manual: RIGHT-press-hold
+  drag; drop/throw by release region; torch+corn combining), and a drag UI
+  needs exactly this position/revision layer.
 - Equipment slot IDs (`EquipmentSlotId`, paperdoll assignments) are stringly
   typed records — ADAPT the slot catalog to UW wear slots (weapon/off-hand/
   shoulders/head/torso/hands/legs/feet/fingers).
@@ -117,19 +136,27 @@ reshape for UW) · **SKIP** (do not copy; reason given).
   rulesets keep identity/generation/eligibility. COPY — UW corpses persist
   and stay searchable, same contract (UW-T15).
 
-### AI — COPY
+### AI — ADAPT (no retreat, flat-world steering)
 
-- `Ai/PursuitCoordinator.cs` (157): COPY pursuit/attack/retreat coordination;
-  UW senses and schedules extend it (UW-T15/T29), not replace it.
+- `Ai/PursuitCoordinator.cs` (157): ADAPT, don't copy blindly.
+  `PursuitState` is `{Idle, Chase, Attack, Dead}` — there is no Retreat, so
+  UW morale/flee needs a Kit enum edit (a fork, stated upfront) or an
+  explicit retreat==Idle mapping. The Chase steering also flattens its
+  target to actor height while the Attack/Chase decision uses 3D distance —
+  mixed frames that misbehave across pits, ledges, and bridges. UW must set
+  a vertical policy for its multi-level dungeon at copy time.
 
 ### Effects — COPY, verify one bound
 
 - `Effects/ActiveEffectLifecycle.cs` (337): source identity, modifier
   removal, conditions, duration/stacking, `IActiveEffectContribution`
-  add/remove. COPY for UW active effects (UW-T19). VERIFY at copy time
-  whether it assumes a max-concurrent bound — UW allows max 3 with
-  stable/unstable time; encode that as ruleset policy over the lifecycle,
-  not a Kit fork.
+  add/remove. COPY for UW active effects (UW-T19), with two decided points:
+  the lifecycle stores states in an unbounded `Dictionary` with no
+  count/capacity check anywhere, so UW max-3 (+stable/unstable time) is a
+  **ruleset admission gate before `Admit`** — no Kit fork needed. And do NOT
+  copy `AdvanceInitialMagicRound` ("donor-style initial round",
+  immediate-first-tick semantic): the manual has no such concept, so leave
+  it behind unless a UW effect task proves otherwise.
 
 ### Progression — COPY
 
@@ -141,8 +168,15 @@ reshape for UW) · **SKIP** (do not copy; reason given).
 - `Controls/SpatialMovementSystem.cs` (462): `Step` with
   `CharacterStepEnvironment`/`CharacterStepControls`, wall-probe/climb
   queries, ray casts, collider projection, continuation capture. COPY — UW
-  walk/run/jump + ≤2 ft climb + drown-adjacent motion ride `Step`; VERIFY
-  swim coverage at copy time and extend, don't fork.
+  walk/run/jump + ≤2 ft climb ride `Step`. Decided at survey time: there is
+  NO swim/water/drown support in Kit Controls (zero hits) — UW swimming is
+  new Kit work, and the named extension point is the caller-supplied
+  `VerticalVelocity` drive in `Step`, which zeroes gravity and jump buffers.
+  Related decisions at copy time: `SpatialTuning` configures chunk-streamed
+  collision/navigation sizes (open-world shaping — retune for one continuous
+  tile-mapped dungeon), and level transitions must go through
+  `ReplaceContent`, which forces the session-per-level vs
+  session-per-dungeon decision the plan's area 4 must settle first.
 - `Controls/FirstPersonCameraSystem.cs` (123) + `FirstPersonCameraTuning`
   (validated record): COPY — Engine-owned camera fed by product pose facts
   is the UW view contract too.
@@ -159,8 +193,10 @@ reshape for UW) · **SKIP** (do not copy; reason given).
   (48), `Presentation/PresentationSlots.cs` (60): COPY — safe structured
   projection values without borrowed storage; the HUD/panel/map/conversation
   projections (F051–F055) build on these.
-- `Presentation/SpriteAtlasAdapter.cs` (65): SKIP — Dagger sprite-workbench
-  specific; UW media arrives via Import packs.
+- `Presentation/SpriteAtlasAdapter.cs` (65): COPY — pure pixel→UV and
+  frame-timing math with zero Dagger references. Import packs supply pixels;
+  something must still map them into Engine sprite requests for UW's
+  sprite-rendered critters/objects, and this is that something.
 
 ### Composition — COPY
 
