@@ -567,6 +567,21 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _outcome = outcome;
     }
 
+    /// <summary>
+    /// Operator probe: stand the avatar on a tile of the admitted level. The
+    /// Engine spatial step owns ordinary movement; this places the avatar for
+    /// probing a level position without walking there.
+    /// </summary>
+    public void PlaceOnTile(int tileX, int tileY)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_placements is null) throw new InvalidOperationException("This session admits no placements.");
+        AdmittedTile? tile = _placements.Tile(tileX, tileY)
+            ?? throw new ArgumentOutOfRangeException(nameof(tileX), $"Tile ({tileX},{tileY}) is outside the level.");
+        _player.Restore(
+            _placements.TileCenter(tile.X, tile.Y, tile.FloorHeight), DetachedMotion(tile.FloorHeight));
+    }
+
     /// <summary>The door tiles this session's level state has opened.</summary>
     public IReadOnlyCollection<(int X, int Y)> OpenedDoors => _session.Dungeon.Current.OpenedDoors;
 

@@ -41,6 +41,14 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
             : "position unavailable";
     }
 
+    [DebugCommand("abyss.goto", Description = "Operator probe: stand the avatar on a level tile.")]
+    public string Goto(int tileX, int tileY)
+    {
+        if (Live is not { } session) return "no live session";
+        session.PlaceOnTile(tileX, tileY);
+        return $"tile=({tileX},{tileY})";
+    }
+
     [DebugCommand("abyss.rune", Description = "Collect one rune into the casting shelf by index.")]
     public string CollectRune(int index)
     {
