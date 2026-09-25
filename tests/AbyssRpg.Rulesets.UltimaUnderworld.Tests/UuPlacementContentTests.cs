@@ -131,6 +131,28 @@ public sealed class UuPlacementContentTests
     }
 
     [Fact]
+    public void A_tile_row_that_names_another_tile_is_refused()
+    {
+        // The runtime indexes tiles by position, so a reordered grid would move
+        // every placement on the level without any other symptom.
+        string reordered = Placements("[500,0,200,0,0,0,0,0,-1,-1,12]")
+            .Replace("[7,7,0,0,0,0]", "[9,9,0,0,0,0]", StringComparison.Ordinal);
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => UuLevelContent.ReadPlacements(Encoding.UTF8.GetBytes(reordered), "placements"));
+        Assert.Contains("row-major", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_degenerate_height_scale_is_refused()
+    {
+        string flat = Placements("[500,0,200,0,0,0,0,0,-1,-1,12]")
+            .Replace("\"heightUnitsPerStep\": 1.0", "\"heightUnitsPerStep\": 0.0", StringComparison.Ordinal);
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => UuLevelContent.ReadPlacements(Encoding.UTF8.GetBytes(flat), "placements"));
+        Assert.Contains("height step scale", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void An_object_row_of_the_wrong_width_is_refused()
     {
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(

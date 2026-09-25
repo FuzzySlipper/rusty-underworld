@@ -6,5 +6,11 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Creation;
 /// </summary>
 public sealed record CreationTables(IReadOnlyList<CreationTables.ClassRow> Classes, byte[] ChoiceTable)
 {
+    /// <summary>The walk gives each class this many records, in class order.</summary>
+    public const int RecordsPerClass = 5;
+
+    /// <summary>The most picks one record may offer; the flow's offer slots bound it.</summary>
+    public const int MaxOfferedSkills = 18;
+
     public sealed record ClassRow(int Strength, int Dexterity, int Intelligence, int BonusPool);
 }

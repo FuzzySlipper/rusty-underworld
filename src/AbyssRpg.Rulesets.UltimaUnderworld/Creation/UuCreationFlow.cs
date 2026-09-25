@@ -49,7 +49,7 @@ public sealed class UuCreationFlow
     public int Difficulty { get; private set; } = -1;
     public string Name { get; private set; } = "";
 
-    private readonly int[] _offeredSkills = new int[18];
+    private readonly int[] _offeredSkills = new int[CreationTables.MaxOfferedSkills];
     private int _arrayPtr;
 
     public UuCreationFlow(CreationTables tables, Random rng)
@@ -111,7 +111,7 @@ public sealed class UuCreationFlow
         for (int pass = 0; pass <= _tables.ChoiceTable.Length; pass++)
         {
             int record = SeekChoiceRecord();
-            if (record < 0 || _arrayPtr >= 5) return null;
+            if (record < 0 || _arrayPtr >= CreationTables.RecordsPerClass) return null;
 
             byte[] table = _tables.ChoiceTable;
             switch (table[record])

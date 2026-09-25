@@ -47,6 +47,17 @@ try
     string renderFile = $"{packId}-render.json";
     string manifestFile = $"{packId}.level.json";
 
+    // A chain the runtime cannot walk would silently drop the objects behind
+    // the break, so the tool refuses to emit a level whose placements are
+    // malformed (out-of-range index, cycle, or a spawn inside lava).
+    IReadOnlyList<LevArkReader.PlacementIssue> issues = LevArkReader.ValidatePlacement(pack, terrain);
+    if (issues.Count > 0)
+    {
+        foreach (LevArkReader.PlacementIssue issue in issues.Take(10))
+            Console.Error.WriteLine($"placement issue: {issue.Kind} at tile ({issue.TileX},{issue.TileY}) object {issue.ObjectIndex}");
+        throw new InvalidDataException($"Level {level} has {issues.Count} placement issue(s); refusing to emit it.");
+    }
+
     LevelPlacements.Placements placements = LevelPlacements.Emit(pack, options);
     string placementsFile = $"{packId}-placements.json";
 

@@ -117,6 +117,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private readonly UuLevelPlacements? _placements;
 
+    /// <summary>The actor each placed critter slot became, so a defeat can be recorded.</summary>
+    private IReadOnlyDictionary<int, ActorState> _placedCritters =
+        new Dictionary<int, ActorState>();
+
     /// <summary>Live placed actors around the avatar; the status line reports it.</summary>
     public int PresentActors
     {
@@ -316,10 +320,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         };
 
         // Placed critters become actors in the same admitted world the item
-        // pass filled, so a swing or an interaction meets a real presence.
+        // pass filled, so a swing or an interaction meets a real presence. A
+        // restored save then removes the actors of placements it says are gone.
         if (prepared.Placements is { } placedLevel && prepared.Tables is { } objectTables)
         {
-            UuCritterAdmission.AdmitLevel(session, prepared.FirstLevel, placedLevel, objectTables);
+            gameSession._placedCritters = UuCritterAdmission
+                .AdmitLevel(session, prepared.FirstLevel, placedLevel, objectTables)
+                .ByObjectIndex;
         }
 
         if (savedSnapshot is not null)
@@ -503,6 +510,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         int attackSkill = (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{AttackSkill}")).Value;
         UuCombatHosting.StrikeOutcome strike = _combat.Release(
             _session.Avatar.Stats, target.Stats, attackSkill, difficulty: 15, damageSides: 6, _rng);
+        if (strike.Hit && strike.TargetDefeated) RecordDefeat(target);
         _outcome = strike.Hit
             ? strike.TargetDefeated
                 ? $"You strike for {strike.Damage} and it falls."
@@ -535,6 +543,21 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _outcome = open ? "You open the door." : "You close the door.";
     }
 
+    /// <summary>
+    /// Records a fallen placement in the level state, which is what the save
+    /// carries: without it the same critter is standing at full strength after
+    /// a load.
+    /// </summary>
+    private void RecordDefeat(ActorState target)
+    {
+        foreach (KeyValuePair<int, ActorState> placed in _placedCritters)
+        {
+            if (placed.Value.DurableId != target.DurableId) continue;
+            _session.Dungeon.Current.RemoveObject(placed.Key);
+            return;
+        }
+    }
+
     private ActorState? NearestOpponent()
     {
         ActorState? nearest = null;
@@ -542,6 +565,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         WorldPoint origin = _player.Position ?? _level.Spawn.Position;
         foreach (ActorState actor in _session.Actors.All)
         {
+            // A fallen opponent is scenery, not a target.
+            if (actor.IsDefeated) continue;
             float distance = actor.Position.HorizontalDistanceTo(origin);
             if (distance > nearestDistance) continue;
             nearest = actor;
@@ -570,7 +595,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// <summary>
     /// Operator probe: stand the avatar on a tile of the admitted level. The
     /// Engine spatial step owns ordinary movement; this places the avatar for
-    /// probing a level position without walking there.
+    /// probing a level position without walking there. Only a tile the level
+    /// admits as open is accepted: a capsule placed inside solid geometry makes
+    /// the Engine refuse the next character step, which taints the runtime and
+    /// costs the live session.
     /// </summary>
     public void PlaceOnTile(int tileX, int tileY)
     {
@@ -578,6 +606,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_placements is null) throw new InvalidOperationException("This session admits no placements.");
         AdmittedTile? tile = _placements.Tile(tileX, tileY)
             ?? throw new ArgumentOutOfRangeException(nameof(tileX), $"Tile ({tileX},{tileY}) is outside the level.");
+        if (!UuTileKind.IsOpen(tile))
+        {
+            throw new InvalidOperationException(
+                $"Tile ({tileX},{tileY}) is not open in the admitted level, so the avatar cannot stand there.");
+        }
         // The Engine's controller stands on the floor by its own half-height,
         // so a placed avatar is the tile center raised to the capsule's
         // standing center; a capsule placed at floor level is inside geometry

@@ -132,6 +132,15 @@ public sealed class SpatialMovementSystem : IDisposable
     /// <summary>How many proposals one admitted frame is subdivided into at most.</summary>
     public const int MaxSubsteps = 8;
 
+    /// <summary>
+    /// Proposes one admitted frame's motion to the Engine and applies the
+    /// confirmed continuation. The frame is subdivided into proposals inside
+    /// the Engine's admitted window, and the caller's own motion and one-shot
+    /// presses ride with the first proposal. A frame longer than
+    /// <see cref="MaxSubsteps"/> windows is proposed up to the cap and the
+    /// remainder is dropped, which bounds one frame's work after a hitch; a
+    /// frame shorter than <see cref="MinimumStepSeconds"/> proposes nothing.
+    /// </summary>
     public CharacterStepReceipt? Step(PlayerControlState player, ProductUpdateState update, CharacterStepEnvironment? environment = null, CharacterStepControls? controls = null)
     {
         if (_disposed) return null;
@@ -140,7 +149,6 @@ public sealed class SpatialMovementSystem : IDisposable
         if (player.Position is not WorldPoint position) return null;
 
         CharacterStepEnvironment stepEnvironment = environment ?? CharacterStepEnvironment.Empty;
-        ulong sequence = checked(player.Motion.LastCommandSequence + 1);
         CharacterStepControls selected = controls ?? default;
         if (selected.VerticalVelocity is float verticalVelocity && !float.IsFinite(verticalVelocity))
             throw new ArgumentOutOfRangeException(nameof(controls), "Controlled vertical velocity must be finite.");
@@ -186,15 +194,19 @@ public sealed class SpatialMovementSystem : IDisposable
         CharacterStepReceipt? latest = null;
         for (int substep = 0; substep < MaxSubsteps && remaining >= MinimumStepSeconds; substep++)
         {
+            // A press, and the motion the caller selected, belong to the frame:
+            // the first proposal carries them, and the later slices carry the
+            // continuation the Engine confirmed.
+            bool first = substep == 0;
             float slice = Math.Min(remaining, MaximumStepSeconds);
             remaining -= slice;
             ulong stepSequence = checked(player.Motion.LastCommandSequence + 1);
             CharacterControllerCommand command = new(
                 selected.PlanarIntent ?? update.PlanarIntent,
                 player.YawRadians,
-                verticalDriveSelected ? false : selected.JumpPressed,
-                verticalDriveSelected ? false : selected.JumpHeld,
-                selected.CrouchRequested,
+                first && !verticalDriveSelected && selected.JumpPressed,
+                first && !verticalDriveSelected && selected.JumpHeld,
+                first && selected.CrouchRequested,
                 ExternalVelocity: Vector3.Zero,
                 ExternalImpulse: Vector3.Zero,
                 slice,
@@ -202,7 +214,7 @@ public sealed class SpatialMovementSystem : IDisposable
             CharacterStepRequest request = new(
                 _session,
                 (player.Position ?? position).ToVector(),
-                player.Motion,
+                first ? motion : player.Motion,
                 stepEnvironment.Support,
                 stepEnvironment.Obstacles,
                 stepEnvironment.MeshInstances,

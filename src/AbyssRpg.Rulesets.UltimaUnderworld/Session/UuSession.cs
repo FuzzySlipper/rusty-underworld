@@ -22,6 +22,7 @@ public sealed class UuSession : IDisposable
 {
     private readonly Dictionary<int, UuLevelDelta> _storedDeltas = [];
     private readonly Dictionary<int, UuEntityAdmission.Admission> _admissions = [];
+    private readonly Dictionary<int, DurableIdentityReference> _placedActors = [];
     private bool _disposed;
 
     public ActorsState Actors { get; }
@@ -199,6 +200,15 @@ public sealed class UuSession : IDisposable
                         Directory.Destroy(identity);
                 }
             }
+
+            // A placement the save says is gone must not stand there as an
+            // actor either: a critter that was struck down is not waiting at
+            // full strength for the next load.
+            foreach (int removed in current.RemovedObjects)
+            {
+                if (_placedActors.Remove(removed, out DurableIdentityReference actor))
+                    Actors.Entities.Destroy(actor);
+            }
         }
         Quests.Clear();
         foreach (QuestVarDto quest in snapshot.QuestVars) Quests.Set(quest.Slot, quest.Value);
@@ -230,6 +240,33 @@ public sealed class UuSession : IDisposable
         delta.MovedObjects.Select(kv => new MovedObjectDto(kv.Key, kv.Value.TileX, kv.Value.TileY)).ToArray(),
         delta.OpenedDoors.Select(door => new DoorDto(door.X, door.Y)).ToArray(),
         delta.Dropped.Select(d => new DroppedDto(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray());
+
+    /// <summary>
+    /// Remembers which actor a placed object index became, so a save that says
+    /// the placement is gone also removes the actor standing there. Critter
+    /// admission registers here; nothing else places actors on the level.
+    /// </summary>
+    public void RegisterPlacedActor(int placementIndex, ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        if (placementIndex <= 0 || placementIndex > UuLevelState.MaxObjectIndex)
+            throw new ArgumentOutOfRangeException(nameof(placementIndex), "A placement index is 1-1023.");
+        _placedActors[placementIndex] = ActorsState.Identity(actor.DurableId);
+    }
+
+    /// <summary>The actor a placement index became, if it is still standing.</summary>
+    public bool TryGetPlacedActor(int placementIndex, out ActorState actor)
+    {
+        if (_placedActors.TryGetValue(placementIndex, out DurableIdentityReference identity)
+            && Actors.Entities.TryResolve(identity, out _))
+        {
+            actor = Actors.Get(checked((long)identity.Value));
+            return true;
+        }
+
+        actor = null!;
+        return false;
+    }
 
     public void Dispose()
     {

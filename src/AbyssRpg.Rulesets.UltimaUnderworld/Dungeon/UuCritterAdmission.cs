@@ -54,6 +54,9 @@ public static class UuCritterAdmission
                 session.Actors, session.ActorIdentities, pose, definition);
             actors.Add(actor);
             byObjectIndex[placed.Index] = actor;
+            // The session owns the placement-to-actor link so a save that
+            // removes the placement also removes the actor.
+            session.RegisterPlacedActor(placed.Index, actor);
         }
 
         return new Admission(actors, byObjectIndex);

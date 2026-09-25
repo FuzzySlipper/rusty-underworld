@@ -58,6 +58,7 @@ public static class UuCreationCatalog
         var choiceTable = new List<byte>();
         foreach (JsonElement record in Array(classesRoot, "skillChoiceTable", classesLabel).EnumerateArray())
             choiceTable.Add(checked((byte)record.GetInt32()));
+        ValidateChoiceTable(choiceTable, classesLabel);
 
         UuAvatarDefaults defaults = new(
             Gender: Index(Array(optionsRoot, "genders", avatarLabel), "male", avatarLabel),
@@ -97,6 +98,55 @@ public static class UuCreationCatalog
         flow.SubmitName(defaults.Name);
         return flow.Confirm(true)
             ?? throw new InvalidOperationException("Default avatar creation did not confirm.");
+    }
+
+    /// <summary>
+    /// Reads the skill-choice walk the way the creation flow walks it: five
+    /// records per class, each record either a fixed skill or a count of
+    /// offered picks. A malformed table would otherwise surface as an index
+    /// overrun deep inside the flow, or silently offer nothing at all.
+    /// </summary>
+    private static void ValidateChoiceTable(IReadOnlyList<byte> table, string label)
+    {
+        int at = 0;
+        for (int classIndex = 0; classIndex < ClassOrder.Count; classIndex++)
+        {
+            for (int record = 0; record < CreationTables.RecordsPerClass; record++)
+            {
+                if (at >= table.Count)
+                    throw new InvalidOperationException($"'{label}' class {classIndex} has fewer than {CreationTables.RecordsPerClass} skill records.");
+                int head = table[at];
+                int width = head switch { 0 => 1, 1 => 2, _ => head + 1 };
+                if (at + width > table.Count)
+                    throw new InvalidOperationException($"'{label}' skill record at {at} runs past the end of the table.");
+                if (head > 1 && head > CreationTables.MaxOfferedSkills)
+                {
+                    throw new InvalidOperationException(
+                        $"'{label}' offers {head} skills at record {at}; at most {CreationTables.MaxOfferedSkills} are offered.");
+                }
+
+                if (head == 1 && table[at + 1] >= UuSkillRolls.SkillCount)
+                {
+                    throw new InvalidOperationException(
+                        $"'{label}' rolls skill {table[at + 1]} at record {at}, but skills are 0-{UuSkillRolls.SkillCount - 1}.");
+                }
+
+                if (head > 1)
+                {
+                    for (int option = 0; option < head; option++)
+                    {
+                        if (table[at + 1 + option] >= UuSkillRolls.SkillCount)
+                        {
+                            throw new InvalidOperationException(
+                                $"'{label}' offers skill {table[at + 1 + option]} at record {at}, "
+                                + $"but skills are 0-{UuSkillRolls.SkillCount - 1}.");
+                        }
+                    }
+                }
+
+                at += width;
+            }
+        }
     }
 
     private static int Index(JsonElement array, string expected, string label)

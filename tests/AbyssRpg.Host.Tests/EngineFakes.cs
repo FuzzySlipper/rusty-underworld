@@ -207,6 +207,9 @@ internal class EngineSpatialDouble : DispatchProxy
     /// <summary>Every step delta the product proposed, in order.</summary>
     internal List<float> StepSeconds { get; } = [];
 
+    /// <summary>Every motion the product proposed, in order.</summary>
+    internal List<CharacterMotion> StepMotions { get; } = [];
+
     internal static EngineSpatialDouble Create(Vector3? stepTranslation = null)
     {
         ISpatialService service = DispatchProxy.Create<ISpatialService, EngineSpatialDouble>();
@@ -235,6 +238,7 @@ internal class EngineSpatialDouble : DispatchProxy
     private CharacterStepReceipt Step(CharacterStepRequest request)
     {
         StepSeconds.Add(request.Command.StepSeconds);
+        StepMotions.Add(request.Motion);
         return Receipt(request);
     }
 

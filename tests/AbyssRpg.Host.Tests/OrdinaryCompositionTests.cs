@@ -185,6 +185,38 @@ public sealed class OrdinaryCompositionTests
             swing.StartsWith("You strike for", StringComparison.Ordinal) || swing == "You miss.",
             $"unexpected swing outcome '{swing}'");
 
+        // Keep swinging until the admitted opponent has really taken damage:
+        // the point is its state change, not that a roll happened to succeed.
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        float Health() => (float)session.NearestActors(1)[0].Actor.Stats
+            .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current;
+        float before = Health();
+        ulong swingStep = 32;
+        void Swing()
+        {
+            product.Update(SixtyHzUpdate(swingStep++, Attack(InputEdge.Pressed)));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(swingStep++));
+            product.Update(new ProductUpdate(Facts(swingStep++), [Attack(InputEdge.Released)]));
+        }
+
+        for (int attempt = 0; attempt < 60 && Health() >= before; attempt++) Swing();
+
+        float after = Health();
+        Assert.True(after < before, $"the admitted opponent kept {after} of {before}");
+        Assert.StartsWith("You strike for", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // A defeated opponent stops being scenery that keeps absorbing swings.
+        for (int attempt = 0; attempt < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; attempt++) Swing();
+
+        Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "the placed critter can be defeated");
+        // The kill is recorded in the level state, which is what a save carries;
+        // without it the critter stands there again after a load.
+        Assert.False(
+            session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex),
+            "the fallen critter's placement is removed from the level");
+        Swing();
+        Assert.Equal("Your swing meets empty air.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
         // A level whose import placed no critter still reports the empty swing.
         using AbyssProduct empty = EmptyProduct(out UiDouble emptyUi);
         empty.Start();
@@ -383,6 +415,44 @@ public sealed class OrdinaryCompositionTests
         product.Update(new ProductUpdate(Facts(3, seconds: 0.0005d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
         Assert.Empty(spatial.StepSeconds);
         Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "ready"));
+
+        // The substep cap bounds one frame's work: a frame longer than the cap
+        // times the Engine's window proposes the cap and no more.
+        spatial.StepSeconds.Clear();
+        product.Update(new ProductUpdate(Facts(4, seconds: 4d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
+        Assert.Equal(
+            SpatialMovementSystem.MaxSubsteps,
+            spatial.StepSeconds.Count);
+        Assert.Equal(
+            SpatialMovementSystem.MaxSubsteps * SpatialMovementSystem.MaximumStepSeconds,
+            spatial.StepSeconds.Sum(),
+            3);
+    }
+
+    [Fact]
+    public void A_driven_vertical_velocity_rides_the_first_proposal_of_a_long_frame()
+    {
+        // Flying drives the capsule's vertical velocity through the step's own
+        // controls, and the subdivision must not drop that override: the first
+        // proposal of the frame carries it, and the later slices carry the
+        // continuation the Engine confirmed.
+        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
+        using SpatialMovementSystem movement = new(
+            spatial.Service,
+            SpatialContentDouble.Create().Service,
+            new SpatialContentArtifact("abyss/imports/level-1/test-collision.json", default, NavigationGridId: 0),
+            new SpatialTuning(0.5d, 8, 8, 1));
+        var player = new PlayerControlState(new WorldPoint(0f, 0f, 0f), 0f, 0f);
+        var update = new ProductUpdateState(0.25f);
+        var controls = new CharacterStepControls(VerticalVelocity: 3f);
+
+        CharacterStepReceipt? receipt = movement.Step(player, update, environment: null, controls);
+
+        Assert.NotNull(receipt);
+        Assert.True(spatial.StepMotions.Count > 1, "the long frame is proposed in slices");
+        // The override rides the first proposal; without it the frame would be
+        // simulated with the stale vertical velocity the player already held.
+        Assert.Equal(3f, spatial.StepMotions[0].ControlledVelocity.Y, 3);
     }
 
     [Fact]

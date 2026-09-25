@@ -120,6 +120,12 @@ public static class UuLevelContent
         double unitsPerTile = Number(root, "unitsPerTile");
         double heightUnitsPerStep = Number(root, "heightUnitsPerStep");
         if (unitsPerTile <= 0d) throw new InvalidOperationException($"'{payloadLabel}' declares a non-positive tile scale.");
+        // A degenerate step scale would put every floor at the same height and
+        // let a placement land inside geometry.
+        if (heightUnitsPerStep <= 0d)
+        {
+            throw new InvalidOperationException($"'{payloadLabel}' declares a non-positive height step scale.");
+        }
 
         JsonElement tilesElement = Required(root, "tiles");
         // The artifact is a full row-major grid because the runtime indexes it
@@ -140,8 +146,19 @@ public static class UuLevelContent
                     $"'{payloadLabel}' tile rows must be [x, y, type, head, floorHeight, door].");
             }
 
+            // The runtime indexes tiles by position, so a row that names a
+            // different tile than its place in the grid would silently move
+            // every placement on the level.
+            int x = (int)row[0].GetDouble();
+            int y = (int)row[1].GetDouble();
+            if (x != at % UuLevelPlacements.TileDimension || y != at / UuLevelPlacements.TileDimension)
+            {
+                throw new InvalidOperationException(
+                    $"'{payloadLabel}' tile row {at} names tile ({x},{y}); the grid is row-major.");
+            }
+
             tiles[at++] = new AdmittedTile(
-                (int)row[0].GetDouble(), (int)row[1].GetDouble(), (int)row[2].GetDouble(),
+                x, y, (int)row[2].GetDouble(),
                 (int)row[3].GetDouble(), (int)row[4].GetDouble(), row[5].GetDouble() != 0d);
         }
 
