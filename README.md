@@ -25,9 +25,10 @@ Bundle assembles. Host launches.**
 > product's one projection and mounts the Engine's own live-debug panel.
 > What is imported is the level's collision, visible geometry, a spawn, its
 > object placements and the object tables: the placed props become durable
-> entities, the placed critters become actors standing on their own tiles, and
-> the use channel opens a placed door through saved level state. Placed things
-> are simulated but not drawn yet, and the conversation, barter and loot owners
+> entities, the placed critters become actors standing on their own tiles, a
+> swing damages and can drop one (the kill is recorded in the saved level
+> state), and the use channel opens a placed door through that state. Placed
+> things are simulated but not drawn yet, and the talk, barter and loot owners
 > are still neither composed nor dispatched to because they need imported
 > conversation content and an item catalog. Start with
 > `scripts/import-level.sh`; the operator step, the Crew profile, and the
