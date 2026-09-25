@@ -10,57 +10,69 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
 /// from the Engine's live-debug panel without a parallel transport or a second
 /// set of rules: each command calls the same method ordinary play calls.
 /// </summary>
-public sealed class UuSessionDebugModule(UuGameSession session) : IDebugCommandModule
+public sealed class UuSessionDebugModule : IDebugCommandModule
 {
-    private readonly UuGameSession _session = session ?? throw new ArgumentNullException(nameof(session));
+    private UuGameSession? _session;
+
+    /// <summary>Points the module at the ruleset's current session, replacing any released one.</summary>
+    public void Attach(UuGameSession session) =>
+        _session = session ?? throw new ArgumentNullException(nameof(session));
+
+    private UuGameSession? Live => _session is { Disposed: false } session ? session : null;
 
     [DebugCommand("abyss.status", Description = "Level, vitals, clock, mode and outcome of the live session.")]
     public string Status()
     {
-        SessionStatus status = _session.Status;
+        if (Live is not { } session) return "no live session";
+        SessionStatus status = session.Status;
         return string.Create(CultureInfo.InvariantCulture,
             $"level={status.Level} hp={status.Hp}/{status.MaxHp} mana={status.Mana}/{status.MaxMana} "
-            + $"charge={status.ChargeFraction:F2} clock={_session.ClockTicks} mode={_session.Mode} "
+            + $"charge={status.ChargeFraction:F2} clock={session.ClockTicks} mode={session.Mode} "
             + $"defeated={status.Defeated} outcome=\"{status.Outcome}\"");
     }
 
     [DebugCommand("abyss.where", Description = "Avatar position and heading in Engine units and radians.")]
     public string Where()
     {
-        AbyssRpg.Kit.Controls.WorldPoint? position = _session.PlayerPosition;
+        if (Live is not { } session) return "no live session";
+        AbyssRpg.Kit.Controls.WorldPoint? position = session.PlayerPosition;
         return position is { } point
-            ? string.Create(CultureInfo.InvariantCulture, $"x={point.X:F2} y={point.Y:F2} z={point.Z:F2} yaw={_session.PlayerYawRadians:F3}")
+            ? string.Create(CultureInfo.InvariantCulture, $"x={point.X:F2} y={point.Y:F2} z={point.Z:F2} yaw={session.PlayerYawRadians:F3}")
             : "position unavailable";
     }
 
     [DebugCommand("abyss.rune", Description = "Collect one rune into the casting shelf by index.")]
     public string CollectRune(int index)
     {
-        _session.CollectRune(index);
-        return $"rune {index} collected; shelf={string.Join(",", _session.Casting.Panel().Shelf)}";
+        if (Live is not { } session) return "no live session";
+        session.CollectRune(index);
+        return $"rune {index} collected; shelf={string.Join(",", session.Casting.Panel().Shelf)}";
     }
 
     [DebugCommand("abyss.cast", Description = "Attempt a cast from the shelved runes through the casting owner.")]
     public string Cast(int spellId)
     {
-        Magic.UuCastingHosting.CastOutcome outcome = _session.AttemptCast(spellId);
+        if (Live is not { } session) return "no live session";
+        Magic.UuCastingHosting.CastOutcome outcome = session.AttemptCast(spellId);
         return string.Create(CultureInfo.InvariantCulture,
             $"gate={outcome.Gate} backfired={outcome.Backfired} mana={outcome.ManaCost} "
             + $"primed={outcome.PrimedForAim} effect={(outcome.Effect?.SpellId.ToString(CultureInfo.InvariantCulture) ?? "none")} "
-            + $"outcome=\"{_session.Status.Outcome}\"");
+            + $"outcome=\"{session.Status.Outcome}\"");
     }
 
     [DebugCommand("abyss.damage", Description = "Apply harm to the avatar's defeat track.")]
     public string Damage(int amount)
     {
-        _session.ApplyDefeatDamage(amount, "Harmed by the debug lane.");
-        return string.Create(CultureInfo.InvariantCulture, $"hp={_session.Status.Hp}/{_session.Status.MaxHp}");
+        if (Live is not { } session) return "no live session";
+        session.ApplyDefeatDamage(amount, "Harmed by the debug lane.");
+        return string.Create(CultureInfo.InvariantCulture, $"hp={session.Status.Hp}/{session.Status.MaxHp}");
     }
 
     [DebugCommand("abyss.respawn", Description = "Return the avatar to the level anchor and restore vitals.")]
     public string Respawn()
     {
-        _session.RespawnAtAnchor();
-        return _session.Status.Outcome;
+        if (Live is not { } session) return "no live session";
+        session.RespawnAtAnchor();
+        return session.Status.Outcome;
     }
 }

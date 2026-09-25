@@ -299,11 +299,13 @@ public interface ISessionStatusSource
 }
 
 /// <summary>
-/// Optional seam exposing the session's own live-debug module. The product
-/// registers it with the Engine's generated catalog; the commands stay owned by
-/// the ruleset that knows what they mean.
+/// Optional seam exposing a ruleset's live-debug module. The product registers
+/// it with the Engine's generated catalog; the commands stay owned by the
+/// ruleset that knows what they mean. The module belongs to the ruleset rather
+/// than to one session because the generated catalog holds one module per type
+/// and a replaced session must not leave a module answering for a dead world.
 /// </summary>
-public interface IDebuggableGameSession : IGameSession
+public interface IDebuggableGameRuleset : IGameRuleset
 {
     Rusty.Engine.Debugging.IDebugCommandModule DebugModule { get; }
 }

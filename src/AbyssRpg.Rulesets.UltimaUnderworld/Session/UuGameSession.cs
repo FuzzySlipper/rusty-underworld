@@ -25,7 +25,7 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
 /// Kit services with this game's policy is ruleset work; the Host only starts,
 /// pauses, resumes, and stops what it gets back.
 /// </summary>
-public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveableGameSession, ISessionStatusSource, IDebuggableGameSession, IRespawnableGameSession
+public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveableGameSession, ISessionStatusSource, IRespawnableGameSession
 {
     /// <summary>Skill index the melee check rolls against (UW1 skill 0 is Attack).</summary>
     public const int AttackSkill = 0;
@@ -34,7 +34,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public const float MeleeReach = 6f;
 
     private const float EyeHeight = 1.6f;
-    private const float MinimumSpawnClearance = 0.05f;
 
     private readonly GameSessionContext _context;
     private readonly UuTuningProfile _tuning;
@@ -57,6 +56,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private double _tickCarry;
     private bool _scenePublished;
     private bool _disposed;
+
+    /// <summary>True once the world is released; the ruleset's debug module reads this.</summary>
+    public bool Disposed => _disposed;
 
     private UuGameSession(
         GameSessionContext context,
@@ -108,11 +110,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 PresentActors);
         }
     }
-
-    /// <summary>The ruleset's own live-debug module over this session.</summary>
-    public IDebugCommandModule DebugModule => _debugModule ??= new UuSessionDebugModule(this);
-
-    private UuSessionDebugModule? _debugModule;
 
     private string _avatarName = "Avatar";
 
@@ -174,11 +171,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             choices, vitals, firstLevel, level.Spawn, tuning.Movement,
             worldSeed: composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal));
         var spatialTuning = new SpatialTuning(0.5d, 8, 8, 1);
+        var movement = new SpatialMovementSystem(context.Engine.Spatial, context.Engine.Content, level.Collision, spatialTuning);
+        // The imported spawn stands on a tile surface; the Engine's character is
+        // a capsule placed by its center, so the surface height is offset by the
+        // controller's own standing half-height and contact skin.
         PlayerControlState player = new(
-            new WorldPoint(level.Spawn.Position.X, level.Spawn.Position.Y + MinimumSpawnClearance, level.Spawn.Position.Z),
+            new WorldPoint(
+                level.Spawn.Position.X,
+                level.Spawn.Position.Y + movement.StandingCenterOffset,
+                level.Spawn.Position.Z),
             level.Spawn.HeadingYawRadians,
             0f);
-        var movement = new SpatialMovementSystem(context.Engine.Spatial, context.Engine.Content, level.Collision, spatialTuning);
         FirstPersonCameraSystem camera;
         try
         {
@@ -221,7 +224,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             session.RestoreSnapshot(snapshot);
             player.Restore(
                 new WorldPoint(snapshot.AvatarPose.X, snapshot.AvatarPose.Y, snapshot.AvatarPose.Z),
-                DetachedMotion());
+                DetachedMotion(snapshot.AvatarPose.Y));
             player.YawRadians = snapshot.AvatarPose.YawRadians;
         }
 
@@ -496,7 +499,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public void RespawnAtAnchor()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        _player.Restore(_level.Spawn.Position, DetachedMotion());
+        _player.Restore(AnchorPosition(), DetachedMotion(AnchorPosition().Y));
         _player.YawRadians = _level.Spawn.HeadingYawRadians;
         _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current =
             _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Maximum.Value;
@@ -505,7 +508,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _outcome = "You wake at the anchor.";
     }
 
-    private static CharacterMotion DetachedMotion() => new(
+    /// <summary>The anchor's capsule-center pose, matching the launch placement.</summary>
+    private WorldPoint AnchorPosition() => new(
+        _level.Spawn.Position.X,
+        _level.Spawn.Position.Y + _movement.StandingCenterOffset,
+        _level.Spawn.Position.Z);
+
+    private static CharacterMotion DetachedMotion(float anchorY) => new(
         ControlledVelocity: Vector3.Zero,
         ExternalVelocity: Vector3.Zero,
         Grounded: false,
@@ -516,7 +525,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         SupportPreviousTranslation: Vector3.Zero,
         SupportPreviousRotation: Quaternion.Identity,
         SupportPointVelocity: Vector3.Zero,
-        FallOriginY: 0f, PeakY: 0f, LastCommandSequence: 0, CollisionWorldHash: 0);
+        FallOriginY: anchorY, PeakY: anchorY,
+        LastCommandSequence: 0, CollisionWorldHash: 0);
 
     public void Dispose()
     {

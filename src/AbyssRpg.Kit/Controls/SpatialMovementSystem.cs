@@ -76,6 +76,15 @@ public sealed class SpatialMovementSystem : IDisposable
         }
     }
 
+    /// <summary>
+    /// Distance from the capsule's base to its center under the current
+    /// configuration. A caller that places a character on a known surface adds
+    /// this to the surface height; placing the center at the surface itself
+    /// starts the capsule inside the world.
+    /// </summary>
+    public float StandingCenterOffset =>
+        (_controller.Shape.StandingHeight * 0.5f) + _controller.Shape.ContactSkin;
+
     public SpatialMovementSystem(ISpatialService spatial, IContentService content, SpatialContentArtifact inputs, SpatialTuning tuning)
     {
         ArgumentNullException.ThrowIfNull(spatial);

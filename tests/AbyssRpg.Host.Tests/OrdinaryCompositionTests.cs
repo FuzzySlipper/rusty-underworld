@@ -311,10 +311,20 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(2, catalog.Modules.Count);
         Assert.Contains(catalog.Modules, module => ReferenceEquals(module, product));
 
+        // The ruleset's module is registered once and re-points at the session a
+        // load replaces, so it must answer for the new world rather than the
+        // disposed one.
+        IDebugCommandModule session = Assert.Single(catalog.Modules.Where(module => !ReferenceEquals(module, product)));
+        product.Update(SixtyHzUpdate(1)); // admits the level, which writes the autosave
+        Assert.True(product.LoadJourneyOnward());
+        product.Update(SixtyHzUpdate(2));
+        var status = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionDebugModule)session;
+        Assert.Contains("level=1", status.Status(), StringComparison.Ordinal);
+        Assert.Contains("x=", status.Where(), StringComparison.Ordinal);
+
         // The product's own commands answer from live state.
         Assert.Contains("bundle=abyssrpg.stygian-abyss", product.ProductInfo(), StringComparison.Ordinal);
-        string slots = product.SlotList();
-        Assert.Equal("no saves", slots);
+        Assert.Contains("autosave/level-1", product.SlotList(), StringComparison.Ordinal);
     }
 
     [Fact]

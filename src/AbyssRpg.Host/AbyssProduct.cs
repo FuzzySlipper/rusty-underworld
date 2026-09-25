@@ -486,7 +486,9 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     {
         ArgumentNullException.ThrowIfNull(registrar);
         registrar.Register(this);
-        if (_session is IDebuggableGameSession debuggable) registrar.Register(debuggable.DebugModule);
+        // The ruleset owns one module for its lifetime and re-points it at each
+        // session, because the generated catalog keeps one module per type.
+        if (_ruleset is IDebuggableGameRuleset debuggable) registrar.Register(debuggable.DebugModule);
     }
 
     [DebugCommand("abyss.product", Description = "Product identity, bundle, mode and resolved composition.")]
