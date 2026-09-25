@@ -303,8 +303,10 @@ public sealed class OrdinaryCompositionTests
         using var product = new AbyssProduct(
             engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
         product.Start();
-        product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        // The launch placement is the floor's own standing height; the probe on
+        // a tile of the same floor height has to land at the same height.
+        AbyssRpg.Kit.Controls.WorldPoint launch = session.AvatarPosition!.Value;
 
         // The fixture's tile (2,2) is solid; (1,1) is the placed door tile.
         InvalidOperationException refused = Assert.Throws<InvalidOperationException>(
@@ -319,7 +321,7 @@ public sealed class OrdinaryCompositionTests
         AbyssRpg.Kit.Controls.WorldPoint standing = session.AvatarPosition!.Value;
         Assert.Equal(12f, standing.X, 3);
         Assert.Equal(12f, standing.Z, 3);
-        Assert.True(standing.Y > 0f, "the probe stands the capsule above the floor, not at floor level");
+        Assert.Equal(launch.Y, standing.Y, 3);
     }
 
     [Fact]
@@ -484,7 +486,7 @@ public sealed class OrdinaryCompositionTests
             new SpatialTuning(0.5d, 8, 8, 1));
         var player = new PlayerControlState(new WorldPoint(0f, 0f, 0f), 0f, 0f);
         var update = new ProductUpdateState(0.25f);
-        var controls = new CharacterStepControls(VerticalVelocity: 3f);
+        var controls = new CharacterStepControls(JumpPressed: true, VerticalVelocity: 3f);
 
         CharacterStepReceipt? receipt = movement.Step(player, update, environment: null, controls);
 
@@ -493,6 +495,15 @@ public sealed class OrdinaryCompositionTests
         // The override rides the first proposal; without it the frame would be
         // simulated with the stale vertical velocity the player already held.
         Assert.Equal(3f, spatial.StepMotions[0].ControlledVelocity.Y, 3);
+        // A press is one frame's edge, not one per slice: a jump must not read
+        // as a fresh press in every proposal of a long frame. (A driven
+        // vertical velocity owns jump for the frame, so it is suppressed here.)
+        Assert.DoesNotContain(true, spatial.StepJumpPressed);
+
+        spatial.StepJumpPressed.Clear();
+        movement.Step(player, new ProductUpdateState(0.25f), environment: null, new CharacterStepControls(JumpPressed: true));
+        Assert.True(spatial.StepJumpPressed[0], "the first proposal carries the press");
+        Assert.DoesNotContain(true, spatial.StepJumpPressed.Skip(1));
     }
 
     [Fact]

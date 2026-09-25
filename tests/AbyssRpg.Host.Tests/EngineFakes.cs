@@ -210,6 +210,9 @@ internal class EngineSpatialDouble : DispatchProxy
     /// <summary>Every motion the product proposed, in order.</summary>
     internal List<CharacterMotion> StepMotions { get; } = [];
 
+    /// <summary>Every jump press the product proposed, in order.</summary>
+    internal List<bool> StepJumpPressed { get; } = [];
+
     internal static EngineSpatialDouble Create(Vector3? stepTranslation = null)
     {
         ISpatialService service = DispatchProxy.Create<ISpatialService, EngineSpatialDouble>();
@@ -239,6 +242,7 @@ internal class EngineSpatialDouble : DispatchProxy
     {
         StepSeconds.Add(request.Command.StepSeconds);
         StepMotions.Add(request.Motion);
+        StepJumpPressed.Add(request.Command.JumpPressed);
         return Receipt(request);
     }
 
