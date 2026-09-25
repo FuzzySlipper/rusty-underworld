@@ -67,6 +67,7 @@ jq -e --arg package_version "$pair_version" --arg source_revision "$pair_source_
 # tests are checked here alongside the product projects, because the UI
 # toolchain is what the product companion work consumes.
 npm ci
+npx tsc -p src/ui
 if compgen -G "tests/AbyssRpg.Ui.Tests/*.test.mjs" > /dev/null; then
   node --test tests/AbyssRpg.Ui.Tests/*.test.mjs
 else
