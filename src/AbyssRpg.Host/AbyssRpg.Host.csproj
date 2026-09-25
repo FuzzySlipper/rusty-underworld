@@ -11,8 +11,12 @@
     <RustyEngineProductEntryType>AbyssRpg.Host.AbyssProduct</RustyEngineProductEntryType>
     <RustyEngineProductId>abyssrpg.product</RustyEngineProductId>
     <RustyEngineProductTitle>AbyssRpg: The Stygian Abyss</RustyEngineProductTitle>
-    <RustyEngineProductUiRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))</RustyEngineProductUiRoot>
+    <RustyEngineProductUiRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui/generated'))</RustyEngineProductUiRoot>
     <RustyEngineProductContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineProductContentRoot>
+    <RustyEngineProductUiEntry>main.js</RustyEngineProductUiEntry>
+    <RustyEngineProductUiProjectionStream>abyss.hud</RustyEngineProductUiProjectionStream>
+    <RustyEngineProductUiProjectionContract>abyss.ui.snapshot.v1</RustyEngineProductUiProjectionContract>
+    <RustyEngineWatchPaths>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'));$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineWatchPaths>
     <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
     <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz>
     <RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
@@ -29,4 +33,8 @@
     <ProjectReference Include="../AbyssRpg.Kit/AbyssRpg.Kit.csproj" />
     <ProjectReference Include="../AbyssRpg.Rulesets.UltimaUnderworld/AbyssRpg.Rulesets.UltimaUnderworld.csproj" />
   </ItemGroup>
+  <Target Name="BuildAbyssProductUi" BeforeTargets="GenerateRustyEngineProductComposition">
+    <Delete Files="$(RustyEngineProductUiRoot)/main.js.map;$(RustyEngineProductUiRoot)/main.d.ts" />
+    <Exec Command="npm --prefix &quot;$(MSBuildThisFileDirectory)../..&quot; exec -- tsc -p &quot;$(MSBuildThisFileDirectory)../ui&quot;" />
+  </Target>
 </Project>

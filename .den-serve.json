@@ -4,7 +4,7 @@
     "command": "exec ./.runtime/runtime-pack/bin/rusty dev --project ./src/AbyssRpg.Host/AbyssRpg.Host.csproj --runtime ./.runtime/runtime-pack --live-debug --bind-host {host} --port {port}",
     "preferredPort": 4177,
     "healthUrl": "/product-ui/main.js",
-    "readyText": "Rusty Underworld",
+    "readyText": "mountProductUi",
     "reusePolicy": "broker_owned",
     "startupTimeout": "180s",
     "healthInterval": "250ms"

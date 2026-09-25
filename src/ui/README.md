@@ -1,18 +1,11 @@
-# ui
+# Product DOM companion
 
-Planned product DOM companion, authored in TypeScript and compiled into
-generated output by the host project's build.
+`main.ts` renders HUD projections and provides menu/debug controls. The Host
+build compiles browser ESM into ignored `generated/`; only that output is staged
+as UI assets. Source maps and declaration files are not runtime assets.
 
-Owns, once implemented: thin DOM presentation of Engine-delivered projections
-and the semantic actions a player takes on them (avatar sheet, inventory and
-paperdoll, runebag and casting, automap and notes, conversation and barter,
-options and save/load surfaces).
+The current ordinary entry does not publish a gameplay HUD. Menu and debug
+controls also need their real runtime consumers; their DOM tests alone do not
+prove those actions work in the product. See [GPU playtesting](../../docs/gpu-playtesting.md).
 
-Boundary rules:
-
-- No gameplay state, no rules evaluation, no game-world rendering, no transport,
-  and no game loop. It renders what the product publishes and reports intents
-  back.
-- Generated output is build product and stays ignored; never edit it by hand.
-
-Nothing is implemented yet.
+The companion owns no gameplay state, world rendering, transport, or game loop.

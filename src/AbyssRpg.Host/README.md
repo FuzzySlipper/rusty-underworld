@@ -1,9 +1,14 @@
 # AbyssRpg.Host
 
-Owned project shell: final dependency graph, no behavior yet — see [`../README.md`](../README.md) and
-[`../../docs/code-organization.md`](../../docs/code-organization.md) for the
-owner contract.
+The ordinary Engine product entry, built-in ruleset selection, lifecycle,
+save helpers, menu projections, and spatial-session adapter live here.
 
-Product lifecycle, explicit built-in ruleset/bundle selection, defaults, and
-the one ordinary product entry. Selects Ultima Underworld; never interprets
-its rules or reads original game data.
+The project builds the TypeScript companion as browser ESM and stages it through
+the packaged Engine SDK. `den-serve` launches that CoreCLR product; see
+[GPU playtesting](../../docs/gpu-playtesting.md).
+
+The entry does not yet load the default bundle, create/attach a dungeon session,
+or publish world rendering. Existing attachment and menu APIs are exercised by
+component tests; they are not an implemented player launch flow.
+
+Ownership remains defined in [code organization](../../docs/code-organization.md).

@@ -1,0 +1,13 @@
+{
+  "id": "rusty-underworld",
+  "backend": "wolf",
+  "description": "AbyssRpg first-person dungeon slice GPU playtest",
+  "url": "http://192.168.1.22:4177/",
+  "window_title": "AbyssRpg: The Stygian Abyss",
+  "controls": {
+    "W/A/S/D": "Movement (verify product consumption)",
+    "Mouse": "Click to focus; look; hold/release primary attack",
+    "Escape": "Release pointer and open menu"
+  },
+  "reset": "Recover relaunches browser; product state remains in the host. Restart den-serve for a fresh product."
+}

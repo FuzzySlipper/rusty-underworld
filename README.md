@@ -17,13 +17,12 @@ remains donor context for formats and divergences; it is not a target.
 The working formula is: **Engine guarantees. Kit shapes. Ruleset decides.
 Bundle assembles. Host launches.**
 
-> **Current state: setup pass with a Kit bootstrap.** This repository owns its
-> shape, its build configuration, its verification script, and its donor
-> research, plus a one-time bootstrap copy of `WorldRpg.Kit` mechanics as
-> `AbyssRpg.Kit` (see `docs/research/rusty-dagger-kit-survey.md`). Ruleset,
-> Host, Importer, UI, and content remain owned empty shells — the directory
-> structure states intended ownership so implementation tasks have an owning
-> home. Do not read the layout below as a description of working gameplay.
+> **Current state: component implementations and a launchable Engine shell.**
+> Kit, ruleset, Host, importer, and DOM companion projects build and have tests.
+> The ordinary CoreCLR entry and companion can be served for Crew GPU playtests.
+> The entry does not yet compose a dungeon session, load the default level, or
+> publish a world scene. Component tests do not establish a playable slice.
+> See [GPU playtesting](docs/gpu-playtesting.md) for setup and observed limitations.
 
 ## Ownership
 
@@ -137,7 +136,7 @@ For every task, identify:
 
 ## Develop and verify
 
-The product will consume the immutable `Rusty.Engine` package from the installed
+The product consumes the immutable `Rusty.Engine` package from the installed
 `.runtime/sdk-feed` and the matched `.runtime/runtime-pack`. That pair's identity
 belongs in `Directory.Build.props`, where the install and verify scripts check it;
 do not restate a version or revision here.
@@ -174,8 +173,16 @@ first project lands, add it to `product_projects` and its suite to
 `test_projects` in the script — the lists are explicit on purpose, because a
 discovery-based loop silently stops covering a project that moved.
 
-Den serves the product through `.den-serve.json` on port 4177 once the host
-project exists.
+Start the Engine host after installing the pair and UI dependencies:
+
+```bash
+npm ci
+den-serve up rusty-underworld -repo "$PWD"
+```
+
+The broker serves port 4177; the Host build compiles the browser ESM companion.
+See [GPU playtesting](docs/gpu-playtesting.md) to register the Crew Wolf profile
+and capture the current product. A successful launch is not gameplay acceptance.
 
 ## Guidance and proof
 

@@ -74,27 +74,17 @@ documents decide, and the difference is recorded rather than silently rounded.
 
 ## Current state
 
-**This repository is a setup pass with a Kit bootstrap: it owns its shape,
-its donor research, and a working `AbyssRpg.Kit` copied once from
-`WorldRpg.Kit`, and it implements no gameplay yet.** Concretely:
+**This repository has component implementations and an Engine-served UI shell,
+but the ordinary product entry does not yet compose a playable dungeon.**
+Kit, ruleset, Host, importer, and UI projects build and have tests. The entry
+currently starts without attaching a session or spatial scene; component-level
+combat, conversation, casting, and menu helpers are not proof of live integration.
 
-- `AbyssRpg.Kit` holds renamed Engine-native mechanisms (identity, actors,
-  combat execution, targeting, inventory, effects, controls, presentation,
-  composition) with no UW policy in them. Ruleset, Host, Importer, UI, and
-  content are owned empty shells so implementation tasks have a home.
-- Every directory README states *intended* ownership. Those statements are
-  declarations for planning, not descriptions of working gameplay.
-- `scripts/verify.sh` verifies the pinned Engine pair and the UI toolchain,
-  builds the checked-in projects, and runs the architecture suite.
-- The shape is written down and binding: `docs/gameplay-design.md` fixes the
-  loop, each system, and its fidelity verdict; `docs/code-organization.md` fixes
-  the owners, the modes, and where new code goes. Both describe intent, not
-  running code.
-- Do not describe, review, or accept behavior this repository has not
-  implemented, and do not let a planned owner's name imply that it runs.
-
-When the first product project lands, update this section, `README.md`, and the
-owning directory README together.
+Use `docs/gpu-playtesting.md` for the Crew GPU setup and evidence. Read current
+source and Den records before claiming a system runs: older directory READMEs
+and design documents may still describe planned ownership. `scripts/verify.sh`
+checks the Engine pair, UI, projects, semantic suites, architecture, and CoreCLR
+staging; this is separate from visible playable-slice acceptance.
 
 ## Current product graph
 
