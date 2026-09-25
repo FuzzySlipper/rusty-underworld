@@ -43,7 +43,7 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(BuiltInRulesets.UltimaUnderworld, product.CompositionIdentity.Ruleset);
         Assert.Equal("abyssrpg.stygian-default", product.CompositionIdentity.Tuning.Value);
         Assert.Equal(
-            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.level-1", "abyssrpg.starting-kit"],
+            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.level-1", "abyssrpg.object-tables", "abyssrpg.starting-kit"],
             product.CompositionIdentity.ContentPacks.Select(pack => pack.Value).OrderBy(value => value, StringComparer.Ordinal));
         Assert.NotNull(product.Session);
         Assert.True(product.Session is ISessionStatusSource);
@@ -176,8 +176,77 @@ public sealed class OrdinaryCompositionTests
         product.Update(new ProductUpdate(Facts(31), [Attack(InputEdge.Released)]));
         Assert.Equal(0f, HudNumber(ui.LastProjection!.Value.Value, "charge"));
         Assert.True(peak > 0f);
-        // A swing with no opponent in the level reports the real outcome.
-        Assert.Equal("Your swing meets empty air.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        // The level's placed critter stands on the spawn tile, so the release
+        // resolves against a real presence rather than empty air.
+        Assert.Equal(1, HudNumber(ui.LastProjection!.Value.Value, "presentActors"));
+        string swing = HudString(ui.LastProjection!.Value.Value, "outcome");
+        Assert.True(
+            swing.StartsWith("You strike for", StringComparison.Ordinal) || swing == "You miss.",
+            $"unexpected swing outcome '{swing}'");
+
+        // A level whose import placed no critter still reports the empty swing.
+        using AbyssProduct empty = EmptyProduct(out UiDouble emptyUi);
+        empty.Start();
+        empty.Update(SixtyHzUpdate(1, Attack(InputEdge.Pressed)));
+        for (ulong step = 2; step <= 20; step++) empty.Update(SixtyHzUpdate(step));
+        empty.Update(new ProductUpdate(Facts(21), [Attack(InputEdge.Released)]));
+        Assert.Equal(0, HudNumber(emptyUi.LastProjection!.Value.Value, "presentActors"));
+        Assert.Equal("Your swing meets empty air.", HudString(emptyUi.LastProjection!.Value.Value, "outcome"));
+    }
+
+    /// <summary>The ordinary fixture without placed critters: no opponent exists.</summary>
+    private static AbyssProduct EmptyProduct(out UiDouble ui)
+    {
+        ui = UiDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: EngineSpatialDouble.Create().Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        return new AbyssProduct(
+            engine, TestContent.Build(withCritter: false), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void The_use_channel_opens_a_placed_door_and_the_state_survives_a_save()
+    {
+        // The avatar walks onto the door tile the fixture's import places: the
+        // Engine spatial step is what puts it there.
+        UiDouble ui = UiDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: EngineSpatialDouble.Create(new System.Numerics.Vector3(12f, 1f, 12f)).Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You open the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.Contains((1, 1), session.OpenedDoors);
+
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You close the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.DoesNotContain((1, 1), session.OpenedDoors);
+
+        // A held press is not a repeat: the door opens once per press.
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        product.Update(new ProductUpdate(Facts(5), [Key(KeyboardControl.KeyE, InputEdge.Held)]));
+        Assert.Contains((1, 1), session.OpenedDoors);
+        product.Update(new ProductUpdate(Facts(6), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+        Assert.Contains((1, 1), session.OpenedDoors);
+
+        // The open state is quicksave state too; the round trip itself is
+        // covered where the payload is (UuSessionTests).
+        product.Update(new ProductUpdate(Facts(7), [Intent("abyss.action.quicksave")]));
+        Assert.Contains(product.Slots(), slot => slot.Key == "quicksave/0");
     }
 
     [Fact]
@@ -450,7 +519,9 @@ public sealed class OrdinaryCompositionTests
         // A bundle admitting a level outside the shipped nine still runs; it
         // simply has no autosave slot to write, and it must not fault the update.
         using AbyssProduct product = new(
-            engine, TestContent.Build(level: 12), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+            engine,
+            TestContent.Build(level: 12, withPlacements: false),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
         product.Start();
         product.Update(SixtyHzUpdate(1));
         product.Update(SixtyHzUpdate(2));

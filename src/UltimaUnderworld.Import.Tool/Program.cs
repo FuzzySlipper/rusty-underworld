@@ -8,7 +8,9 @@ using UltimaUnderworld.Import;
 
 if (args.Length == 0 || args[0] != "emit-level")
 {
-    Console.Error.WriteLine("Usage: emit-level --levark <LEV.ARK> --terrain <TERRAIN.DAT> --level <n> --out <dir>");
+    Console.Error.WriteLine(
+        "Usage: emit-level --levark <LEV.ARK> --terrain <TERRAIN.DAT> --level <n> --out <dir> "
+        + "[--objects <OBJECTS.DAT> --packs <content/abyss/packs>]");
     return 2;
 }
 
@@ -24,6 +26,10 @@ try
     string terrainPath = Get("--terrain");
     int level = int.Parse(Get("--level"));
     string output = Get("--out");
+    string? objectsPath = Array.IndexOf(args, "--objects") >= 0 ? Get("--objects") : null;
+    // The object tables are install-global, so they are written beside the
+    // authored packs rather than into a per-level directory.
+    string? packsDirectory = Array.IndexOf(args, "--packs") >= 0 ? Get("--packs") : null;
 
     byte[] archive = File.ReadAllBytes(levArk);
     byte[] terrain = File.ReadAllBytes(terrainPath);
@@ -41,12 +47,16 @@ try
     string renderFile = $"{packId}-render.json";
     string manifestFile = $"{packId}.level.json";
 
+    LevelPlacements.Placements placements = LevelPlacements.Emit(pack, options);
+    string placementsFile = $"{packId}-placements.json";
+
     string collisionJson = LevelCollisionMesh.ToJson(
         collision, $"uw1/level-{level}/nav", $"uw1/level-{level}/mesh", meshParameters);
     File.WriteAllText(Path.Combine(output, collisionFile), collisionJson);
     File.WriteAllText(
         Path.Combine(output, renderFile),
         LevelRenderMesh.ToJson(render, level, options));
+    File.WriteAllText(Path.Combine(output, placementsFile), LevelPlacements.ToJson(placements));
 
     // Paths in the manifest and descriptor are content-root-relative ('/'
     // separators); the tool derives the 'abyss/…' prefix from the output path
@@ -58,6 +68,7 @@ try
         level,
         collision = new { path = $"{prefix}{collisionFile}", sha256 = Sha256(collisionJson) },
         render = new { path = $"{prefix}{renderFile}" },
+        placements = new { path = $"{prefix}{placementsFile}" },
         spawn = new
         {
             tileX = spawn.TileX,
@@ -74,6 +85,8 @@ try
             origin = pack.Provenance.SourceFile,
             tiles = pack.Tiles.Count,
             objects = pack.Objects.Count,
+            liveObjects = placements.LiveObjects,
+            mobileObjects = placements.MobileObjects,
         },
     };
     string manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions { WriteIndented = true });
@@ -99,6 +112,39 @@ try
     File.WriteAllText(
         Path.Combine(output, $"{packId}.pack.json"),
         JsonSerializer.Serialize(descriptor, new JsonSerializerOptions { WriteIndented = true }));
+
+    if (objectsPath is not null && packsDirectory is not null)
+    {
+        // The object tables are install-global, not per level: one pack beside
+        // the authored packs, admitted by the bundle like any other content.
+        string tablesId = "abyssrpg.object-tables";
+        string tablesFile = $"{tablesId}.json";
+        byte[] objectsBytes = File.ReadAllBytes(objectsPath);
+        ObjectTablePack.Tables tables = ObjectTablePack.Emit(
+            ObjectsDatReader.Read(objectsBytes),
+            UwTableProvenance.FromBytes("UW1", "UW/DATA/OBJECTS.DAT", objectsBytes));
+        string tablesJson = ObjectTablePack.ToJson(tables);
+        Directory.CreateDirectory(packsDirectory);
+        string tablesPrefix = ContentPrefix(packsDirectory);
+        File.WriteAllText(Path.Combine(packsDirectory, tablesFile), tablesJson);
+        File.WriteAllText(
+            Path.Combine(packsDirectory, $"{tablesId}.pack.json"),
+            JsonSerializer.Serialize(new
+            {
+                kind = "abyssrpg.content-pack",
+                id = tablesId,
+                ruleset = "abyssrpg.ultima-underworld",
+                dependencies = Array.Empty<object>(),
+                payload = $"{tablesPrefix}{tablesFile}",
+                provenance = new
+                {
+                    source = "UW1",
+                    origin = "UW/DATA/OBJECTS.DAT",
+                    sha256 = Sha256(tablesJson),
+                },
+            }, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine($"Emitted object tables: {tables.Critters.Count} critters, {tables.Containers.Count} containers.");
+    }
 
     Console.WriteLine(
         $"Emitted level {level}: {pack.Tiles.Count} tiles, {pack.Objects.Count} objects, "

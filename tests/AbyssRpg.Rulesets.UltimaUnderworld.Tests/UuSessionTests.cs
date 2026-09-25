@@ -36,6 +36,33 @@ public sealed class UuSessionTests
         [new AdmittedObject(0, 0, 0), new AdmittedObject(5, 44, 0)]);
 
     [Fact]
+    public void A_snapshot_round_trip_keeps_the_levels_own_changes()
+    {
+        UuCreationFlow.CreationResult choices = Choices();
+        var vitals = UuVitalsPolicy.Recalculate(choices.Attributes[0], 1, 0, choices.Attributes[2]);
+        AdmittedLevel level = Level(1);
+        using var session = UuSession.NewGame(
+            choices, vitals, level, new ActorPose(new WorldPoint(0, 0, 0), 0f));
+
+        // Play changes the level: a door opens, a placed object is taken.
+        session.Dungeon.Current.SetDoor(1, 0, true);
+        session.Dungeon.Current.RemoveObject(5);
+        UuSessionSnapshot snapshot = session.CaptureSnapshot(new AvatarPoseDto(0, 0, 0, 0));
+
+        using var restored = UuSession.NewGame(
+            choices, vitals, level, new ActorPose(new WorldPoint(0, 0, 0), 0f));
+        Assert.False(restored.Dungeon.Current.OpenedDoors.Contains((1, 0)));
+        Assert.True(restored.Dungeon.Current.IsLive(5));
+
+        restored.RestoreSnapshot(snapshot);
+        Assert.Contains((1, 0), restored.Dungeon.Current.OpenedDoors);
+        Assert.False(restored.Dungeon.Current.IsLive(5));
+        // The entity of an object the save says is gone is not left standing.
+        Assert.False(restored.Directory.TryResolve(
+            AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, 5), out _));
+    }
+
+    [Fact]
     public void New_game_travel_and_save_round_trip()
     {
         UuCreationFlow.CreationResult choices = Choices();

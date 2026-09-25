@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AbyssRpg.Kit.Actors;
 using AbyssRpg.Kit.Controls;
+using AbyssRpg.Rulesets.UltimaUnderworld.Dungeon;
 using Rusty.Engine;
 
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Content;
@@ -16,9 +17,42 @@ public sealed record UuLevelDefinition(
     int Level,
     SpatialContentArtifact Collision,
     string RenderPath,
+    string? PlacementsPath,
     ActorPose Spawn,
     string ProvenanceSource,
-    string ProvenanceOrigin);
+    string ProvenanceOrigin,
+    int LiveObjects,
+    int MobileObjects);
+
+/// <summary>
+/// The level's placement set as the runtime admits it: every tile with its
+/// floor height and chain head, every object slot with its chain and container
+/// fields, and the world scale the importer used, so a tile maps to a position.
+/// </summary>
+public sealed record UuLevelPlacements(
+    double UnitsPerTile,
+    double HeightUnitsPerStep,
+    AdmittedTile[] Tiles,
+    AdmittedObject[] Objects)
+{
+    /// <summary>World center of a tile at its floor height.</summary>
+    public WorldPoint TileCenter(int tileX, int tileY, int floorHeight) => new(
+        (float)((tileX + 0.5d) * UnitsPerTile),
+        (float)(floorHeight * HeightUnitsPerStep),
+        (float)((tileY + 0.5d) * UnitsPerTile));
+
+    /// <summary>The tile a world position stands on, or null outside the grid.</summary>
+    public AdmittedTile? TileAt(AbyssRpg.Kit.Controls.WorldPoint position) => Tile(
+        (int)Math.Floor(position.X / UnitsPerTile),
+        (int)Math.Floor(position.Z / UnitsPerTile));
+
+    public AdmittedTile? Tile(int tileX, int tileY) =>
+        tileX is >= 0 and < TileDimension && tileY is >= 0 and < TileDimension
+            ? Tiles[(tileY * TileDimension) + tileX]
+            : null;
+
+    public const int TileDimension = 64;
+}
 
 public static class UuLevelContent
 {
@@ -40,6 +74,14 @@ public static class UuLevelContent
         string collisionSha = String(collision, "sha256");
         JsonElement render = Object(root, "render");
         string renderPath = String(render, "path");
+        // Placements are optional so a level imported before them still loads;
+        // such a level admits no placed object.
+        string? placementsPath = root.TryGetProperty("placements", out JsonElement placements)
+            && placements.ValueKind == JsonValueKind.Object
+            && placements.TryGetProperty("path", out JsonElement placementsValue)
+            && placementsValue.ValueKind == JsonValueKind.String
+            ? placementsValue.GetString()
+            : null;
         JsonElement spawn = Object(root, "spawn");
         JsonElement provenance = Object(root, "provenance");
         string source = String(provenance, "source");
@@ -58,10 +100,84 @@ public static class UuLevelContent
             level,
             new SpatialContentArtifact(collisionPath, ParseSha256(collisionSha, payloadLabel), NavigationGridId: 0),
             renderPath,
+            placementsPath,
             pose,
             source,
-            String(provenance, "origin"));
+            String(provenance, "origin"),
+            (int)OptionalNumber(provenance, "liveObjects"),
+            (int)OptionalNumber(provenance, "mobileObjects"));
     }
+
+    /// <summary>Reads the placement artifact the manifest names.</summary>
+    public static UuLevelPlacements ReadPlacements(ReadOnlyMemory<byte> payload, string payloadLabel)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(payloadLabel);
+        using JsonDocument document = Parse(payload, payloadLabel);
+        JsonElement root = document.RootElement;
+        if (Number(root, "schemaVersion") != SchemaVersion)
+            throw new InvalidOperationException($"'{payloadLabel}' must declare schemaVersion {SchemaVersion}.");
+
+        double unitsPerTile = Number(root, "unitsPerTile");
+        double heightUnitsPerStep = Number(root, "heightUnitsPerStep");
+        if (unitsPerTile <= 0d) throw new InvalidOperationException($"'{payloadLabel}' declares a non-positive tile scale.");
+
+        JsonElement tilesElement = Required(root, "tiles");
+        // The artifact is a full row-major grid because the runtime indexes it
+        // by tile; a short one would silently mis-place every object.
+        if (tilesElement.GetArrayLength() != UuLevelPlacements.TileDimension * UuLevelPlacements.TileDimension)
+        {
+            throw new InvalidOperationException(
+                $"'{payloadLabel}' must carry a full {UuLevelPlacements.TileDimension}x{UuLevelPlacements.TileDimension} tile grid.");
+        }
+
+        var tiles = new AdmittedTile[tilesElement.GetArrayLength()];
+        int at = 0;
+        foreach (JsonElement row in tilesElement.EnumerateArray())
+        {
+            if (row.GetArrayLength() != 6)
+            {
+                throw new InvalidOperationException(
+                    $"'{payloadLabel}' tile rows must be [x, y, type, head, floorHeight, door].");
+            }
+
+            tiles[at++] = new AdmittedTile(
+                (int)row[0].GetDouble(), (int)row[1].GetDouble(), (int)row[2].GetDouble(),
+                (int)row[3].GetDouble(), (int)row[4].GetDouble(), row[5].GetDouble() != 0d);
+        }
+
+        JsonElement objectsElement = Required(root, "objects");
+        var objects = new AdmittedObject[objectsElement.GetArrayLength()];
+        at = 0;
+        foreach (JsonElement row in objectsElement.EnumerateArray())
+        {
+            if (row.GetArrayLength() != 10)
+            {
+                throw new InvalidOperationException(
+                    $"'{payloadLabel}' object rows must be [index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY].");
+            }
+
+            objects[at++] = new AdmittedObject(
+                (int)row[0].GetDouble(),
+                (int)row[2].GetDouble(),
+                (int)row[5].GetDouble(),
+                Owner: (int)row[6].GetDouble(),
+                Link: (int)row[7].GetDouble(),
+                Quality: (int)row[4].GetDouble(),
+                Mobile: row[1].GetDouble() != 0d,
+                HomeTileX: (int)row[8].GetDouble(),
+                HomeTileY: (int)row[9].GetDouble());
+        }
+
+        return new UuLevelPlacements(unitsPerTile, heightUnitsPerStep, tiles, objects);
+    }
+
+    private static double OptionalNumber(JsonElement root, string name) =>
+        root.ValueKind == JsonValueKind.Object
+            && root.TryGetProperty(name, out JsonElement value)
+            && value.ValueKind == JsonValueKind.Number
+            && value.TryGetDouble(out double number)
+            ? number
+            : 0d;
 
     /// <summary>Parses the importer's "sha256:&lt;hex&gt;" identity into the Engine's content words.</summary>
     public static ContentSha256 ParseSha256(string value, string payloadLabel)

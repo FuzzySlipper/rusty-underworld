@@ -37,8 +37,9 @@ public static class UuEntityAdmission
                 if (!objects.TryGetValue(index, out AdmittedObject? obj))
                     break;
                 // Empty slots and removed objects contribute no entity, but
-                // the walk continues: chains stay linked past them.
-                if (obj.ItemId != 0 && state.IsLive(index))
+                // the walk continues: chains stay linked past them. A critter
+                // slot becomes an actor instead (UuCritterAdmission).
+                if (obj.ItemId != 0 && state.IsLive(index) && !IsCritter(obj))
                 {
                     var identity = UuIdentityPolicy.LevelObjectIdentity(level.LevelNumber, index);
                     if (!directory.TryResolve(identity, out EntityId entity))
@@ -53,6 +54,9 @@ public static class UuEntityAdmission
 
         return new Admission(byIndex, identities);
     }
+
+    private static bool IsCritter(AdmittedObject obj) =>
+        obj.Mobile && Content.UuObjectTablesContent.IsCritterItem(obj.ItemId);
 
     public static void AbandonLevel(EntityDirectory directory, Admission admission)
     {

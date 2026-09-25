@@ -65,6 +65,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuTuningProfile tuning,
         UuLevelDefinition level,
         UuLevelScene scene,
+        UuLevelPlacements? placements,
         UuSession session,
         SpatialMovementSystem movement,
         PlayerControlState player,
@@ -77,6 +78,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _tuning = tuning;
         _level = level;
         _scene = scene;
+        _placements = placements;
         _session = session;
         _movement = movement;
         _player = player;
@@ -112,6 +114,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     }
 
     private string _avatarName = "Avatar";
+
+    private readonly UuLevelPlacements? _placements;
 
     private int PresentActors
     {
@@ -178,6 +182,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuCreationFlow.CreationResult Choices,
         UuVitalsPolicy.Vitals Vitals,
         AdmittedLevel FirstLevel,
+        UuLevelPlacements? Placements,
+        UuObjectTables? Tables,
         UuSessionSnapshot? Snapshot,
         int WorldSeed,
         string DefaultAvatarName);
@@ -217,14 +223,26 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             choices.Attributes[0], 1, choices.Skills[SkillIndexForVitals],
             choices.Attributes[2]);
 
-        // The imported pack admits collision, geometry and a spawn; tiles and
-        // placements are not imported yet, so no object or actor joins the
-        // world and the interaction owners stay unreached. Den #8590 carries
-        // placement admission and the admitted Use/interact dispatch.
-        var firstLevel = new AdmittedLevel(level.Level, [], []);
+        // The level's placements come from the operator's own import: every
+        // tile with its chain, and every object slot with its container fields.
+        // A level imported before placements existed still admits (empty), and
+        // the critter tables are their own pack so a level can play without them.
+        UuLevelPlacements? placements = level.PlacementsPath is { Length: > 0 } path
+            ? UuLevelContent.ReadPlacements(
+                composition.Content.ReadBytes(path), $"content pack '{levelPack.Id.Value}' placements")
+            : null;
+        ContentPack? tablesPack = composition.ContentPacks
+            .SingleOrDefault(pack => pack.Id.Value == UuObjectTablesContent.PackId);
+        UuObjectTables? tables = tablesPack is null
+            ? null
+            : UuObjectTablesContent.Read(tablesPack.Payload, $"content pack '{tablesPack.Id.Value}'");
+        AdmittedLevel firstLevel = placements is null
+            ? new AdmittedLevel(level.Level, [], [])
+            : new AdmittedLevel(level.Level, placements.Tiles, placements.Objects);
 
         return new Prepared(
-            tuning, level, choices, vitals, firstLevel, savedSnapshot, worldSeed, creation.Defaults.Name);
+            tuning, level, choices, vitals, firstLevel, placements, tables, savedSnapshot, worldSeed,
+            creation.Defaults.Name);
     }
 
     public static UuGameSession Create(GameSessionContext context, RulesetSavePayload? saved)
@@ -284,6 +302,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             tuning,
             level,
             scene,
+            prepared.Placements,
             session,
             movement,
             player,
@@ -294,6 +313,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             _avatarName = choices.Name.Length == 0 ? prepared.DefaultAvatarName : choices.Name,
         };
+
+        // Placed critters become actors in the same admitted world the item
+        // pass filled, so a swing or an interaction meets a real presence.
+        if (prepared.Placements is { } placedLevel && prepared.Tables is { } objectTables)
+        {
+            UuCritterAdmission.AdmitLevel(session, prepared.FirstLevel, placedLevel, objectTables);
+        }
 
         if (savedSnapshot is not null)
         {
@@ -434,6 +460,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _player, update.Input, (float)seconds, canMove: true, _session.Swimming, _session.Flying);
         StepLocomotion(step, update, seconds);
         TickAttack(step, (float)seconds);
+        if (step.UsePressed && !_session.Flying) Interact();
         _casting.Upkeep(_session.Clock.ElapsedTicks);
         TickSurvival(seconds);
         _camera.Update(_player);
@@ -482,6 +509,31 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             : "You miss.";
     }
 
+    /// <summary>
+    /// The admitted interaction verb: the avatar uses what it stands at. A door
+    /// tile opens and closes through the level state the save carries, so the
+    /// change survives a load; anywhere else the outcome says so.
+    /// </summary>
+    private void Interact()
+    {
+        if (_placements is null || _player.Position is not { } position)
+        {
+            _outcome = "There is nothing here to use.";
+            return;
+        }
+
+        AdmittedTile? tile = _placements.TileAt(position);
+        if (tile is not { Door: true })
+        {
+            _outcome = "There is nothing here to use.";
+            return;
+        }
+
+        bool open = !_session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y));
+        _session.Dungeon.Current.SetDoor(tile.X, tile.Y, open);
+        _outcome = open ? "You open the door." : "You close the door.";
+    }
+
     private ActorState? NearestOpponent()
     {
         ActorState? nearest = null;
@@ -513,6 +565,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         track.Current = Math.Max(0, track.Current - damage);
         _outcome = outcome;
     }
+
+    /// <summary>The door tiles this session's level state has opened.</summary>
+    public IReadOnlyCollection<(int X, int Y)> OpenedDoors => _session.Dungeon.Current.OpenedDoors;
 
     /// <summary>Collects one rune into the shelf through the casting owner (debug and pickup callers).</summary>
     public void CollectRune(int index) => _casting.CollectRune(index);

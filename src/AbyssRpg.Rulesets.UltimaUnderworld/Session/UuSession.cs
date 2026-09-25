@@ -184,6 +184,22 @@ public sealed class UuSession : IDisposable
         _storedDeltas.Clear();
         foreach (UuLevelDeltaDto delta in snapshot.Deltas)
             _storedDeltas[delta.LevelNumber] = FromDeltaDto(delta);
+        // The admitted level was rebuilt from content, so the saved changes to
+        // it -- opened doors, removed and moved objects, dropped items -- have
+        // to be applied to the live level state, and the entities of objects
+        // the save says are gone must not stand in the restored world.
+        if (_storedDeltas.TryGetValue(Dungeon.CurrentLevel, out UuLevelDelta? current))
+        {
+            Dungeon.Current.ApplyDelta(current);
+            if (_admissions.TryGetValue(Dungeon.CurrentLevel, out UuEntityAdmission.Admission? admission))
+            {
+                foreach (int removed in current.RemovedObjects)
+                {
+                    if (admission.Identities.TryGetValue(removed, out DurableIdentityReference identity))
+                        Directory.Destroy(identity);
+                }
+            }
+        }
         Quests.Clear();
         foreach (QuestVarDto quest in snapshot.QuestVars) Quests.Set(quest.Slot, quest.Value);
         foreach (AutomapPageDto page in snapshot.Automap)

@@ -22,7 +22,23 @@ if [[ ! -f "$data_dir/LEV.ARK" || ! -f "$data_dir/TERRAIN.DAT" ]]; then
 fi
 
 out="$repo_root/content/abyss/imports/level-$level"
+# The object tables are generated from the operator's own OBJECTS.DAT, so they
+# live in the ignored imports tree beside the level, not with the authored packs.
+packs="$repo_root/content/abyss/imports/object-tables"
+mkdir -p "$packs"
+
+# The object tables are install-global (critters, containers), so they land
+# beside the authored packs; the level's placements ride with the level.
+if [[ -f "$data_dir/OBJECTS.DAT" ]]; then
+  tables_args=(--objects "$data_dir/OBJECTS.DAT" --packs "$packs")
+else
+  tables_args=()
+  echo "OBJECTS.DAT missing in $data_dir: the level imports without critter and container tables." >&2
+fi
+
 dotnet run --project "$repo_root/src/UltimaUnderworld.Import.Tool/UltimaUnderworld.Import.Tool.csproj" \
   --configuration Release -- \
-  emit-level --levark "$data_dir/LEV.ARK" --terrain "$data_dir/TERRAIN.DAT" --level "$level" --out "$out"
-echo "Imported level $level into $out. Rebuild the product to stage it."
+  emit-level --levark "$data_dir/LEV.ARK" --terrain "$data_dir/TERRAIN.DAT" --level "$level" --out "$out" \
+  "${tables_args[@]}"
+
+echo "Imported level $level into $out (placements included). Rebuild the product to stage it."

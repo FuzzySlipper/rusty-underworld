@@ -53,7 +53,8 @@ public sealed class UuLocomotionPolicy
         LookReceipt Look,
         bool AttackHeld,
         bool AttackPressed,
-        bool AttackReleased);
+        bool AttackReleased,
+        bool UsePressed);
 
     public (CharacterStepControls Controls, UuMoveIntent Intent) BeginStep(
         ReadOnlySpan<ProductInputEvent> inputs, float seconds, bool canMove, bool swimming, bool flying)
@@ -113,7 +114,10 @@ public sealed class UuLocomotionPolicy
             controls, intent, receipt,
             AttackHeld: _input.Physical.Held(PointerButton.Primary),
             AttackPressed: _input.Physical.Pressed(PointerButton.Primary),
-            AttackReleased: _input.Physical.Released(PointerButton.Primary));
+            AttackReleased: _input.Physical.Released(PointerButton.Primary),
+            // The use channel is the UW interaction verb: it opens a door the
+            // avatar stands at, and doubles as fly-ascend while flying.
+            UsePressed: frame.UsePressed);
     }
 }
 
