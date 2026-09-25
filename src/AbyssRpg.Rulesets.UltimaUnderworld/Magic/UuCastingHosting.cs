@@ -12,6 +12,8 @@ public sealed class UuCastingHosting
         UuCastGates.GateResult Gate,
         bool Backfired,
         int BackfireDamage,
+        int ManaCost,
+        bool PrimedForAim,
         UuCastingWorkflow.SpellEffectInstance? Effect,
         UuMaintainedSpells.MaintainedSpell? Evicted);
 
@@ -38,35 +40,53 @@ public sealed class UuCastingHosting
 
     public MagicPanel Panel() => new(_shelf.Shelf.ToArray(), _maintained.Spells.ToArray(), _effects.ToArray());
 
-    public void Upkeep(ulong nowTicks) => _effects.RemoveAll(e => UuCastingWorkflow.IsExpired(e, nowTicks));
+    public void Upkeep(ulong nowTicks)
+    {
+        var expired = _effects.Where(e => UuCastingWorkflow.IsExpired(e, nowTicks)).ToList();
+        _effects.RemoveAll(expired.Contains);
+        foreach (UuCastingWorkflow.SpellEffectInstance e in expired) _maintained.Dismiss(e.SpellId);
+    }
 
+    /// <summary>
+    /// Cast the shelved runes. The caller deducts ManaCost from the avatar
+    /// track on Cast; targeting consumes PrimedForAim.
+    /// </summary>
     public CastOutcome AttemptCast(
-        string runes, int characterLevel, int mana, int castingSkill,
+        int characterLevel, int mana, int castingSkill,
         bool delayed, ulong nowTicks, double ticksPerSecond, int spellId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(runes);
+        string runes = UuRuneCatalog.SpellLetters(_shelf.Shelf);
         UuSpellCatalog.SpellEntry? spell = UuSpellCatalog.FindByRunes(runes);
         UuCastGates.GateResult gate = UuCastGates.CheckGates(
             spell is not null, characterLevel, spell?.Circle ?? 0, mana, delayed);
         if (gate != UuCastGates.GateResult.Cast)
-            return new CastOutcome(gate, false, 0, null, null);
+            return new CastOutcome(gate, false, 0, 0, false, null, null);
 
         UuCastGates.GateResult cast = UuCastGates.RollCast(castingSkill, spell!.Circle, _rng);
         if (cast == UuCastGates.GateResult.Backfire)
-            return new CastOutcome(cast, true, UuCastGates.RollBackfire(_rng), null, null);
+            return new CastOutcome(cast, true, UuCastGates.RollBackfire(_rng), 0, false, null, null);
         if (cast != UuCastGates.GateResult.Cast)
-            return new CastOutcome(cast, false, 0, null, null);
+            return new CastOutcome(cast, false, 0, 0, false, null, null);
+
+        // Aimed spells prime for targeting before anything is admitted or applied.
+        if (spell.NeedsAim)
+            return new CastOutcome(UuCastGates.GateResult.Cast, false, 0, spell.Cost, true, null, null);
 
         UuMaintainedSpells.MaintainedSpell? evicted = null;
         UuCastingWorkflow.SpellEffectInstance? effect = null;
         if (spell.Icon >= 0)
         {
             evicted = UuSpellEffects.AdmitMaintained(_maintained, spell, spellId);
-            ulong expires = nowTicks + UuCastingWorkflow.DurationTicks(spell.Duration, ticksPerSecond, _rng);
-            (_, effect) = UuCastingWorkflow.Apply(spell.NeedsAim, spellId, expires, stability: 1);
+            // Duration-0 maintained (Curse) holds until dismissed.
+            ulong expires = spell.Duration > 0
+                ? nowTicks + UuCastingWorkflow.DurationTicks(spell.Duration, ticksPerSecond, _rng)
+                : ulong.MaxValue;
+            (_, effect) = UuCastingWorkflow.Apply(
+                false, spellId, expires,
+                stability: 1 /* stable class; per-spell classes ride with UuSpellStability */);
             if (effect is not null) _effects.Add(effect);
         }
 
-        return new CastOutcome(UuCastGates.GateResult.Cast, false, 0, effect, evicted);
+        return new CastOutcome(UuCastGates.GateResult.Cast, false, 0, spell.Cost, false, effect, evicted);
     }
 }
