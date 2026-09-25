@@ -441,7 +441,11 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_session is ISessionStatusSource status && !status.Status.Defeated)
         {
             // Nothing to return from: the lane is reachable outside the menu,
-            // and a healthy respawn would teleport and heal the avatar.
+            // and a healthy respawn would teleport and heal the avatar. The
+            // refusal is published like any other, so an optimistic companion
+            // focus is corrected by the next projection.
+            _hostOutcome = "Nothing to return from; the avatar is standing.";
+            Publish();
             return false;
         }
 

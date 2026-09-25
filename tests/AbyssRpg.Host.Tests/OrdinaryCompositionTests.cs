@@ -345,17 +345,18 @@ public sealed class OrdinaryCompositionTests
         product.Start();
         product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
-        string before = ((ISessionStatusSource)session).Status.Outcome;
         float hp = ((ISessionStatusSource)session).Status.Hp;
         AbyssRpg.Kit.Controls.WorldPoint? where = session.PlayerPosition;
 
         // The respawn lane is reachable outside the menu; a healthy avatar must
-        // not be teleported to the anchor and healed by it.
+        // not be teleported to the anchor and healed by it, and the refusal is
+        // published so an optimistic focus is corrected.
         product.Update(new ProductUpdate(Facts(2), [Intent("abyss.action.respawn")]));
         Assert.Equal(ProductMode.Playing, product.Mode);
-        Assert.Equal(before, ((ISessionStatusSource)session).Status.Outcome);
+        Assert.Contains("Nothing to return", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
         Assert.Equal(hp, ((ISessionStatusSource)session).Status.Hp);
         Assert.Equal(where, session.PlayerPosition);
+        Assert.False(HudBoolean(ui.LastProjection!.Value.Value, "defeated"));
         Assert.Same(session, product.Session);
     }
 
