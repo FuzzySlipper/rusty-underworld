@@ -204,6 +204,9 @@ internal class EngineSpatialDouble : DispatchProxy
     /// <summary>The transform the next character step reports; a walking avatar lands here.</summary>
     internal Vector3 StepTranslation { get; set; } = new(1, 4, 0);
 
+    /// <summary>Every step delta the product proposed, in order.</summary>
+    internal List<float> StepSeconds { get; } = [];
+
     internal static EngineSpatialDouble Create(Vector3? stepTranslation = null)
     {
         ISpatialService service = DispatchProxy.Create<ISpatialService, EngineSpatialDouble>();
@@ -229,7 +232,13 @@ internal class EngineSpatialDouble : DispatchProxy
         return new SpatialSession(new SpatialSessionHandle(1), static () => { });
     }
 
-    private CharacterStepReceipt Step(CharacterStepRequest request) => default(CharacterStepReceipt) with
+    private CharacterStepReceipt Step(CharacterStepRequest request)
+    {
+        StepSeconds.Add(request.Command.StepSeconds);
+        return Receipt(request);
+    }
+
+    private CharacterStepReceipt Receipt(CharacterStepRequest request) => default(CharacterStepReceipt) with
     {
         Generation = 1,
         Transform = new Transform(StepTranslation, Quaternion.Identity, Vector3.One),

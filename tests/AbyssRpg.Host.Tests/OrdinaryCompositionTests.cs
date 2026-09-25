@@ -1,5 +1,6 @@
 using System.Text;
 using AbyssRpg.Kit;
+using AbyssRpg.Kit.Controls;
 using AbyssRpg.Kit.Presentation;
 using Rusty.Engine;
 using Rusty.Engine.Debugging;
@@ -347,6 +348,44 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_long_frame_is_subdivided_into_steps_the_engine_admits()
+    {
+        // The Engine admits a spatial proposal of at most a fifteenth of a
+        // second; a longer frame handed over whole is rejected and taints the
+        // runtime, so a hitch must not be able to do that.
+        UiDouble ui = UiDouble.Create();
+        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+
+        product.Update(new ProductUpdate(Facts(1, seconds: 1d / 60d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
+        Assert.Single(spatial.StepSeconds);
+        Assert.Equal(1f / 60f, spatial.StepSeconds[0], 4);
+
+        spatial.StepSeconds.Clear();
+        product.Update(new ProductUpdate(Facts(2, seconds: 0.25d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
+        Assert.NotEmpty(spatial.StepSeconds);
+        Assert.All(spatial.StepSeconds, seconds => Assert.InRange(
+            seconds, SpatialMovementSystem.MinimumStepSeconds, SpatialMovementSystem.MaximumStepSeconds));
+        // The whole frame is proposed across the substeps it was divided into.
+        Assert.Equal(0.25f, spatial.StepSeconds.Sum(), 3);
+
+        // A frame shorter than the Engine's floor proposes nothing at all.
+        spatial.StepSeconds.Clear();
+        product.Update(new ProductUpdate(Facts(3, seconds: 0.0005d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
+        Assert.Empty(spatial.StepSeconds);
+        Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "ready"));
+    }
+
+    [Fact]
     public void A_held_mapping_does_not_repeat_a_one_shot_action()
     {
         using AbyssProduct product = Product(out _, out _, out _, out _);
@@ -669,9 +708,9 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains("cannot return", HudString(releasedUi.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
     }
 
-    private static ProductUpdateFacts Facts(ulong step) => new(
+    private static ProductUpdateFacts Facts(ulong step, double seconds = 1d / 60d) => new(
         ProductUpdateMode.Realtime, ProductLifecycleState.Running,
-        step, step, step, step, 60, 1, 0, 1d / 60d);
+        step, step, step, step, 60, 1, 0, seconds);
 
     internal static ProductUpdate SixtyHzUpdate(ulong step, params ProductInputEvent[] input) =>
         new(Facts(step), input);
