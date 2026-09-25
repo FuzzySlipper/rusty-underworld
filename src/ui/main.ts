@@ -106,15 +106,16 @@ const STYLES = `
   background: rgba(18, 16, 14, 0.82);
   color: #e8e0cc;
   font: 13px/1.45 system-ui, sans-serif;
-  min-width: 14rem;
+  min-width: 15rem;
 }
-.abyss-hud .bar { width: 12rem; height: 0.55rem; background: #2c2822; border-radius: 0.2rem; }
-.abyss-hud .bar .track { height: 100%; }
+.abyss-hud .bar { display: block; width: 13rem; margin: 0.15rem 0; }
+.abyss-hud .bar .track { display: block; height: 0.5rem; background: #2c2822; border-radius: 0.2rem; }
 .abyss-hud .bar .fill { height: 100%; width: 0; border-radius: 0.2rem; }
 .abyss-hud .hp .fill { background: #b04434; }
 .abyss-hud .mana .fill { background: #3f6fb5; }
 .abyss-hud .charge .fill { background: #c9a13b; }
-.abyss-hud .label { display: block; opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.abyss-hud .label { display: block; opacity: 0.75; font-size: 10px; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.06em; }
+.abyss-hud .status { margin: 0.4rem 0 0; max-width: 16rem; }
 .abyss-hud[data-ready="false"] .bar { opacity: 0.35; }
 .abyss-menu, .abyss-debug, .abyss-metrics {
   position: fixed;
