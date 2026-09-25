@@ -128,6 +128,7 @@ const STYLES = `
 .abyss-menu { top: 0.75rem; right: 0.75rem; padding: 0.6rem 0.75rem; min-width: 13rem; }
 .abyss-menu[hidden] { display: none; }
 .abyss-menu button { display: block; width: 100%; margin: 0.2rem 0; }
+.abyss-menu .tools { display: block; margin-top: 0.4rem; }
 .abyss-menu .slots { margin: 0.4rem 0 0; padding: 0; list-style: none; opacity: 0.8; font-size: 12px; }
 .abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
 .abyss-debug { top: 9rem; }
@@ -275,21 +276,16 @@ export function mountProductUi(
   metricsHost.className = 'panel';
   metrics.append(metricsHost);
 
-  const controls = document.createElement('section');
-  controls.className = 'abyss-controls';
-  controls.setAttribute('data-rusty-ui-interactive', '');
-  controls.style.position = 'fixed';
-  controls.style.right = '0.75rem';
-  controls.style.bottom = '0.75rem';
-  controls.style.display = 'flex';
-  controls.style.gap = '0.4rem';
-  const debugToggle = button('Debug console');
+  // The Engine console and the renderer metrics readout are menu-time tools:
+  // while the product is playing the Engine keeps the pointer captured, so a
+  // control outside the menu could not be clicked.
+  const debugToggle = button('Engine console');
   const metricsToggle = button('Renderer metrics');
   debugToggle.setAttribute('aria-pressed', 'false');
   metricsToggle.setAttribute('aria-pressed', String(metricsVisible));
-  controls.append(debugToggle, metricsToggle);
+  menu.append(debugToggle, metricsToggle);
 
-  root.append(style, hud, menu, debug, metrics, controls);
+  root.append(style, hud, menu, debug, metrics);
 
   const claim = (intent: string): void => {
     context.intents?.claim(intent, { kind: 'digital', active: true });
@@ -435,7 +431,6 @@ export function mountProductUi(
       menu.remove();
       debug.remove();
       metrics.remove();
-      controls.remove();
     },
   };
 }

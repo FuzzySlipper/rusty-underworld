@@ -181,7 +181,10 @@ test('every control claims a declared intent', (t) => {
   const { ctx, document } = mount(t);
   ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
   const menu = document.querySelector('.abyss-menu');
-  for (const button of menu.querySelectorAll('button')) {
+  const actionButtons = [...menu.querySelectorAll('button')].filter(
+    (b) => !['Engine console', 'Renderer metrics'].some((label) => b.textContent.startsWith(label)),
+  );
+  for (const button of actionButtons) {
     button.disabled = false;
     button.dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
   }
@@ -220,10 +223,11 @@ test('the Engine live-debug panel and metrics widget are mounted and disposed', 
 
   const metrics = document.querySelector('.abyss-metrics');
   assert.equal(metrics.hidden, false);
-  const toggles = [...document.querySelectorAll('.abyss-controls button')];
-  toggles[1].dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
+  const toggle = (label) => [...document.querySelectorAll('.abyss-menu button')]
+    .find((b) => b.textContent.startsWith(label));
+  toggle('Renderer metrics').dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
   assert.equal(metrics.hidden, true);
-  toggles[0].dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
+  toggle('Engine console').dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
   assert.equal(document.querySelector('.abyss-debug').hidden, false);
 
   ui.dispose();
@@ -235,7 +239,7 @@ test('the Engine live-debug panel and metrics widget are mounted and disposed', 
 
 test('interactive surfaces are marked for the Engine input lane', (t) => {
   const { document } = mount(t);
-  for (const selector of ['.abyss-menu', '.abyss-debug', '.abyss-metrics', '.abyss-controls']) {
+  for (const selector of ['.abyss-menu', '.abyss-debug', '.abyss-metrics']) {
     assert.equal(document.querySelector(selector).hasAttribute('data-rusty-ui-interactive'), true, selector);
   }
 });
