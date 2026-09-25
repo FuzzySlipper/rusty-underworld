@@ -96,9 +96,12 @@ otherwise swallow.
 The first slice imports a level's collision, visible geometry, and spawn. Object,
 critter, and conversation placements are not imported yet, so melee resolves
 against no opponent, and the conversation, barter, loot, and NPC owners are
-composed but unreachable in play. Casting is reachable through the debug lane
-(`abyss.rune`, `abyss.cast`) rather than from collected world runes. Survival
-pressure exists but has little to act on without placed items.
+composed but unreachable in play — nothing dispatches an interaction into them.
+Casting is reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather
+than from collected world runes. Survival pressure exists but has little to act
+on without placed items. Den #8590 carries all of that as one piece of work:
+placement admission, the admitted Use/interact dispatch, combat against a real
+opponent, and world-reachable casting.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly
 the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)

@@ -166,6 +166,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             choices.Attributes[0], 1, choices.Skills[SkillIndexForVitals],
             choices.Attributes[2]);
 
+        // The imported pack admits collision, geometry and a spawn; tiles and
+        // placements are not imported yet, so no object or actor joins the
+        // world and the interaction owners stay unreached. Den #8590 carries
+        // placement admission and the admitted Use/interact dispatch.
         var firstLevel = new AdmittedLevel(level.Level, [], []);
         UuSession session = UuSession.NewGame(
             choices, vitals, firstLevel, level.Spawn, tuning.Movement,
