@@ -3,11 +3,26 @@
   "id": "abyssrpg.stygian-abyss",
   "ruleset": "abyssrpg.ultima-underworld",
   "contentPacks": [
-    { "id": "abyssrpg.avatar-options" },
-    { "id": "abyssrpg.classes" },
-    { "id": "abyssrpg.starting-kit" },
-    { "id": "abyssrpg.object-tables" },
-    { "id": "abyssrpg.level-1" }
+    {
+      "id": "abyssrpg.avatar-options"
+    },
+    {
+      "id": "abyssrpg.classes"
+    },
+    {
+      "id": "abyssrpg.starting-kit"
+    },
+    {
+      "id": "abyssrpg.object-tables"
+    },
+    {
+      "id": "abyssrpg.level-1"
+    },
+    {
+      "id": "abyssrpg.level-2"
+    }
   ],
-  "tuning": { "id": "abyssrpg.stygian-default" }
+  "tuning": {
+    "id": "abyssrpg.stygian-default"
+  }
 }

@@ -122,7 +122,6 @@ public sealed class SpatialMovementSystem : IDisposable
         catch { session.Dispose(); throw; }
     }
 
-    /// <summary>Submits the current control state to the Engine and applies its receipt in the admitted update order.</summary>
     /// <summary>The longest step the Engine admits in one proposal.</summary>
     public const float MaximumStepSeconds = 1f / 15f;
 
@@ -133,8 +132,9 @@ public sealed class SpatialMovementSystem : IDisposable
     public const int MaxSubsteps = 8;
 
     /// <summary>
-    /// Proposes one admitted frame's motion to the Engine and applies the
-    /// confirmed continuation. The frame is subdivided into proposals inside
+    /// Submits the current control state to the Engine and applies its receipt
+    /// in the admitted update order: one admitted frame's motion, proposed and
+    /// continued. The frame is subdivided into proposals inside
     /// the Engine's admitted window, and the caller's own motion and one-shot
     /// presses ride with the first proposal. A frame longer than
     /// <see cref="MaxSubsteps"/> windows is proposed up to the cap and the

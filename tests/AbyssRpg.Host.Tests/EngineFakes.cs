@@ -201,6 +201,9 @@ internal class EngineSpatialDouble : DispatchProxy
     /// <summary>Sessions the Engine was asked to create; nothing else proves work was reached.</summary>
     internal int SessionsCreated { get; private set; }
 
+    /// <summary>Content artifact replacements the product asked for, in order.</summary>
+    internal List<SpatialContentArtifactReplaceRequest> ContentReplacements { get; } = [];
+
     /// <summary>The transform the next character step reports; a walking avatar lands here.</summary>
     internal Vector3 StepTranslation { get; set; } = new(1, 4, 0);
 
@@ -227,7 +230,7 @@ internal class EngineSpatialDouble : DispatchProxy
         nameof(ISpatialService.DefaultCharacterControllerConfig) => RepresentativeConfig(),
         nameof(ISpatialService.ValidateCharacterControllerConfig) => null,
         nameof(ISpatialService.CreateSession) => Created(),
-        nameof(ISpatialService.ReplaceContentArtifact) => new SpatialContentArtifactReplaceReceipt(),
+        nameof(ISpatialService.ReplaceContentArtifact) => ReplaceContentArtifact((SpatialContentArtifactReplaceRequest)arguments![0]!),
         nameof(ISpatialService.ProposeCharacterStep) => Step((CharacterStepRequest)arguments![0]!),
         _ => throw new NotSupportedException(method?.Name),
     };
@@ -236,6 +239,12 @@ internal class EngineSpatialDouble : DispatchProxy
     {
         SessionsCreated += 1;
         return new SpatialSession(new SpatialSessionHandle(1), static () => { });
+    }
+
+    private SpatialContentArtifactReplaceReceipt ReplaceContentArtifact(SpatialContentArtifactReplaceRequest request)
+    {
+        ContentReplacements.Add(request);
+        return default;
     }
 
     private CharacterStepReceipt Step(CharacterStepRequest request)
@@ -272,6 +281,9 @@ internal class EngineSpatialDouble : DispatchProxy
 internal sealed class GraphicsDouble : IGraphicsService
 {
     internal MeshResourceCreateRequest? MeshRequest { get; private set; }
+
+    /// <summary>Every geometry resource the product created, in order.</summary>
+    internal List<MeshResourceCreateRequest> MeshRequests { get; } = [];
     internal IReadOnlyList<AppearanceFact> LastSnapshot { get; private set; } = [];
     internal int SnapshotCalls { get; private set; }
     internal int MaterialCalls { get; private set; }
@@ -286,6 +298,7 @@ internal sealed class GraphicsDouble : IGraphicsService
     public MeshResource CreateMeshResource(MeshResourceCreateRequest arg0)
     {
         MeshRequest = arg0;
+        MeshRequests.Add(arg0);
         return new MeshResource(new MeshResourceHandle(1), static () => { });
     }
 

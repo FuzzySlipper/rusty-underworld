@@ -41,6 +41,14 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
             : "position unavailable";
     }
 
+    [DebugCommand("abyss.travel", Description = "Operator probe: travel to another imported level of the dungeon.")]
+    public string Travel(int level)
+    {
+        if (Live is not { } session) return "no live session";
+        session.TravelToLevel(level, costTicks: 0);
+        return $"level={level}";
+    }
+
     [DebugCommand("abyss.actors", Description = "The nearest placed actors with their distance from the avatar.")]
     public string Actors()
     {

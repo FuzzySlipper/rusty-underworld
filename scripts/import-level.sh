@@ -41,4 +41,27 @@ dotnet run --project "$repo_root/src/UltimaUnderworld.Import.Tool/UltimaUnderwor
   emit-level --levark "$data_dir/LEV.ARK" --terrain "$data_dir/TERRAIN.DAT" --level "$level" --out "$out" \
   "${tables_args[@]}"
 
+admit_level() {
+  python3 - "$repo_root" "$level" <<'PYEOF'
+import json, sys, pathlib
+root, level = pathlib.Path(sys.argv[1]), int(sys.argv[2])
+bundle = root / "content/abyss/bundles/stygian-abyss.bundle.json"
+document = json.loads(bundle.read_text())
+packs = document["contentPacks"]
+entry = {"id": f"abyssrpg.level-{level}"}
+if entry not in packs:
+    # Keep the authored order: levels stay together, in level order, at the end
+    # of the packs the bundle already lists.
+    at = max((index for index, pack in enumerate(packs)
+              if pack["id"].startswith("abyssrpg.level-")), default=len(packs) - 1) + 1
+    packs.insert(at, entry)
+    bundle.write_text(json.dumps(document, indent=2) + "\n")
+    print(f"Admitted abyssrpg.level-{level} in the shipped bundle.")
+PYEOF
+}
+
+# The shipped bundle is the product's default composition: an imported level is
+# admitted there, so the launcher can reach it and travel can enter it.
+admit_level
+
 echo "Imported level $level into $out (placements included). Rebuild the product to stage it."

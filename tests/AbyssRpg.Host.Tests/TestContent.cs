@@ -16,6 +16,12 @@ internal static class TestContent
     public const string LevelPayloadPath = "abyss/imports/level-1/test.level-1.level.json";
     public const string PlacementsPath = "abyss/imports/level-1/test.level-1-placements.json";
 
+    /// <summary>The same staged shape for any level a fixture admits.</summary>
+    public static string CollisionPathFor(int level) => $"abyss/imports/level-{level}/test.level-{level}-collision.json";
+    public static string RenderPathFor(int level) => $"abyss/imports/level-{level}/test.level-{level}-render.json";
+    public static string LevelPayloadPathFor(int level) => $"abyss/imports/level-{level}/test.level-{level}.level.json";
+    public static string PlacementsPathFor(int level) => $"abyss/imports/level-{level}/test.level-{level}-placements.json";
+
     /// <summary>The placed critter's item id, its object index, and the container's.</summary>
     public const int CritterItemId = 64;
     public const int CritterObjectIndex = 501;
@@ -24,7 +30,9 @@ internal static class TestContent
     public const int PropObjectIndex = 500;
 
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
-    internal static ProductContent Build(bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true)
+    internal static ProductContent Build(
+        bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
+        bool withSecondLevel = false)
     {
         List<ProductContentFile> files =
         [
@@ -38,7 +46,7 @@ internal static class TestContent
                 { "id": "abyssrpg.classes" },
                 { "id": "abyssrpg.starting-kit" },
                 { "id": "abyssrpg.object-tables" },
-                { "id": "abyssrpg.level-__LEVEL__" }
+                { "id": "abyssrpg.level-__LEVEL__" }__SECOND_LEVEL__
               ],
               "tuning": { "id": "abyssrpg.stygian-default" }
             }
@@ -86,21 +94,37 @@ internal static class TestContent
             File("abyss/content-packs/tuning.json", """{ "id": "abyssrpg.stygian-default", "clockTicksPerSecond": 255, "movement": "default" }"""),
         ];
 
-        if (withLevel)
-        {
-            files.Add(File("abyss/packs/test.level-1.pack.json", Pack($"abyssrpg.level-{level}", LevelPayloadPath)));
-            files.Add(File(LevelPayloadPath, LevelManifest(level, withPlacements)));
-            files.Add(File(RenderPath, RenderMesh(level)));
-            if (withPlacements) files.Add(File(PlacementsPath, Placements(level, withCritter)));
-        }
+        if (withLevel) StageLevel(files, level, withPlacements, withCritter);
+        if (withSecondLevel) StageLevel(files, SecondLevel, withPlacements: true, withCritter: true);
 
         // The descriptor grammar names one pack per level, so a bundle that
         // admits another level starts from the same staged tree.
         files[0] = File(
             "abyss/bundles/stygian-abyss.bundle.json",
             Encoding.UTF8.GetString(files[0].Bytes.Span)
-                .Replace("__LEVEL__", level.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal));
+                .Replace("__LEVEL__", level.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal)
+                .Replace(
+                    "__SECOND_LEVEL__",
+                    withSecondLevel ? $",\n    {{ \"id\": \"abyssrpg.level-{SecondLevel}\" }}".Replace("\\n", "\n") : "",
+                    StringComparison.Ordinal));
         return new ProductContent(files.ToArray());
+    }
+
+    /// <summary>The second level a travel fixture admits: its own import, its own critter.</summary>
+    public const int SecondLevel = 2;
+
+    /// <summary>The critter item id the second level places, distinct from the first level's.</summary>
+    public const int SecondLevelCritterItemId = 66;
+
+    /// <summary>The door tile the second level places, distinct from the first level's.</summary>
+    public static readonly (int X, int Y) SecondLevelDoorTile = (1, 2);
+
+    private static void StageLevel(List<ProductContentFile> files, int level, bool withPlacements, bool withCritter)
+    {
+        files.Add(File($"abyss/packs/test.level-{level}.pack.json", Pack($"abyssrpg.level-{level}", LevelPayloadPathFor(level))));
+        files.Add(File(LevelPayloadPathFor(level), LevelManifest(level, withPlacements)));
+        files.Add(File(RenderPathFor(level), RenderMesh(level)));
+        if (withPlacements) files.Add(File(PlacementsPathFor(level), Placements(level, withCritter)));
     }
 
     internal static string LevelManifest(int level = 1, bool withPlacements = true) =>
@@ -114,12 +138,12 @@ internal static class TestContent
           "provenance": { "source": "UW1", "origin": "LEV.ARK", "tiles": 1, "objects": 4, "liveObjects": 4, "mobileObjects": 1 }
         }
         """
-        .Replace("__COLLISION__", CollisionPath, StringComparison.Ordinal)
+        .Replace("__COLLISION__", CollisionPathFor(level), StringComparison.Ordinal)
         .Replace("__SHA__", Sha256Literal, StringComparison.Ordinal)
-        .Replace("__RENDER__", RenderPath, StringComparison.Ordinal)
+        .Replace("__RENDER__", RenderPathFor(level), StringComparison.Ordinal)
         .Replace(
             "__PLACEMENTS__",
-            withPlacements ? $"\n  \"placements\": {{ \"path\": \"{PlacementsPath}\" }}," : "",
+            withPlacements ? $"\n  \"placements\": {{ \"path\": \"{PlacementsPathFor(level)}\" }}," : "",
             StringComparison.Ordinal);
 
     /// <summary>
@@ -131,7 +155,8 @@ internal static class TestContent
       "schemaVersion": 1,
       "source": { "SourceGame": "UW1", "SourceFile": "UW/DATA/OBJECTS.DAT", "ByteLength": 3554, "Sha256Hex": "00" },
       "critters": [
-        { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 }
+        { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 },
+        { "itemId": 66, "level": 2, "avgHp": 20, "strength": 18, "dexterity": 10, "intelligence": 4, "speed": 4, "corpseIndex": 4, "swimmer": false, "flier": false, "faction": 2 }
       ],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 }
@@ -162,14 +187,16 @@ internal static class TestContent
                 // One tile is a door, so the interaction verb has something to
                 // use, and one tile is solid, so the operator probe's refusal
                 // has a tile to refuse.
-                int door = (x, y) == (1, 1) ? 1 : 0;
+                (int doorX, int doorY) = level == SecondLevel ? SecondLevelDoorTile : (1, 1);
+                int door = (x, y) == (doorX, doorY) ? 1 : 0;
                 int type = (x, y) == (2, 2) ? 0 : 1;
                 tiles.Append($"[{x},{y},{type},{head},0,{door}]");
             }
         }
 
+        int critterItem = level == SecondLevel ? SecondLevelCritterItemId : CritterItemId;
         string critterRow = withCritter
-            ? $"[{CritterObjectIndex},1,{CritterItemId},0,0,0,0,0,0,0,0],\n            "
+            ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,0,0,0,0],\n            "
             : "";
         return $$"""
         {

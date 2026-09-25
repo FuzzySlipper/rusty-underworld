@@ -286,6 +286,117 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(1, empty.OpenedDoors.Count);
     }
 
+    /// <summary>A product whose bundle admits two imported levels, for travel.</summary>
+    private static AbyssProduct TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial)
+    {
+        ui = UiDouble.Create();
+        graphics = new GraphicsDouble();
+        spatial = EngineSpatialDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: graphics);
+        return new AbyssProduct(
+            engine,
+            TestContent.Build(withSecondLevel: true),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void Travel_admits_the_target_levels_own_items_actors_and_geometry()
+    {
+        using AbyssProduct product = TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // Level 1 admits its own critter.
+        Assert.Equal(1, session.PresentActors);
+        int levelOneActor = (int)session.NearestActors(1)[0].Actor.DurableId;
+        int meshesBefore = graphics.MeshRequests.Count;
+        ulong clockBefore = session.ClockTicks;
+
+        session.TravelToLevel(TestContent.SecondLevel, costTicks: 25);
+
+        // The new level's content is admitted: its own geometry is drawn, its
+        // own critter stands in the world, and the level left behind keeps its
+        // actor out of the world.
+        Assert.Equal(TestContent.SecondLevel, session.Status.Level);
+        Assert.Equal(1, session.PresentActors);
+        int levelTwoActor = (int)session.NearestActors(1)[0].Actor.DurableId;
+        Assert.NotEqual(levelOneActor, levelTwoActor);
+        Assert.True(graphics.MeshRequests.Count > meshesBefore, "the new level's geometry is drawn");
+        Assert.NotEmpty(spatial.ContentReplacements);
+        // A transition costs the caller's ticks: the level is entered and the
+        // clock advances by exactly that, on top of what the world already ran.
+        Assert.Equal(clockBefore + 25ul, session.ClockTicks);
+        Assert.Contains("level 2", session.Status.Outcome, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_level_changes_own_state_and_kills_survive_travel()
+    {
+        using AbyssProduct product = TwoLevelProduct(out UiDouble ui, out _, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // On level 1: open its door and drop its critter. The Engine's step is
+        // what places the avatar, so the fixture's step transform is the door
+        // tile's own center.
+        spatial.StepTranslation = new System.Numerics.Vector3(12f, 1f, 12f);
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You open the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.Contains((1, 1), session.OpenedDoors);
+
+        float before = (float)session.NearestActors(1)[0].Actor.Stats
+            .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current;
+        ulong swingStep = 10;
+        void Swing()
+        {
+            product.Update(SixtyHzUpdate(swingStep++, Attack(InputEdge.Pressed)));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(swingStep++));
+            product.Update(new ProductUpdate(Facts(swingStep++), [Attack(InputEdge.Released)]));
+        }
+
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        for (int attempt = 0; attempt < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; attempt++) Swing();
+
+        Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "level 1's critter can be defeated");
+        Assert.False(session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex));
+
+        // Away and back: the door is still open and the fallen critter is still
+        // gone, because both are level state the dungeon keeps per level.
+        session.TravelToLevel(TestContent.SecondLevel, costTicks: 0);
+        Assert.DoesNotContain((1, 1), session.OpenedDoors);
+        Assert.Equal(TestContent.SecondLevel, session.Status.Level);
+
+        session.TravelToLevel(1, costTicks: 0);
+        Assert.Equal(1, session.Status.Level);
+        Assert.Contains((1, 1), session.OpenedDoors);
+        Assert.Empty(session.NearestActors(1));
+        Assert.Equal(0, session.PresentActors);
+    }
+
+    [Fact]
+    public void Travel_to_a_level_the_bundle_did_not_import_is_refused_with_the_operator_step()
+    {
+        using AbyssProduct product = TwoLevelProduct(out UiDouble ui, out _, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        InvalidOperationException missing = Assert.Throws<InvalidOperationException>(
+            () => session.TravelToLevel(7, costTicks: 0));
+        Assert.Contains("scripts/import-level.sh", missing.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => session.TravelToLevel(1, costTicks: 0));
+        Assert.Equal(1, session.Status.Level);
+        Assert.Equal(1, session.PresentActors);
+    }
+
     [Fact]
     public void The_operator_tile_probe_refuses_a_tile_the_avatar_cannot_stand_on()
     {

@@ -37,7 +37,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private readonly GameSessionContext _context;
     private readonly UuTuningProfile _tuning;
-    private readonly UuLevelDefinition _level;
+    private UuLevelDefinition _level;
     private readonly UuLevelScene _scene;
     private readonly UuSession _session;
     private readonly SpatialMovementSystem _movement;
@@ -50,6 +50,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private Material? _material;
     private MeshResource? _mesh;
     private Appearance? _appearance;
+
+    /// <summary>Level resource generations kept alive until the session ends.</summary>
+    private readonly List<(Appearance? Appearance, MeshResource? Mesh, Material? Material)> _retiredLevelResources = [];
     private ProductMode _mode = ProductMode.Playing;
     private ProductMode? _pendingMode;
     private bool _defeatRequested;
@@ -66,6 +69,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuLevelDefinition level,
         UuLevelScene scene,
         UuLevelPlacements? placements,
+        UuLevelCatalog? catalog,
         UuSession session,
         SpatialMovementSystem movement,
         PlayerControlState player,
@@ -79,6 +83,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _level = level;
         _scene = scene;
         _placements = placements;
+        _catalog = catalog;
         _session = session;
         _movement = movement;
         _player = player;
@@ -115,10 +120,24 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private string _avatarName = "Avatar";
 
-    private readonly UuLevelPlacements? _placements;
+    private UuLevelPlacements? _placements;
 
-    /// <summary>The actor each placed critter slot became, so a defeat can be recorded.</summary>
-    private IReadOnlyDictionary<int, ActorState> _placedCritters =
+    /// <summary>The imported levels this session may travel between, when the entry built one.</summary>
+    private readonly UuLevelCatalog? _catalog;
+
+    /// <summary>
+    /// The actor each placed critter slot became, per level, so a defeat can be
+    /// recorded against the level that holds the placement and a target search
+    /// never reaches an inhabitant of another level.
+    /// </summary>
+    private readonly Dictionary<int, IReadOnlyDictionary<int, ActorState>> _placedCrittersByLevel = [];
+
+    private IReadOnlyDictionary<int, ActorState> PlacedCritters =>
+        _placedCrittersByLevel.TryGetValue(_session.Dungeon.CurrentLevel, out var map)
+            ? map
+            : EmptyCritters;
+
+    private static readonly IReadOnlyDictionary<int, ActorState> EmptyCritters =
         new Dictionary<int, ActorState>();
 
     /// <summary>Live placed actors around the avatar; the status line reports it.</summary>
@@ -308,6 +327,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             level,
             scene,
             prepared.Placements,
+            new UuLevelCatalog(context.Composition),
             session,
             movement,
             player,
@@ -324,7 +344,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         // restored save then removes the actors of placements it says are gone.
         if (prepared.Placements is { } placedLevel && prepared.Tables is { } objectTables)
         {
-            gameSession._placedCritters = UuCritterAdmission
+            gameSession._placedCrittersByLevel[prepared.FirstLevel.LevelNumber] = UuCritterAdmission
                 .AdmitLevel(session, prepared.FirstLevel, placedLevel, objectTables)
                 .ByObjectIndex;
         }
@@ -384,7 +404,18 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_scenePublished) return;
+        PublishLevel(_scene);
+    }
 
+    /// <summary>
+    /// Draws one level's geometry. The previous generation of resources is kept
+    /// until the session ends: the renderer may still hold what it was drawing,
+    /// so a level change retires its resources rather than releasing them under
+    /// a frame that is already in flight.
+    /// </summary>
+    private void PublishLevel(UuLevelScene scene)
+    {
+        ArgumentNullException.ThrowIfNull(scene);
         Material? material = null;
         MeshResource? mesh = null;
         Appearance? appearance = null;
@@ -401,12 +432,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 MaterialAlphaMode.Opaque,
                 0.5f));
             mesh = _context.Engine.Graphics.CreateMeshResource(new MeshResourceCreateRequest(
-                _scene.Positions,
-                _scene.Normals,
+                scene.Positions,
+                scene.Normals,
                 ReadOnlyMemory<Vector2>.Empty,
-                _scene.Colors,
-                _scene.Indices,
-                new MeshGroup[] { new(0, 0, (uint)_scene.Indices.Length) },
+                scene.Colors,
+                scene.Indices,
+                new MeshGroup[] { new(0, 0, (uint)scene.Indices.Length) },
                 new MeshMaterialBinding[] { new(0, material) }));
             appearance = _context.Engine.Graphics.CreateMeshAppearance(mesh);
             _context.Engine.Graphics.PublishSnapshot(
@@ -421,6 +452,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     Visible: true,
                     RenderLayer.Scene),
             });
+            RetireLevelResources();
             _material = material;
             _mesh = mesh;
             _appearance = appearance;
@@ -440,6 +472,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         _context.Engine.CameraView.SetBackgroundColor(new SetBackgroundColorRequest(new Color(0.03f, 0.03f, 0.05f, 1f)));
         _camera.Update(_player);
+    }
+
+    /// <summary>Keeps the generation being replaced until the session releases it.</summary>
+    private void RetireLevelResources()
+    {
+        if (_appearance is null && _mesh is null && _material is null) return;
+        _retiredLevelResources.Add((_appearance, _mesh, _material));
+        _appearance = null;
+        _mesh = null;
+        _material = null;
     }
 
     /// <summary>Stable Engine object id for the one level appearance this session owns.</summary>
@@ -550,7 +592,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// </summary>
     private void RecordDefeat(ActorState target)
     {
-        foreach (KeyValuePair<int, ActorState> placed in _placedCritters)
+        foreach (KeyValuePair<int, ActorState> placed in PlacedCritters)
         {
             if (placed.Value.DurableId != target.DurableId) continue;
             _session.Dungeon.Current.RemoveObject(placed.Key);
@@ -563,7 +605,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         ActorState? nearest = null;
         float nearestDistance = MeleeReach;
         WorldPoint origin = _player.Position ?? _level.Spawn.Position;
-        foreach (ActorState actor in _session.Actors.All)
+        // Only this level's inhabitants are in reach: an actor of another level
+        // stands in a world the avatar is not in.
+        foreach (ActorState actor in PlacedCritters.Values)
         {
             // A fallen opponent is scenery, not a target.
             if (actor.IsDefeated) continue;
@@ -620,11 +664,73 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _player.Restore(standing, DetachedMotion(standing.Y));
     }
 
+    /// <summary>
+    /// Moves the avatar to another imported level of the same dungeon: the
+    /// level's own content is admitted (collision, visible geometry, items and
+    /// critters), the level left behind keeps its state and loses its actors,
+    /// and the target search follows the avatar. Travel cost is the caller's:
+    /// the gameplay caller that owns a transition (stairs, a pit, a moongate)
+    /// decides what a transition costs in clock time.
+    /// </summary>
+    public void TravelToLevel(int level, ulong costTicks)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_catalog is null) throw new InvalidOperationException("This session has no imported level catalog.");
+        int from = _session.Dungeon.CurrentLevel;
+        if (level == from)
+            throw new InvalidOperationException($"The avatar is already on level {level}.");
+
+        UuLevelDefinition definition = _catalog.Definition(level);
+        AdmittedLevel admitted = _catalog.Admit(level);
+        UuLevelScene scene = _catalog.Scene(level);
+        UuLevelPlacements? placements = _catalog.Placements(level);
+
+        // The level left behind keeps what happened on it, in the session's own
+        // stored deltas, and its actors leave the world with it.
+        _session.TravelTo(admitted, costTicks);
+        AbandonActors(from);
+
+        // The Engine stands the avatar in the new level's collision before any
+        // step is proposed, then the new level's geometry is drawn.
+        _movement.ReplaceContent(definition.Collision);
+        PublishLevel(scene);
+        _level = definition;
+        _placements = placements;
+
+        // A restored level's dead placements are already gone from its state, so
+        // admission skips them and the actors of the living ones join the world.
+        if (placements is not null && _catalog.Tables is { } tables)
+        {
+            _placedCrittersByLevel[level] = UuCritterAdmission
+                .AdmitLevel(_session, admitted, placements, tables)
+                .ByObjectIndex;
+        }
+
+        WorldPoint anchor = AnchorPositionOf(definition);
+        _player.Restore(anchor, DetachedMotion(anchor.Y));
+        _camera.Update(_player);
+        _outcome = $"You descend to level {level}.";
+    }
+
+    /// <summary>Releases the actors of a level the avatar has left.</summary>
+    private void AbandonActors(int level)
+    {
+        if (!_placedCrittersByLevel.Remove(level, out IReadOnlyDictionary<int, ActorState>? actors)) return;
+        foreach (ActorState actor in actors.Values)
+            _session.Actors.Entities.Destroy(AbyssRpg.Kit.Actors.ActorsState.Identity(actor.DurableId));
+    }
+
+    /// <summary>The anchor pose of a level: its spawn raised to the capsule's standing center.</summary>
+    private WorldPoint AnchorPositionOf(UuLevelDefinition level) => new(
+        level.Spawn.Position.X,
+        level.Spawn.Position.Y + _movement.StandingCenterOffset,
+        level.Spawn.Position.Z);
+
     /// <summary>The nearest placed actors to the avatar, with their distance.</summary>
     public IReadOnlyList<(ActorState Actor, float Distance)> NearestActors(int take)
     {
         WorldPoint origin = _player.Position ?? _level.Spawn.Position;
-        return _session.Actors.All
+        return PlacedCritters.Values
             .Select(actor => (Actor: actor, Distance: actor.Position.HorizontalDistanceTo(origin)))
             .OrderBy(entry => entry.Distance)
             .Take(take)
@@ -756,6 +862,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         Attempt(() => _appearance?.Dispose());
         Attempt(() => _mesh?.Dispose());
         Attempt(() => _material?.Dispose());
+        foreach ((Appearance? appearance, MeshResource? mesh, Material? material) in _retiredLevelResources)
+        {
+            Attempt(() => appearance?.Dispose());
+            Attempt(() => mesh?.Dispose());
+            Attempt(() => material?.Dispose());
+        }
+
         Attempt(_camera.Dispose);
         Attempt(_movement.Dispose);
         Attempt(_session.Dispose);
