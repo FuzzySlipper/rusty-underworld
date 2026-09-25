@@ -32,6 +32,49 @@ public sealed class HostEntryTests
         Assert.Throws<ArgumentOutOfRangeException>(() => BuiltInRulesets.CreateRuleset(new RulesetId("nope")));
     }
 
+    /// <summary>
+    /// The staged manifest is the only declaration the browser shell sees, and
+    /// the entry and the companion each keep their own copy. A rename in one of
+    /// them would otherwise fail silently at runtime: a control that sends an
+    /// undeclared intent, or a HUD that filters on a contract nothing publishes.
+    /// </summary>
+    [Fact]
+    public void The_project_declaration_matches_the_entry()
+    {
+        string root = RepositoryRoot();
+        string project = File.ReadAllText(Path.Combine(root, "src", "AbyssRpg.Host", "AbyssRpg.Host.csproj"));
+        var xml = System.Xml.Linq.XDocument.Parse(project);
+        var intents = xml.Descendants()
+            .Where(node => node.Name.LocalName == "RustyEngineProductInputIntent")
+            .Select(node => node.Attribute("Include")?.Value ?? node.Value.Trim())
+            .ToArray();
+        var mappings = xml.Descendants()
+            .Where(node => node.Name.LocalName == "RustyEngineProductInputMapping")
+            .Select(node => node.Attribute("Intent")?.Value ?? "")
+            .ToArray();
+        var projections = xml.Descendants()
+            .Where(node => node.Name.LocalName is "RustyEngineProductUiProjectionStream" or "RustyEngineProductUiProjectionContract")
+            .ToArray();
+
+        Assert.Equal(
+            AbyssProductEntry.Default.DeclaredIntents.OrderBy(name => name, StringComparer.Ordinal),
+            intents.OrderBy(name => name, StringComparer.Ordinal));
+        Assert.NotEmpty(mappings);
+        Assert.All(mappings, intent => Assert.Contains(intent, AbyssProductEntry.Default.DeclaredIntents));
+        Assert.Contains(projections, node => node.Name.LocalName == "RustyEngineProductUiProjectionStream"
+            && node.Value.Trim() == AbyssProductEntry.Default.UiProjectionStream);
+        Assert.Contains(projections, node => node.Name.LocalName == "RustyEngineProductUiProjectionContract"
+            && node.Value.Trim() == AbyssProductEntry.Default.UiProjectionContract);
+    }
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AGENTS.md")))
+            directory = directory.Parent;
+        return directory?.FullName ?? throw new InvalidOperationException("The repository root was not found.");
+    }
+
     [Fact]
     public void Lifecycle_starts_pauses_resumes_and_stops()
     {

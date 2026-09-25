@@ -64,7 +64,15 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         _store = new AbyssSaveStore(context, "abyssrpg.saves");
         _slots = new AbyssSaveSlots(_store);
         _projection = new AbyssUiProjection(context, AbyssProductEntry.Default);
-        _session = CreateSession(null);
+        try
+        {
+            _session = CreateSession(null);
+        }
+        catch
+        {
+            _store.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -266,10 +274,11 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
 
         if (input.Kind is not (InputEventKind.DirectDigital or InputEventKind.MappedDigital)) return;
         // A direct UI intent carries its active fact in X with no edge; a mapped
-        // intent carries the physical edge instead.
+        // intent carries the physical press. One-shot actions fire on the press:
+        // a held edge would repeat a quicksave or rebuild the world every tick.
         bool active = input.Kind == InputEventKind.DirectDigital
             ? input.X > 0f
-            : input.Edge is InputEdge.Pressed or InputEdge.Held;
+            : input.Edge == InputEdge.Pressed;
         if (!active) return;
         string intent = System.Text.Encoding.UTF8.GetString(input.Intent.Span);
         switch (intent)
@@ -309,9 +318,11 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_session is IModeAwareGameSession modes) modes.ApplyProductMode(_mode);
     }
 
+    private GameSessionContext SessionContext() => new(_context, _composition);
+
     private IGameSession CreateSession(RulesetSavePayload? saved)
     {
-        var context = new GameSessionContext(_context, _composition);
+        GameSessionContext context = SessionContext();
         return saved is null
             ? _ruleset.CreateSession(context)
             : ((ISaveableGameRuleset)_ruleset).CreateSession(context, saved);
@@ -326,8 +337,23 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_session is not ISaveableGameSession saveable || _session is not ISessionStatusSource status) return;
         int level = status.Status.Level;
         if (level == _lastAutosaveLevel) return;
+        // Slots are named per level and the shipped dungeon has nine; a bundle
+        // that admits another level still plays, it just has no autosave name.
+        if (level is < 1 or > AbyssSaveSlots.LevelCount) return;
+        try
+        {
+            _slots.Autosave(level, saveable.CaptureSave().Bytes.ToArray());
+        }
+        catch (Exception error) when (error is AbyssSaveFormatException or NotSupportedException or IOException)
+        {
+            // A save outage must not fault the admitted update, and the level is
+            // only marked saved once its bytes are durable.
+            _hostOutcome = $"Autosave failed: {error.Message}";
+            Publish();
+            return;
+        }
+
         _lastAutosaveLevel = level;
-        _slots.Autosave(level, saveable.CaptureSave().Bytes.ToArray());
         MarkSlotsDirty();
     }
 
@@ -350,8 +376,13 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     public bool LoadJourneyOnward()
     {
         ThrowIfShutdown();
+        // A save written by another ruleset would only fail after the live world
+        // was gone, so the choice is made over this product's own saves.
         string? key = AbyssSaveUx.JourneyOnward(
-            Slots().Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label)).ToArray());
+            Slots()
+                .Where(slot => string.Equals(slot.Ruleset, _composition.Identity.Ruleset.Value, StringComparison.Ordinal))
+                .Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label))
+                .ToArray());
         if (key is null)
         {
             _hostOutcome = "No save to journey onward from.";
@@ -367,11 +398,28 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             return false;
         }
 
+        var payload = new RulesetSavePayload(new RulesetId(loaded.State.Ruleset), loaded.State.Payload);
+        // Everything that can be decided without destroying the running world is
+        // decided first, so a refused load leaves the session in place.
         try
         {
-            ReplaceSession(new RulesetSavePayload(new RulesetId(loaded.State.Ruleset), loaded.State.Payload));
+            if (_ruleset is ISaveableGameRuleset saveableRuleset)
+                saveableRuleset.ValidateSavedSession(SessionContext(), payload);
         }
-        catch (Exception error) when (error is InvalidOperationException or ArgumentException or AbyssSaveFormatException)
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException
+            or AbyssSaveFormatException or System.Text.Json.JsonException)
+        {
+            _hostOutcome = $"Save '{key}' could not be loaded: {error.Message}";
+            Publish();
+            return false;
+        }
+
+        try
+        {
+            ReplaceSession(payload);
+        }
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException
+            or AbyssSaveFormatException or System.Text.Json.JsonException)
         {
             _hostOutcome = $"Save '{key}' could not be loaded: {error.Message}";
             Publish();
@@ -379,7 +427,6 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         }
 
         _hostOutcome = $"Resumed {key}.";
-        _lifecycle = AbyssLifecycleMode.Running;
         _mode = ProductMode.Playing;
         ApplyMode();
         _session?.PublishInitial();
@@ -391,6 +438,13 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     public bool Respawn()
     {
         ThrowIfShutdown();
+        if (_session is ISessionStatusSource status && !status.Status.Defeated)
+        {
+            // Nothing to return from: the lane is reachable outside the menu,
+            // and a healthy respawn would teleport and heal the avatar.
+            return false;
+        }
+
         if (_session is not IRespawnableGameSession respawnable)
         {
             // The companion asked for gameplay focus with this action; publish
@@ -425,8 +479,10 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             {
                 loaded = _store.Load(key);
             }
-            catch (AbyssSaveFormatException)
+            catch (Exception error) when (error is AbyssSaveFormatException or NotSupportedException or IOException)
             {
+                // An unreadable store degrades the menu; it must not fault the
+                // admitted update that publishes it.
                 continue;
             }
 

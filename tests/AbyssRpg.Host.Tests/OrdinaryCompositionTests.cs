@@ -237,18 +237,169 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
-    public void Declared_intents_match_the_entry_and_are_all_handled()
+    public void Each_declared_action_intent_reaches_its_owner()
     {
-        // Every declared intent must reach a consumer: an intent the shell can
-        // send but nothing handles is the undeclared-intent defect in reverse.
+        // The declared lifecycle intents are covered above; these three are the
+        // menu's actions, and each must change owner state rather than merely
+        // being an admitted update.
+        using AbyssProduct quicksaver = Product(out UiDouble quicksaveUi, out _, out _, out _);
+        quicksaver.Start();
+        quicksaver.Update(SixtyHzUpdate(1));
+        Assert.DoesNotContain(quicksaver.Slots(), slot => slot.Key.StartsWith("quicksave/", StringComparison.Ordinal));
+        quicksaver.Update(new ProductUpdate(Facts(2), [Intent("abyss.action.quicksave")]));
+        Assert.Contains(quicksaver.Slots(), slot => slot.Key == "quicksave/0");
+        Assert.Contains("Saved to quicksave/0", HudString(quicksaveUi.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+
+        // The Engine delivers a mapped intent as a physical MappedDigital press;
+        // the same action must arrive from that shape too.
+        quicksaver.Update(new ProductUpdate(Facts(3), [Mapped("abyss.action.quicksave", InputEdge.Pressed)]));
+        Assert.Contains(quicksaver.Slots(), slot => slot.Key == "quicksave/1");
+
+        using AbyssProduct loader = Product(out UiDouble loadUi, out _, out _, out _);
+        loader.Start();
+        loader.Update(SixtyHzUpdate(1));
+        var original = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)loader.Session!;
+        loader.Update(new ProductUpdate(Facts(2), [Intent("abyss.action.journey-onward")]));
+        Assert.NotSame(original, loader.Session);
+        Assert.Contains("Resumed", HudString(loadUi.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+
+        using AbyssProduct fallen = Product(out UiDouble fallenUi, out _, out _, out _);
+        fallen.Start();
+        var doomed = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)fallen.Session!;
+        doomed.ApplyDefeatDamage(((ISessionStatusSource)doomed).Status.Hp, "slain");
+        fallen.Update(SixtyHzUpdate(1));
+        Assert.Equal(ProductMode.Dead, fallen.Mode);
+        fallen.Update(new ProductUpdate(Facts(2), [Intent("abyss.action.respawn")]));
+        Assert.Equal(ProductMode.Playing, fallen.Mode);
+        Assert.False(HudBoolean(fallenUi.LastProjection!.Value.Value, "defeated"));
+    }
+
+    [Fact]
+    public void A_held_mapping_does_not_repeat_a_one_shot_action()
+    {
+        using AbyssProduct product = Product(out _, out _, out _, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+
+        // The manifest maps the chord as a press; a held edge must not write a
+        // second slot for every tick the key stays down.
+        product.Update(new ProductUpdate(Facts(2), [Mapped("abyss.action.quicksave", InputEdge.Held)]));
+        Assert.DoesNotContain(product.Slots(), slot => slot.Key.StartsWith("quicksave/", StringComparison.Ordinal));
+
+        product.Update(new ProductUpdate(Facts(3), [Mapped("abyss.action.quicksave", InputEdge.Pressed)]));
+        Assert.Contains(product.Slots(), slot => slot.Key == "quicksave/0");
+    }
+
+    [Fact]
+    public void A_refused_load_keeps_the_live_session_and_reports_why()
+    {
+        using AbyssProduct product = Product(out UiDouble ui, out _, out _, out InMemoryPersistenceService persistence);
+
+        // First run: there is no save at all.
+        Assert.False(product.LoadJourneyOnward());
+        Assert.Contains("No save", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+
+        IGameSession live = product.Session!;
+        byte[] healthy = ((ISaveableGameSession)live).CaptureSave().Bytes.ToArray();
+        AbyssSaveStore seed = Seed(persistence);
+
+        // A slot another ruleset wrote would only fail after this world was gone,
+        // so Journey Onward does not choose it.
+        seed.Save("autosave/level-1", new AbyssSaveEnvelope("abyssrpg.some-other-game", healthy));
+        seed.Save("quicksave/0", new AbyssSaveEnvelope("abyssrpg.some-other-game", healthy));
+        Assert.False(product.LoadJourneyOnward());
+        Assert.Contains("No save", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        Assert.Same(live, product.Session);
+        seed.Delete("autosave/level-1");
+        seed.Delete("quicksave/0");
+
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+
+        // A corrupt payload is refused before the running world is released.
+        seed.Save("autosave/level-1", new AbyssSaveEnvelope(BuiltInRulesets.UltimaUnderworld.Value, [0xFF, 0x00, 0x01]));
+        Assert.False(product.LoadJourneyOnward());
+        Assert.Contains("could not be loaded", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        Assert.Same(live, product.Session);
+
+        // A well-formed save of another level is refused the same way.
+        string foreignLevel = System.Text.RegularExpressions.Regex.Replace(
+            Encoding.UTF8.GetString(healthy), "\"Level\":1", "\"Level\":7");
+        Assert.NotEqual(Encoding.UTF8.GetString(healthy), foreignLevel);
+        seed.Save("autosave/level-1", new AbyssSaveEnvelope(
+            BuiltInRulesets.UltimaUnderworld.Value, Encoding.UTF8.GetBytes(foreignLevel)));
+        Assert.False(product.LoadJourneyOnward());
+        Assert.Contains("level 7", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        Assert.Same(live, product.Session);
+
+        // A healthy save still replaces the world.
+        seed.Save("autosave/level-1", new AbyssSaveEnvelope(BuiltInRulesets.UltimaUnderworld.Value, healthy));
+        Assert.True(product.LoadJourneyOnward());
+        Assert.NotSame(live, product.Session);
+    }
+
+    [Fact]
+    public void A_session_that_cannot_return_is_never_teleported_by_the_lane()
+    {
         using AbyssProduct product = Product(out UiDouble ui, out _, out _, out _);
         product.Start();
-        foreach (string intent in AbyssProductEntry.Default.DeclaredIntents)
-        {
-            product.Update(new ProductUpdate(Facts(1), [Intent(intent)]));
-            Assert.NotNull(ui.LastProjection);
-        }
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        string before = ((ISessionStatusSource)session).Status.Outcome;
+        float hp = ((ISessionStatusSource)session).Status.Hp;
+        AbyssRpg.Kit.Controls.WorldPoint? where = session.PlayerPosition;
 
+        // The respawn lane is reachable outside the menu; a healthy avatar must
+        // not be teleported to the anchor and healed by it.
+        product.Update(new ProductUpdate(Facts(2), [Intent("abyss.action.respawn")]));
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        Assert.Equal(before, ((ISessionStatusSource)session).Status.Outcome);
+        Assert.Equal(hp, ((ISessionStatusSource)session).Status.Hp);
+        Assert.Equal(where, session.PlayerPosition);
+        Assert.Same(session, product.Session);
+    }
+
+    [Fact]
+    public void A_level_without_a_slot_name_still_plays_and_keeps_its_store()
+    {
+        var persistence = new InMemoryPersistenceService();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: persistence,
+            spatial: EngineSpatialDouble.Create().Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: UiDouble.Create().Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+
+        // A bundle admitting a level outside the shipped nine still runs; it
+        // simply has no autosave slot to write, and it must not fault the update.
+        using AbyssProduct product = new(
+            engine, TestContent.Build(level: 12), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        Assert.DoesNotContain(product.Slots(), slot => slot.Key.StartsWith("autosave/", StringComparison.Ordinal));
+
+        // A launch that cannot create its session releases the store it opened.
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            using AbyssProduct broken = new(
+                EngineContextFake.Create(
+                    persistence: persistence,
+                    content: SpatialContentDouble.Create().Service),
+                TestContent.Build(withLevel: false),
+                BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        });
+    }
+
+    private static AbyssSaveStore Seed(InMemoryPersistenceService persistence) =>
+        new(EngineContextFake.Create(persistence: persistence), "abyssrpg.saves");
+
+    [Fact]
+    public void Declared_intents_match_the_entry_and_are_all_handled()
+    {
+        // The declaration itself, minus the owner behaviour covered above.
         Assert.Equal(
             AbyssProductEntry.Default.DeclaredIntents.OrderBy(name => name, StringComparer.Ordinal),
             new[]
@@ -303,7 +454,7 @@ public sealed class OrdinaryCompositionTests
     [Fact]
     public void Debug_commands_register_the_product_and_the_live_session()
     {
-        using AbyssProduct product = Product(out _, out _, out _, out _);
+        using AbyssProduct product = Product(out UiDouble ui, out _, out _, out _);
         product.Start();
 
         var catalog = new RecordingCatalog();
@@ -322,10 +473,27 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains("level=1", status.Status(), StringComparison.Ordinal);
         Assert.Contains("x=", status.Where(), StringComparison.Ordinal);
 
-        // The product's own commands answer from live state.
+        // The product's own commands answer from live state and act on it.
         Assert.Contains("bundle=abyssrpg.stygian-abyss", product.ProductInfo(), StringComparison.Ordinal);
         Assert.Contains("autosave/level-1", product.SlotList(), StringComparison.Ordinal);
+        Assert.Contains("quicksave/", product.Save(), StringComparison.Ordinal);
+        Assert.Contains("quicksave/0", product.SlotList(), StringComparison.Ordinal);
+        Assert.Contains("mode=Paused", product.PauseCommand(), StringComparison.Ordinal);
+        Assert.Equal(ProductMode.Paused, product.Mode);
+        Assert.Contains("lifecycle=Running mode=Playing", product.PlayCommand(), StringComparison.Ordinal);
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        Assert.Contains("Resumed", product.Load(), StringComparison.Ordinal);
+
+        // Restart replaces the world from the same content and reports it.
+        IGameSession before = product.Session!;
+        product.Restart();
+        Assert.NotSame(before, product.Session);
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        product.Update(SixtyHzUpdate(3));
+        Assert.True(HudBoolean(Hud(ui), "ready"));
     }
+
+    private static UiValue Hud(UiDouble ui) => ui.LastProjection!.Value.Value;
 
     [Fact]
     public void Defeat_requests_the_dead_mode_and_respawn_returns_play()
@@ -375,6 +543,17 @@ public sealed class OrdinaryCompositionTests
     /// One direct UI intent as the Engine delivers it: no edge, the active fact
     /// in X, and the intent name in the intent field.
     /// </summary>
+    private static ProductInputEvent Mapped(string intent, InputEdge edge) =>
+        Event(InputEventKind.MappedDigital, edge) with
+    {
+        Intent = Encoding.UTF8.GetBytes(intent),
+        ValueKind = InputValueKind.Digital,
+        X = 1f,
+        Provenance = InputProvenance.Physical,
+        Context = new InputContext(Encoding.UTF8.GetBytes("gameplay")),
+        Binding = new InputBinding(1, 1, 1),
+    };
+
     private static ProductInputEvent Intent(string intent) =>
         Event(InputEventKind.DirectDigital, InputEdge.None) with
     {

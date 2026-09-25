@@ -20,6 +20,9 @@ public sealed class UuGameRuleset : IGameRuleset, ISaveableGameRuleset, IDebugga
 
     public IGameSession CreateSession(GameSessionContext context) => Attach(UuGameSession.Create(context));
 
+    public void ValidateSavedSession(GameSessionContext context, RulesetSavePayload saved) =>
+        UuGameSession.Validate(context, saved);
+
     public IGameSession CreateSession(GameSessionContext context, RulesetSavePayload saved)
     {
         ArgumentNullException.ThrowIfNull(context);

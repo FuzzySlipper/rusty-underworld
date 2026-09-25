@@ -503,6 +503,13 @@ public sealed class GameSaveEnvelope
 public interface ISaveableGameRuleset : IGameRuleset
 {
     IGameSession CreateSession(GameSessionContext context, RulesetSavePayload saved);
+
+    /// <summary>
+    /// Refuses a payload this composition cannot restore, called before the Host
+    /// releases the live session. Without it a doomed load would have to destroy
+    /// the running world first; with it, only an Engine resource failure can.
+    /// </summary>
+    void ValidateSavedSession(GameSessionContext context, RulesetSavePayload saved);
 }
 
 /// <summary>Optional session seam for capturing only ruleset-owned durable meaning.</summary>

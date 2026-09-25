@@ -202,9 +202,16 @@ test('every control claims a declared intent', (t) => {
     assert.ok(declared.has(claim.intent), `${claim.intent} is not a declared intent`);
     assert.deepEqual(claim.value, { kind: 'digital', active: true });
   }
-  // The projection into gameplay captures once, and resume, start and respawn
-  // re-capture even though the mode already reads gameplay.
-  assert.equal(ctx.ui.focused, 4);
+  // Every control that returns to play keeps the pointer-lock gesture alive by
+  // asking for gameplay focus, even where the mode already reads gameplay.
+  for (const label of ['Resume', 'Start a new session', 'Respawn at the anchor']) {
+    const button = [...document.querySelectorAll('.abyss-menu button')]
+      .find((candidate) => candidate.textContent.startsWith(label));
+    ctx.ui.focused = 0;
+    button.disabled = false;
+    button.dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
+    assert.equal(ctx.ui.focused, 1, `${label} did not ask for gameplay focus`);
+  }
   assert.equal(ctx.ui.modes.at(-1), 'gameplay');
 });
 
@@ -294,4 +301,67 @@ test('a missing Engine debug panel degrades to a stated message', async (t) => {
   });
   await new Promise((resolve) => setImmediate(resolve));
   assert.match(document.querySelector('.abyss-debug .title').textContent, /unavailable/);
+});
+
+/**
+ * The injected loader above asserts the mounting contract; this test closes the
+ * other half by loading the packaged Engine module the runtime pack actually
+ * serves. The pack is installed by `scripts/verify.sh`, so in the ordinary loop
+ * this runs; without it the check reports a skip rather than passing silently.
+ */
+test('the packaged Engine live-debug module exports and mounts', async (t) => {
+  const pack = new URL('../../.runtime/runtime-pack/share/live-debug-panel/index.js', import.meta.url);
+  let module;
+  try {
+    module = await import(pack.href);
+  } catch (error) {
+    t.diagnostic(`SKIP: the runtime pack is not installed (${error.message}).`);
+    return;
+  }
+
+  assert.equal(typeof module.mountLiveDebugPanel, 'function');
+  assert.equal(typeof module.mountRendererMetricsWidget, 'function');
+
+  const dom = new JSDOM('<!doctype html><html><body><div id="host"></div></body></html>');
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    fetch: globalThis.fetch,
+    HTMLElement: globalThis.HTMLElement,
+    Element: globalThis.Element,
+    Node: globalThis.Node,
+  };
+  globalThis.window = dom.window;
+  globalThis.document = dom.window.document;
+  globalThis.HTMLElement = dom.window.HTMLElement;
+  globalThis.Element = dom.window.Element;
+  globalThis.Node = dom.window.Node;
+  // The module polls the Engine's live-debug route through its own transport;
+  // a stub keeps the assertion about mounting rather than about a served host.
+  const transport = {
+    async execute() {
+      return { message: JSON.stringify({ available: false, diagnostic: 'test stub' }) };
+    },
+  };
+  try {
+    const host = dom.window.document.getElementById('host');
+    const panel = await module.mountLiveDebugPanel(host, { enabled: false, presentation: 'inline', transport });
+    assert.ok(host.textContent.length > 0);
+    panel.dispose();
+
+    const metricsHost = dom.window.document.createElement('div');
+    dom.window.document.body.append(metricsHost);
+    const metrics = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: false, transport });
+    assert.ok(metricsHost.childElementCount >= 1);
+    metrics.dispose();
+    assert.equal(metricsHost.childElementCount, 0);
+  } finally {
+    globalThis.window = previous.window;
+    globalThis.document = previous.document;
+    globalThis.fetch = previous.fetch;
+    globalThis.HTMLElement = previous.HTMLElement;
+    globalThis.Element = previous.Element;
+    globalThis.Node = previous.Node;
+    dom.window.close();
+  }
 });

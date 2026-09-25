@@ -176,6 +176,7 @@ public sealed class AbyssUiProjection : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        (_stream as IDisposable)?.Dispose();
         _stream = null;
     }
 }

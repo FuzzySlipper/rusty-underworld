@@ -139,6 +139,28 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// </summary>
     public static UuGameSession Create(GameSessionContext context) => Create(context, saved: null);
 
+    /// <summary>
+    /// Refuses a saved payload the composition cannot restore, before the Host
+    /// releases the live session to make room for it. It reads the same content
+    /// the restore reads and allocates nothing Engine-owned.
+    /// </summary>
+    public static void Validate(GameSessionContext context, RulesetSavePayload saved)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(saved);
+        (ContentPack levelPack, int levelNumber) = RequireLevelPack(context.Composition);
+        UuLevelDefinition level = UuLevelContent.Read(levelPack.Payload, $"content pack '{levelPack.Id.Value}'");
+        if (level.Level != levelNumber)
+            throw new InvalidOperationException($"Level pack '{levelPack.Id.Value}' declares level {level.Level}.");
+        UuSessionSnapshot snapshot = UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
+        if (snapshot.Level != level.Level)
+        {
+            throw new InvalidOperationException(
+                $"Save is on level {snapshot.Level}; the bundle admits level {level.Level}. "
+                + "Import that level before loading this save.");
+        }
+    }
+
     public static UuGameSession Create(GameSessionContext context, RulesetSavePayload? saved)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -154,6 +176,18 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuLevelDefinition level = UuLevelContent.Read(levelPack.Payload, $"content pack '{levelPack.Id.Value}'");
         if (level.Level != levelNumber)
             throw new InvalidOperationException($"Level pack '{levelPack.Id.Value}' declares level {level.Level}.");
+
+        // Decode before anything Engine-owned exists: a corrupt or foreign-level
+        // save must fail without leaving a half-built world behind.
+        UuSessionSnapshot? savedSnapshot = saved is null
+            ? null
+            : UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
+        if (savedSnapshot is not null && savedSnapshot.Level != level.Level)
+        {
+            throw new InvalidOperationException(
+                $"Save is on level {savedSnapshot.Level}; the bundle admits level {level.Level}. "
+                + "Import that level before loading this save.");
+        }
         string renderPath = level.RenderPath;
         UuLevelScene scene = UuLevelSceneContent.Read(content.ReadBytes(renderPath), renderPath);
 
@@ -175,7 +209,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             choices, vitals, firstLevel, level.Spawn, tuning.Movement,
             worldSeed: composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal));
         var spatialTuning = new SpatialTuning(0.5d, 8, 8, 1);
-        var movement = new SpatialMovementSystem(context.Engine.Spatial, context.Engine.Content, level.Collision, spatialTuning);
+        SpatialMovementSystem movement;
+        try
+        {
+            movement = new SpatialMovementSystem(context.Engine.Spatial, context.Engine.Content, level.Collision, spatialTuning);
+        }
+        catch
+        {
+            session.Dispose();
+            throw;
+        }
         // The imported spawn stands on a tile surface; the Engine's character is
         // a capsule placed by its center, so the surface height is offset by the
         // controller's own standing half-height and contact skin.
@@ -195,6 +238,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         catch
         {
             movement.Dispose();
+            session.Dispose();
             throw;
         }
 
@@ -214,22 +258,21 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _avatarName = choices.Name.Length == 0 ? creation.Defaults.Name : choices.Name,
         };
 
-        if (saved is not null)
+        if (savedSnapshot is not null)
         {
-            UuSessionSnapshot snapshot = UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
-            if (snapshot.Level != level.Level)
+            try
+            {
+                session.RestoreSnapshot(savedSnapshot);
+                player.Restore(
+                    new WorldPoint(savedSnapshot.AvatarPose.X, savedSnapshot.AvatarPose.Y, savedSnapshot.AvatarPose.Z),
+                    DetachedMotion(savedSnapshot.AvatarPose.Y));
+                player.YawRadians = savedSnapshot.AvatarPose.YawRadians;
+            }
+            catch
             {
                 gameSession.Dispose();
-                throw new InvalidOperationException(
-                    $"Save is on level {snapshot.Level}; the bundle admits level {level.Level}. "
-                    + "Import that level before loading this save.");
+                throw;
             }
-
-            session.RestoreSnapshot(snapshot);
-            player.Restore(
-                new WorldPoint(snapshot.AvatarPose.X, snapshot.AvatarPose.Y, snapshot.AvatarPose.Z),
-                DetachedMotion(snapshot.AvatarPose.Y));
-            player.YawRadians = snapshot.AvatarPose.YawRadians;
         }
 
         return gameSession;

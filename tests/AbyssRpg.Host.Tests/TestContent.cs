@@ -16,7 +16,7 @@ internal static class TestContent
     public const string LevelPayloadPath = "abyss/imports/level-1/test.level-1.level.json";
 
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
-    internal static ProductContent Build(bool withLevel = true)
+    internal static ProductContent Build(bool withLevel = true, int level = 1)
     {
         List<ProductContentFile> files =
         [
@@ -29,7 +29,7 @@ internal static class TestContent
                 { "id": "abyssrpg.avatar-options" },
                 { "id": "abyssrpg.classes" },
                 { "id": "abyssrpg.starting-kit" },
-                { "id": "abyssrpg.level-1" }
+                { "id": "abyssrpg.level-__LEVEL__" }
               ],
               "tuning": { "id": "abyssrpg.stygian-default" }
             }
@@ -77,19 +77,25 @@ internal static class TestContent
 
         if (withLevel)
         {
-            files.Add(File("abyss/packs/test.level-1.pack.json", Pack("abyssrpg.level-1", LevelPayloadPath)));
-            files.Add(File(LevelPayloadPath, LevelManifest()));
-            files.Add(File(RenderPath, RenderMesh()));
+            files.Add(File("abyss/packs/test.level-1.pack.json", Pack($"abyssrpg.level-{level}", LevelPayloadPath)));
+            files.Add(File(LevelPayloadPath, LevelManifest(level)));
+            files.Add(File(RenderPath, RenderMesh(level)));
         }
 
+        // The descriptor grammar names one pack per level, so a bundle that
+        // admits another level starts from the same staged tree.
+        files[0] = File(
+            "abyss/bundles/stygian-abyss.bundle.json",
+            Encoding.UTF8.GetString(files[0].Bytes.Span)
+                .Replace("__LEVEL__", level.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal));
         return new ProductContent(files.ToArray());
     }
 
-    internal static string LevelManifest() =>
-        """
+    internal static string LevelManifest(int level = 1) =>
+        $$"""
         {
           "schemaVersion": 1,
-          "level": 1,
+          "level": {{level}},
           "collision": { "path": "__COLLISION__", "sha256": "sha256:__SHA__" },
           "render": { "path": "__RENDER__" },
           "spawn": { "tileX": 0, "tileY": 0, "x": 0.0, "y": 0.0, "z": 0.0, "yawRadians": 0.0, "origin": "derived-open-space" },
@@ -108,10 +114,10 @@ internal static class TestContent
     internal const string Sha256Literal = "0000000000000000000000000000000000000000000000000000000000000000";
 
     /// <summary>One floor quad plus one wall quad, four vertices each.</summary>
-    internal static string RenderMesh() => """
+    internal static string RenderMesh(int level = 1) => $$"""
     {
       "schemaVersion": 1,
-      "level": 1,
+      "level": {{level}},
       "unitsPerTile": 8.0,
       "heightUnitsPerStep": 1.0,
       "bounds": { "min": [0, 0, 0], "max": [8, 8, 8] },
