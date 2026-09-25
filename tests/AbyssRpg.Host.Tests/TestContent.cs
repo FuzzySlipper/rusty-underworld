@@ -159,9 +159,12 @@ internal static class TestContent
                     (1, 0) => ContainerObjectIndex,
                     _ => 0,
                 };
-                // One tile is a door, so the interaction verb has something to use.
+                // One tile is a door, so the interaction verb has something to
+                // use, and one tile is solid, so the operator probe's refusal
+                // has a tile to refuse.
                 int door = (x, y) == (1, 1) ? 1 : 0;
-                tiles.Append($"[{x},{y},0,{head},0,{door}]");
+                int type = (x, y) == (2, 2) ? 0 : 1;
+                tiles.Append($"[{x},{y},{type},{head},0,{door}]");
             }
         }
 

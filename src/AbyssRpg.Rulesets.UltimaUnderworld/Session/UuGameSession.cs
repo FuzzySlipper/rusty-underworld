@@ -631,6 +631,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             .ToArray();
     }
 
+    /// <summary>Where the avatar's capsule center stands, before any new proposal.</summary>
+    public WorldPoint? AvatarPosition => _player.Position;
+
     /// <summary>The door tiles this session's level state has opened.</summary>
     public IReadOnlyCollection<(int X, int Y)> OpenedDoors => _session.Dungeon.Current.OpenedDoors;
 

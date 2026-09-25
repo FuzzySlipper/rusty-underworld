@@ -243,7 +243,7 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
-    public void The_use_channel_opens_a_placed_door_and_the_state_survives_a_save()
+    public void The_use_channel_opens_and_closes_a_placed_door()
     {
         // The avatar walks onto the door tile the fixture's import places: the
         // Engine spatial step is what puts it there.
@@ -280,6 +280,46 @@ public sealed class OrdinaryCompositionTests
         // covered where the payload is (UuSessionTests).
         product.Update(new ProductUpdate(Facts(7), [Intent("abyss.action.quicksave")]));
         Assert.Contains(product.Slots(), slot => slot.Key == "quicksave/0");
+
+        // Nothing in reach: the verb says so instead of toggling anything.
+        var empty = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(1, empty.OpenedDoors.Count);
+    }
+
+    [Fact]
+    public void The_operator_tile_probe_refuses_a_tile_the_avatar_cannot_stand_on()
+    {
+        // A capsule placed inside solid geometry makes the Engine refuse the
+        // next character step, which taints the runtime and costs the session,
+        // so the probe refuses the tile instead of standing there.
+        UiDouble ui = UiDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: EngineSpatialDouble.Create().Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // The fixture's tile (2,2) is solid; (1,1) is the placed door tile.
+        InvalidOperationException refused = Assert.Throws<InvalidOperationException>(
+            () => session.PlaceOnTile(2, 2));
+        Assert.Contains("is not open", refused.Message, StringComparison.Ordinal);
+        Assert.Throws<ArgumentOutOfRangeException>(() => session.PlaceOnTile(64, 0));
+
+        session.PlaceOnTile(1, 1);
+        // Standing height: the tile center raised to the capsule's own center,
+        // because a capsule at floor level is inside geometry and the next step
+        // proposal is refused.
+        AbyssRpg.Kit.Controls.WorldPoint standing = session.AvatarPosition!.Value;
+        Assert.Equal(12f, standing.X, 3);
+        Assert.Equal(12f, standing.Z, 3);
+        Assert.True(standing.Y > 0f, "the probe stands the capsule above the floor, not at floor level");
     }
 
     [Fact]
