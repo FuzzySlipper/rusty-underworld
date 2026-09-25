@@ -21,13 +21,12 @@ public static class AbyssInteraction
         ArgumentNullException.ThrowIfNull(strings);
         ArgumentException.ThrowIfNullOrWhiteSpace(npc);
         var hosting = new UuConversationHosting(session, rng);
-        var vm = new UuConversationVm(script, strings, hosting,
-            new SessionVariables(session));
+        var vm = new UuConversationVm(script, strings, hosting, new SessionVariables());
         vm.Run();
         return new TalkResult(vm.Transcript, hosting.Panel(npc, vm.Transcript));
     }
 
-    private sealed class SessionVariables(UuSession session) : IUuConversationVariables
+    private sealed class SessionVariables : IUuConversationVariables
     {
         public int Read(int address) => 0;
         public void Write(int address, int value) { }
