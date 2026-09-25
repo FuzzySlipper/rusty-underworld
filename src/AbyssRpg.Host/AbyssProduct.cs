@@ -157,9 +157,14 @@ public sealed class AbyssProduct : IEngineProduct
         if (_session is null) return;
         var result = AbyssRpg.Rulesets.UltimaUnderworld.Survival.UuSurvivalPolicy.Tick(
             _session.Survival, seconds, _rng);
-        if (result.HungerDamage + result.FatigueDamage + result.PoisonDamage > 0)
-            _session.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack)
-                .Spend(result.HungerDamage + result.FatigueDamage + result.PoisonDamage);
+        int damage = result.HungerDamage + result.FatigueDamage + result.PoisonDamage;
+        if (damage > 0)
+        {
+            var track = _session.Avatar.Stats.GetTrack(
+                AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack);
+            // Clamp: starvation can exceed remaining health; Spend throws on shortfall.
+            track.Current = Math.Max(0, track.Current - damage);
+        }
     }
 
     /// <summary>
