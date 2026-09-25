@@ -263,9 +263,11 @@ export function mountProductUi(
   debugHost.className = 'panel';
   debug.append(debugTitle, debugHost);
 
+  let metricsVisible = true;
+
   const metrics = document.createElement('section');
   metrics.className = 'abyss-metrics';
-  metrics.hidden = true;
+  metrics.hidden = !metricsVisible;
   metrics.setAttribute('data-rusty-ui-interactive', '');
   const metricsHost = document.createElement('div');
   metricsHost.className = 'panel';
@@ -282,7 +284,7 @@ export function mountProductUi(
   const debugToggle = button('Debug console');
   const metricsToggle = button('Renderer metrics');
   debugToggle.setAttribute('aria-pressed', 'false');
-  metricsToggle.setAttribute('aria-pressed', 'false');
+  metricsToggle.setAttribute('aria-pressed', String(metricsVisible));
   controls.append(debugToggle, metricsToggle);
 
   root.append(style, hud, menu, debug, metrics, controls);
@@ -324,8 +326,8 @@ export function mountProductUi(
     debugToggle.setAttribute('aria-pressed', String(!debug.hidden));
   });
   metricsToggle.addEventListener('click', () => {
-    metrics.hidden = !metrics.hidden;
-    metricsToggle.setAttribute('aria-pressed', String(!metrics.hidden));
+    metrics.hidden = metricsVisible;
+    setMetricsVisible(!metricsVisible);
   });
 
   // A lost pointer lock is a real interaction change: the product decides what
@@ -344,21 +346,42 @@ export function mountProductUi(
   let metricsMount: LiveDebugMount | null = null;
   let disposed = false;
   const loadLiveDebug = dependencies.loadLiveDebug ?? loadEngineLiveDebug;
-  void (async () => {
+
+  // The renderer-metrics widget reads the Engine renderer's own widget state, so
+  // the toggle asks the Engine to show or hide it by re-mounting with the wanted
+  // state rather than hiding a DOM node the Engine would keep updating.
+  const setMetricsVisible = (visible: boolean): void => {
+    metricsVisible = visible;
+    metricsToggle.setAttribute('aria-pressed', String(visible));
+    metricsMount?.dispose();
+    metricsMount = null;
+    void ready.then((module) => {
+      if (disposed || module === null || !metricsVisible) return;
+      metricsMount = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: true });
+    });
+  };
+
+  const ready = (async (): Promise<LiveDebugModule | null> => {
     try {
       const module = await loadLiveDebug();
-      if (disposed) return;
+      if (disposed) return null;
       const panel = await module.mountLiveDebugPanel(debugHost, { enabled: true, presentation: 'inline' });
       if (disposed) {
         panel.dispose();
-        return;
+        return null;
       }
       panelMount = panel;
-      metricsMount = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: false });
+      return module;
     } catch {
       debugTitle.textContent = 'Engine live debug unavailable';
+      return null;
     }
   })();
+
+  void ready.then((module) => {
+    if (disposed || module === null) return;
+    setMetricsVisible(metricsVisible);
+  });
 
   const renderMenu = (view: MenuView, defeated: boolean): void => {
     menu.hidden = !view.visible;

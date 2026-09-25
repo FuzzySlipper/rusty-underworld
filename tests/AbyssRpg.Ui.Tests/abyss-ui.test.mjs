@@ -214,17 +214,22 @@ test('the Engine live-debug panel and metrics widget are mounted and disposed', 
   assert.deepEqual(debug.panelMounts[0].options, { enabled: true, presentation: 'inline' });
   assert.equal(debug.panelMounts[0].host, document.querySelector('.abyss-debug .panel'));
   assert.equal(debug.metricsMounts[0].host, document.querySelector('.abyss-metrics > div'));
+  // The widget reads the Engine renderer's own widget state, so the first mount
+  // asks the Engine to show it.
+  assert.deepEqual(debug.metricsMounts[0].options, { initiallyVisible: true });
 
   const metrics = document.querySelector('.abyss-metrics');
-  assert.equal(metrics.hidden, true);
+  assert.equal(metrics.hidden, false);
   const toggles = [...document.querySelectorAll('.abyss-controls button')];
   toggles[1].dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
-  assert.equal(metrics.hidden, false);
+  assert.equal(metrics.hidden, true);
   toggles[0].dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
   assert.equal(document.querySelector('.abyss-debug').hidden, false);
 
   ui.dispose();
   assert.equal(debug.panelMounts[0].disposed, 1);
+  // The hide toggle disposes the first widget and mounts nothing in its place.
+  assert.equal(debug.metricsMounts.length, 1);
   assert.equal(debug.metricsMounts[0].disposed, 1);
 });
 
