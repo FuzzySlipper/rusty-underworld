@@ -148,25 +148,43 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(saved);
-        (ContentPack levelPack, int levelNumber) = RequireLevelPack(context.Composition);
-        UuLevelDefinition level = UuLevelContent.Read(levelPack.Payload, $"content pack '{levelPack.Id.Value}'");
-        if (level.Level != levelNumber)
-            throw new InvalidOperationException($"Level pack '{levelPack.Id.Value}' declares level {level.Level}.");
-        UuSessionSnapshot snapshot = UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
-        if (snapshot.Level != level.Level)
+        Prepared prepared = Prepare(context, saved);
+        if (prepared.Snapshot is null) return;
+        // Restoring is what reads the snapshot's values, so the dry run restores
+        // into a throwaway Kit world: it owns no Engine resource, and a payload
+        // whose values are out of range is refused before the Host releases the
+        // live session rather than after.
+        UuSession probe = UuSession.NewGame(
+            prepared.Choices, prepared.Vitals, prepared.FirstLevel, prepared.Level.Spawn,
+            prepared.Tuning.Movement, worldSeed: prepared.WorldSeed);
+        try
         {
-            throw new InvalidOperationException(
-                $"Save is on level {snapshot.Level}; the bundle admits level {level.Level}. "
-                + "Import that level before loading this save.");
+            probe.RestoreSnapshot(prepared.Snapshot);
+        }
+        finally
+        {
+            probe.Dispose();
         }
     }
 
-    public static UuGameSession Create(GameSessionContext context, RulesetSavePayload? saved)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-        ResolvedGameComposition composition = context.Composition;
-        ProductContent content = composition.Content;
+    /// <summary>
+    /// Everything the composition decides before any Engine resource exists:
+    /// the authored packs, the imported level, the rolled avatar, and the saved
+    /// payload decoded and level-checked.
+    /// </summary>
+    private sealed record Prepared(
+        UuTuningProfile Tuning,
+        UuLevelDefinition Level,
+        UuCreationFlow.CreationResult Choices,
+        UuVitalsPolicy.Vitals Vitals,
+        AdmittedLevel FirstLevel,
+        UuSessionSnapshot? Snapshot,
+        int WorldSeed,
+        string DefaultAvatarName);
 
+    private static Prepared Prepare(GameSessionContext context, RulesetSavePayload? saved)
+    {
+        ResolvedGameComposition composition = context.Composition;
         UuTuningProfile tuning = UuTuningProfile.Read(
             composition.Tuning.Payload, $"tuning '{composition.Tuning.Id.Value}'");
         ContentPack avatarPack = composition.RequireContentPack(new ContentPackId("abyssrpg.avatar-options"));
@@ -188,13 +206,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 $"Save is on level {savedSnapshot.Level}; the bundle admits level {level.Level}. "
                 + "Import that level before loading this save.");
         }
-        string renderPath = level.RenderPath;
-        UuLevelScene scene = UuLevelSceneContent.Read(content.ReadBytes(renderPath), renderPath);
 
         UuCreationCatalog.Catalog creation = UuCreationCatalog.Read(
             avatarPack.Payload, classPack.Payload,
             $"content pack '{avatarPack.Id.Value}'", $"content pack '{classPack.Id.Value}'");
-        var rng = new Random(unchecked((int)composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal)));
+        int worldSeed = composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal);
+        var rng = new Random(unchecked(worldSeed));
         UuCreationFlow.CreationResult choices = UuCreationCatalog.RollDefault(creation, rng);
         UuVitalsPolicy.Vitals vitals = UuVitalsPolicy.Recalculate(
             choices.Attributes[0], 1, choices.Skills[SkillIndexForVitals],
@@ -205,9 +222,29 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         // world and the interaction owners stay unreached. Den #8590 carries
         // placement admission and the admitted Use/interact dispatch.
         var firstLevel = new AdmittedLevel(level.Level, [], []);
+
+        return new Prepared(
+            tuning, level, choices, vitals, firstLevel, savedSnapshot, worldSeed, creation.Defaults.Name);
+    }
+
+    public static UuGameSession Create(GameSessionContext context, RulesetSavePayload? saved)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ProductContent content = context.Composition.Content;
+        Prepared prepared = Prepare(context, saved);
+        UuTuningProfile tuning = prepared.Tuning;
+        UuLevelDefinition level = prepared.Level;
+        UuSessionSnapshot? savedSnapshot = prepared.Snapshot;
+
+        string renderPath = level.RenderPath;
+        UuLevelScene scene = UuLevelSceneContent.Read(content.ReadBytes(renderPath), renderPath);
+
+        UuCreationFlow.CreationResult choices = prepared.Choices;
+        UuVitalsPolicy.Vitals vitals = prepared.Vitals;
+        var rng = new Random(unchecked(prepared.WorldSeed));
         UuSession session = UuSession.NewGame(
-            choices, vitals, firstLevel, level.Spawn, tuning.Movement,
-            worldSeed: composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal));
+            choices, vitals, prepared.FirstLevel, level.Spawn, tuning.Movement,
+            worldSeed: prepared.WorldSeed);
         var spatialTuning = new SpatialTuning(0.5d, 8, 8, 1);
         SpatialMovementSystem movement;
         try
@@ -255,7 +292,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             new UuCastingHosting(rng),
             rng)
         {
-            _avatarName = choices.Name.Length == 0 ? creation.Defaults.Name : choices.Name,
+            _avatarName = choices.Name.Length == 0 ? prepared.DefaultAvatarName : choices.Name,
         };
 
         if (savedSnapshot is not null)

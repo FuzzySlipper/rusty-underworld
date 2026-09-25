@@ -12,6 +12,9 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
     private ulong _nextBlob;
     private string _scope = "";
 
+    /// <summary>Fails the next write once, the way a transient persistence outage would.</summary>
+    internal bool FailNextSave { get; set; }
+
     internal void Put(string scope, string key, byte[] payload) => _values[(scope, key)] = new(1, payload.ToArray());
 
     public PersistenceStore OpenStore(PersistenceOpenRequest request)
@@ -22,6 +25,12 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
 
     public PersistenceSaveReceipt Save(PersistenceSaveRequest request)
     {
+        if (FailNextSave)
+        {
+            FailNextSave = false;
+            throw new IOException("transient outage");
+        }
+
         (string Scope, string Key) key = (_scope, request.Key);
         bool present = _values.TryGetValue(key, out Entry? existing);
         if ((request.RevisionGuard == PersistenceRevisionGuard.Absent && present)
@@ -189,6 +198,9 @@ internal class EngineSpatialDouble : DispatchProxy
 {
     internal ISpatialService Service { get; private set; } = null!;
 
+    /// <summary>Sessions the Engine was asked to create; nothing else proves work was reached.</summary>
+    internal int SessionsCreated { get; private set; }
+
     internal static EngineSpatialDouble Create()
     {
         ISpatialService service = DispatchProxy.Create<ISpatialService, EngineSpatialDouble>();
@@ -201,11 +213,17 @@ internal class EngineSpatialDouble : DispatchProxy
     {
         nameof(ISpatialService.DefaultCharacterControllerConfig) => RepresentativeConfig(),
         nameof(ISpatialService.ValidateCharacterControllerConfig) => null,
-        nameof(ISpatialService.CreateSession) => new SpatialSession(new SpatialSessionHandle(1), static () => { }),
+        nameof(ISpatialService.CreateSession) => Created(),
         nameof(ISpatialService.ReplaceContentArtifact) => new SpatialContentArtifactReplaceReceipt(),
         nameof(ISpatialService.ProposeCharacterStep) => Step((CharacterStepRequest)arguments![0]!),
         _ => throw new NotSupportedException(method?.Name),
     };
+
+    private SpatialSession Created()
+    {
+        SessionsCreated += 1;
+        return new SpatialSession(new SpatialSessionHandle(1), static () => { });
+    }
 
     private static CharacterStepReceipt Step(CharacterStepRequest request) => default(CharacterStepReceipt) with
     {

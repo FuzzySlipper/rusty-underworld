@@ -52,10 +52,13 @@ public sealed class OrdinaryCompositionTests
     [Fact]
     public void Missing_import_fails_launch_with_the_operator_step_named()
     {
+        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
         IEngineContext engine = EngineContextFake.Create(
             persistence: new InMemoryPersistenceService(),
-            spatial: EngineSpatialDouble.Create().Service,
-            content: SpatialContentDouble.Create().Service);
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
 
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
             new AbyssProduct(engine, TestContent.Build(withLevel: false), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld)));
@@ -332,10 +335,82 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains("level 7", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
         Assert.Same(live, product.Session);
 
+        // A payload that decodes and names the right level but carries a value
+        // the restore cannot accept is refused the same way, so a corrupt slot
+        // cannot take the world down with it.
+        string corrupted = System.Text.RegularExpressions.Regex.Replace(
+            Encoding.UTF8.GetString(healthy), "\"Slot\":0", "\"Slot\":999");
+        Assert.NotEqual(Encoding.UTF8.GetString(healthy), corrupted);
+        seed.Save("autosave/level-1", new AbyssSaveEnvelope(
+            BuiltInRulesets.UltimaUnderworld.Value, Encoding.UTF8.GetBytes(corrupted)));
+        Assert.False(product.LoadJourneyOnward());
+        Assert.Contains("could not be loaded", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        Assert.Same(live, product.Session);
+        product.Update(SixtyHzUpdate(4));
+        Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "ready"));
+
         // A healthy save still replaces the world.
         seed.Save("autosave/level-1", new AbyssSaveEnvelope(BuiltInRulesets.UltimaUnderworld.Value, healthy));
         Assert.True(product.LoadJourneyOnward());
         Assert.NotSame(live, product.Session);
+    }
+
+    [Fact]
+    public void A_save_the_ruleset_cannot_restore_is_refused_before_any_engine_work()
+    {
+        // Validation has to cover the payload's values, not just its shape: a
+        // payload that decodes and names the admitted level but carries an
+        // out-of-range value must be refused while the live world is still
+        // there and before the Engine is asked for anything.
+        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        var ruleset = (ISaveableGameRuleset)BuiltInRulesets.CreateRuleset(BuiltInRulesets.UltimaUnderworld);
+        ProductContent content = TestContent.Build();
+        var context = new GameSessionContext(
+            engine, AbyssProduct.ResolveComposition(content, BuiltInRulesets.DefaultBundle));
+
+        using IGameSession live = ruleset.CreateSession(context);
+        byte[] healthy = ((ISaveableGameSession)live).CaptureSave().Bytes.ToArray();
+        string corrupted = System.Text.RegularExpressions.Regex.Replace(
+            Encoding.UTF8.GetString(healthy), "\"Slot\":0", "\"Slot\":999");
+        Assert.NotEqual(Encoding.UTF8.GetString(healthy), corrupted);
+        // The payload still decodes and still names level 1.
+        Assert.Contains("\"Level\":1", corrupted, StringComparison.Ordinal);
+
+        var payload = new RulesetSavePayload(BuiltInRulesets.UltimaUnderworld, Encoding.UTF8.GetBytes(corrupted));
+        int withLiveWorld = spatial.SessionsCreated;
+        Assert.ThrowsAny<Exception>(() => ruleset.ValidateSavedSession(context, payload));
+        // Validation asked the Engine for nothing, which is what lets the Host
+        // refuse this payload while the running world is still there.
+        Assert.Equal(withLiveWorld, spatial.SessionsCreated);
+        // A caller that skips validation still builds and then disposes; the
+        // product never takes that path, because it validates first.
+        Assert.ThrowsAny<Exception>(() => ruleset.CreateSession(context, payload));
+        Assert.Equal(1, ((ISessionStatusSource)live).Status.Level);
+    }
+
+    [Fact]
+    public void A_failed_autosave_is_reported_and_retried_without_faulting_the_update()
+    {
+        using AbyssProduct product = Product(out UiDouble ui, out _, out _, out InMemoryPersistenceService persistence);
+        persistence.FailNextSave = true;
+        product.Start();
+
+        // A write outage must not fault the admitted update, and the level is
+        // only marked saved once its bytes are durable.
+        product.Update(SixtyHzUpdate(1));
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        Assert.Contains("Autosave failed", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        Assert.DoesNotContain(product.Slots(), slot => slot.Key.StartsWith("autosave/", StringComparison.Ordinal));
+
+        // The next admitted update retries and writes the slot.
+        product.Update(SixtyHzUpdate(2));
+        Assert.Contains(product.Slots(), slot => slot.Key == "autosave/level-1");
     }
 
     [Fact]
