@@ -25,9 +25,10 @@ Bundle assembles. Host launches.**
 > product's one projection and mounts the Engine's own live-debug panel.
 > What is imported so far is the level's collision, visible geometry, and a
 > spawn: objects, critters, and conversations are not placed yet, so melee has
-> no opponent and the conversation and barter owners are composed but
-> unreachable. Start with `scripts/import-level.sh`; the operator step, the Crew
-> profile, and the observed limits are in
+> no opponent, and the conversation, barter, loot and NPC owners exist but are
+> neither composed into the admitted session nor dispatched to. Start with
+> `scripts/import-level.sh`; the operator step, the Crew profile, and the
+> observed limits are in
 > [GPU playtesting](docs/gpu-playtesting.md), and the captures behind this claim
 > are in [the slice evidence](docs/playtest-evidence/8587-8588/README.md).
 
