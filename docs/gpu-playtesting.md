@@ -95,16 +95,18 @@ failures the browser would otherwise swallow.
 
 The slice imports a level's collision, visible geometry, spawn, object
 placements and the object tables. Placed props become durable entities and
-placed critters become actors on their own tiles, so melee resolves against a
-real opponent and the use channel opens a placed door through saved level state.
-Two limits remain in that area: placed objects and actors are simulated but not
-drawn, and the conversation, barter and loot owners are neither composed nor
-dispatched to, because talk needs imported conversation content and loot needs an
-item catalog; the door also stays solid until its tile's collision is replaced.
-Casting is reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather
-than from collected world runes. `abyss.goto` and `abyss.actors` are operator
-probes for placing the avatar on a tile and reading nearby actors; they are not a
-gameplay path.
+placed critters become actors on their own tiles, so melee damages and can drop a
+real opponent (the kill is recorded in the saved level state) and the use channel
+opens a placed door through that state. Named remainders, each carried by its own
+task: placed objects and actors are simulated but not drawn, the door stays solid
+until its tile's collision is replaced, and talk and barter need imported
+conversation content (#8592, #8614); loot needs an item catalog and casting is
+reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather than from a
+collected world rune (#8615); a travelled-to level admits no actors yet (#8616).
+`abyss.goto` and `abyss.actors` are operator probes for placing the avatar on a
+tile and reading nearby actors; they are not a gameplay path, and the probe
+refuses a tile the level does not admit as open, because a capsule inside solid
+geometry makes the Engine refuse the next step and taints the runtime.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly
 the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)
