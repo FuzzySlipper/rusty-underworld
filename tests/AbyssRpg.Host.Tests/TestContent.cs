@@ -77,7 +77,7 @@ internal static class TestContent
                 { "id": "paladin", "strength": 18, "dexterity": 14, "intelligence": 16, "bonusPool": 12 },
                 { "id": "shepherd", "strength": 16, "dexterity": 16, "intelligence": 16, "bonusPool": 12 }
               ],
-              "skillChoiceTable": [1, 7, 2, 11, 12]
+              "skillChoiceTable": [1, 0, 1, 1, 2, 3, 4, 1, 5, 1, 2]
             }
             """),
             File("abyss/content-packs/starting-kit.json", """{ "id": "abyssrpg.starting-kit", "items": ["torch"] }"""),
