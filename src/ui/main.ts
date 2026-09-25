@@ -130,8 +130,10 @@ const STYLES = `
 .abyss-menu button { display: block; width: 100%; margin: 0.2rem 0; }
 .abyss-menu .slots { margin: 0.4rem 0 0; padding: 0; list-style: none; opacity: 0.8; font-size: 12px; }
 .abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
+.abyss-debug { top: 9rem; }
 .abyss-debug[hidden] { display: none; }
 .abyss-metrics { left: 0.75rem; top: 3.5rem; padding: 0.4rem 0.6rem; }
+.abyss-metrics .panel:empty { display: none; }
 .abyss-metrics[hidden] { display: none; }
 `;
 
