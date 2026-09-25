@@ -53,6 +53,32 @@ public sealed class UuConversationHosting : IUuConversationImports
     public PanelData Panel(string npc, IReadOnlyList<string> transcript) =>
         new(_prompts.ToArray(), _lastTrade, GetAttitude(npc));
 
+    public sealed record TalkResult(IReadOnlyList<string> Transcript, PanelData Panel);
+
+    /// <summary>
+    /// Run a conversation on the VM against live hosted imports. Targeting
+    /// (which entity) rides with perception/UI; this hosts the talk.
+    /// </summary>
+    public static TalkResult Talk(
+        Session.UuSession session, UuConversationVm.ConversationScript script,
+        Func<int, int, string> strings, string npc, Random? rng = null)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(script);
+        ArgumentNullException.ThrowIfNull(strings);
+        ArgumentException.ThrowIfNullOrWhiteSpace(npc);
+        var hosting = new UuConversationHosting(session, rng);
+        var vm = new UuConversationVm(script, strings, hosting, new BlankVariables());
+        vm.Run();
+        return new TalkResult(vm.Transcript, hosting.Panel(npc, vm.Transcript));
+    }
+
+    private sealed class BlankVariables : IUuConversationVariables
+    {
+        public int Read(int address) => 0;
+        public void Write(int address, int value) { }
+    }
+
     public int Call(string name, UuConversationVm vm)
     {
         ArgumentNullException.ThrowIfNull(vm);

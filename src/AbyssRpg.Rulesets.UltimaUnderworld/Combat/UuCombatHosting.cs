@@ -1,9 +1,7 @@
 using Rusty.Engine.Mechanics;
-using AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 using AbyssRpg.Rulesets.UltimaUnderworld.Creation;
-using AbyssRpg.Rulesets.UltimaUnderworld.Magic;
 
-namespace AbyssRpg.Host;
+namespace AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 
 /// <summary>
 /// Combat integration: hold builds charge (full in FullChargeSeconds,
@@ -12,7 +10,7 @@ namespace AbyssRpg.Host;
 /// routes through T34 death (tree/anchor). The Kit attack-execution
 /// machine (cooldowns/impacts) integrates when NPC combat lands.
 /// </summary>
-public sealed class AbyssCombat
+public sealed class UuCombatHosting
 {
     public const double FullChargeSeconds = 1.0;
 
@@ -49,6 +47,6 @@ public sealed class AbyssCombat
         return new StrikeOutcome(true, damage, targetHp.Current <= 0);
     }
 
-    public static UuDeathPolicy.Respawn RouteDefeat(bool treeRebirthAvailable) =>
-        UuDeathPolicy.Route(treeRebirthAvailable);
+    public static Magic.UuDeathPolicy.Respawn RouteDefeat(bool treeRebirthAvailable) =>
+        Magic.UuDeathPolicy.Route(treeRebirthAvailable);
 }
