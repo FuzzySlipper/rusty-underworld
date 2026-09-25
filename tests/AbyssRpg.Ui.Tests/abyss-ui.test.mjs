@@ -261,6 +261,19 @@ test('the menu keys open the Engine console and hide the metrics widget', async 
   assert.equal(document.querySelector('.abyss-metrics').hidden, false);
   key('m');
   assert.equal(document.querySelector('.abyss-metrics').hidden, true);
+
+  // An open console can still be closed after play resumed and the menu went,
+  // but a closed one cannot be opened from gameplay.
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, false);
+  ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
+  assert.equal(document.querySelector('.abyss-menu').hidden, true);
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, true);
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, true);
+  key('m');
+  assert.equal(document.querySelector('.abyss-metrics').hidden, true);
 });
 
 test('interactive surfaces are marked for the Engine input lane', (t) => {

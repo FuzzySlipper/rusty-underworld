@@ -131,7 +131,7 @@ const STYLES = `
 .abyss-menu .tools { display: block; margin-top: 0.4rem; }
 .abyss-menu .slots { margin: 0.4rem 0 0; padding: 0; list-style: none; opacity: 0.8; font-size: 12px; }
 .abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
-.abyss-debug { top: 9rem; }
+.abyss-debug { top: 14rem; }
 .abyss-debug[hidden] { display: none; }
 .abyss-metrics { left: 0.75rem; top: 3.5rem; padding: 0.4rem 0.6rem; }
 .abyss-metrics .panel:empty { display: none; }
@@ -334,16 +334,21 @@ export function mountProductUi(
   });
 
   const onMenuKey = (event: KeyboardEvent): void => {
-    if (!menuVisible || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+    // A tool can always be opened from the menu and always closed again, even
+    // once play resumed and the menu went away.
+    const consoleKey = menuVisible || !debug.hidden;
+    const metricsKey = menuVisible || metricsVisible;
+    if (!consoleKey && !metricsKey) return;
     const target = event.target as { closest?: (selector: string) => Element | null } | null;
     if (typeof target?.closest === 'function'
       && target.closest('input, textarea, [contenteditable="true"]') !== null) {
       return;
     }
-    if (event.key === 'c' || event.key === 'C') {
+    if (consoleKey && (event.key === 'c' || event.key === 'C')) {
       toggleDebug();
       event.preventDefault();
-    } else if (event.key === 'm' || event.key === 'M') {
+    } else if (metricsKey && (event.key === 'm' || event.key === 'M')) {
       metrics.hidden = metricsVisible;
       setMetricsVisible(!metricsVisible);
       event.preventDefault();
