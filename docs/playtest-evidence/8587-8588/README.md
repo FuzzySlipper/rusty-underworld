@@ -1,7 +1,10 @@
 # Tasks 8587 and 8588: Crew GPU run
 
-Observed 2026-09-25. Profile `rusty-underworld`; Wolf/Gamescope Firefox; 1280×720
-stream; slot-1. Sessions `7e59854e-0725-4f18-9aea-6f8e0eaff527` (frames 01–04,
+Observed 2026-09-25 on revision `e4fd43f` (frame 05 on `fb203ef`). The commits
+after them changed the renderer-metrics wrapper's pre-mount visibility, a
+comment, and a refusal message for an unrespawnable session; none of them
+changes what these frames show. Profile `rusty-underworld`; Wolf/Gamescope
+Firefox; 1280×720 stream; slot-1. Sessions `7e59854e-0725-4f18-9aea-6f8e0eaff527` (frames 01–04,
 06, 07) and `599b24d0-56b6-4020-9747-f9c754811b8d` (frame 05), both driven
 through the installed Crew `playtest` CLI. Every frame below is a byte-for-byte
 copy of an original capture; the original artifact id and directory follow each
