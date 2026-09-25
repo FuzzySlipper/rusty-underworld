@@ -11,7 +11,12 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Conversation;
 /// </summary>
 public sealed class UuConversationHosting : IUuConversationImports
 {
-    public sealed record BarterTray(int NpcValue, int PlayerValue, int CharmSkill, int AppraisalSkill, int MaxPatience);
+    public sealed record BarterTray(int NpcValue, int PlayerValue, int CharmSkill, int AppraisalSkill, int MaxPatience)
+    {
+        public bool IsEmpty => NpcValue == 0 && PlayerValue == 0;
+    }
+
+    public sealed record NpcRecord(int Level, int Hp, int MaxHp);
 
     public sealed record PanelData(IReadOnlyList<string> Prompts, string? LastTrade, int Attitude);
 
@@ -21,6 +26,8 @@ public sealed class UuConversationHosting : IUuConversationImports
     private readonly Random _rng;
     private readonly Dictionary<string, int> _attitudes = [];
     private AvatarPresence _avatar = new(0, 1, 10, 30);
+    private string _talker = "";
+    private NpcRecord _talkerRecord = new(1, 10, 10);
     private readonly List<string> _prompts = [];
     private BarterTray _tray = new(0, 0, 0, 0, 3);
     private int _patience;
@@ -47,6 +54,14 @@ public sealed class UuConversationHosting : IUuConversationImports
 
     public void SetAttitude(string npc, int attitude) => _attitudes[npc] = attitude;
 
+    public void SetTalker(string npc, NpcRecord record)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(npc);
+        ArgumentNullException.ThrowIfNull(record);
+        _talker = npc;
+        _talkerRecord = record;
+    }
+
     public int GetAttitude(string npc) =>
         _attitudes.TryGetValue(npc, out int attitude) ? attitude : UuAttitude.Mellow;
 
@@ -61,13 +76,17 @@ public sealed class UuConversationHosting : IUuConversationImports
     /// </summary>
     public static TalkResult Talk(
         Session.UuSession session, UuConversationVm.ConversationScript script,
-        Func<int, int, string> strings, string npc, Random? rng = null)
+        Func<int, int, string> strings, string npc, Random? rng = null,
+        BarterTray? tray = null, AvatarPresence? avatar = null, NpcRecord? talker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(script);
         ArgumentNullException.ThrowIfNull(strings);
         ArgumentException.ThrowIfNullOrWhiteSpace(npc);
         var hosting = new UuConversationHosting(session, rng);
+        hosting.SetTalker(npc, talker ?? new NpcRecord(1, 10, 10));
+        if (tray is not null) hosting.SetTray(tray);
+        if (avatar is not null) hosting.SetAvatar(avatar);
         var vm = new UuConversationVm(script, strings, hosting, new BlankVariables());
         vm.Run();
         return new TalkResult(vm.Transcript, hosting.Panel(npc, vm.Transcript));
@@ -88,9 +107,11 @@ public sealed class UuConversationHosting : IUuConversationImports
             "set_quest" => SetQuest(vm),
             "do_offer" => Offer(vm),
             "do_demand" => Demand(vm),
-            "babl_ask" or "babl_menu" or "babl_fmenu" => Ask(vm),
-            "setup_to_barter" => 1,
-            "end_barter" => 1,
+            "babl_ask" => Ask(vm, 0),
+            "babl_menu" => Ask(vm, 1),
+            "babl_fmenu" => Ask(vm, 2),
+            "setup_to_barter" => 0,
+            "end_barter" => 0,
             _ => 0,
         };
     }
@@ -104,6 +125,7 @@ public sealed class UuConversationHosting : IUuConversationImports
     private int Offer(UuConversationVm vm)
     {
         _ = vm;
+        if (_tray.IsEmpty) return 0;
         (UuBarterPolicy.TradeResult result, int patience) = UuBarterPolicy.Offer(
             _tray.NpcValue, _tray.PlayerValue, _tray.CharmSkill, _tray.AppraisalSkill,
             _patience, _tray.MaxPatience, _rng);
@@ -116,17 +138,21 @@ public sealed class UuConversationHosting : IUuConversationImports
     private int Demand(UuConversationVm vm)
     {
         _ = vm;
-        // Presence comes from the bound avatar record; the ask from the tray.
+        // Presence comes from the bound avatar record; resolve comes from
+        // the bound talker record; attitude reads under the talker key.
         (UuBarterPolicy.DemandResult result, int shift) = UuBarterPolicy.Demand(
             _avatar.CharmSkill, _avatar.Level, _avatar.Hp, _avatar.Vitality,
-            _tray.NpcValue, GetAttitude("talker"), 1, 10, 10);
-        _attitudes["talker"] = GetAttitude("talker") + shift;
+            _tray.NpcValue, GetAttitude(_talker),
+            _talkerRecord.Level, _talkerRecord.Hp, _talkerRecord.MaxHp);
+        _attitudes[_talker] = GetAttitude(_talker) + shift;
         return result == UuBarterPolicy.DemandResult.Yielded ? 1 : 0;
     }
 
-    private int Ask(UuConversationVm vm)
+    private int Ask(UuConversationVm vm, int argCount)
     {
-        _prompts.Add($"prompt:{vm.PeekArg(0)}");
+        if (argCount == 0) _prompts.Add("prompt:ask");
+        else if (argCount == 1) _prompts.Add($"prompt:{vm.PeekArg(0)}");
+        else _prompts.Add($"prompt:{vm.PeekArg(1)}:{vm.PeekArg(0)}");
         return 0;
     }
 }
