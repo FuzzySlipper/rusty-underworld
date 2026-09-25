@@ -135,8 +135,9 @@ test('menu visibility and availability follow the projection, not local state', 
         ...baseMenu(),
         visible: true,
         mode: 'paused',
-        canSave: false,
+        canSave: true,
         canResume: true,
+        canRespawn: false,
         slots: [{ key: 'quicksave/0', label: 'Quicksave 0', savedAtUtc: '2026-09-25T01:00:00.0000000Z' }],
       },
     }),
@@ -147,7 +148,8 @@ test('menu visibility and availability follow the projection, not local state', 
   const buttons = [...menu.querySelectorAll('button')];
   const byLabel = (text) => buttons.find((b) => b.textContent.startsWith(text));
   assert.equal(byLabel('Resume').disabled, false);
-  assert.equal(byLabel('Save').disabled, true);
+  assert.equal(byLabel('Save').disabled, false);
+  assert.equal(byLabel('Respawn at the anchor').disabled, true);
   assert.equal(byLabel('Journey Onward').disabled, false);
   assert.match(byLabel('Journey Onward').textContent, /autosave\/level-1/);
   assert.equal(menu.querySelectorAll('.slots li').length, 1);
