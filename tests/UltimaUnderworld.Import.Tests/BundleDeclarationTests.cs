@@ -34,15 +34,28 @@ public sealed class BundleDeclarationTests
         foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
         {
             string id = pack.GetProperty("id").GetString()!;
-            // Level packs are operator-produced; authored packs must exist and
-            // their payloads must be admitted with them.
-            if (id.StartsWith("abyssrpg.level-", StringComparison.Ordinal))
+            // Level and object-table packs are operator-produced from the
+            // game's own data, so they are generated into the imports tree
+            // rather than committed; the descriptor is found wherever the
+            // resolver would find it under the content root.
+            if (id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
+                || id == "abyssrpg.object-tables")
             {
-                string level = id["abyssrpg.level-".Length..];
-                string imported = Path.Combine(root, "abyss", "imports", $"level-{level}", $"{id}.pack.json");
+                string generated = Directory
+                    .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)
+                    .FirstOrDefault() ?? "";
                 Assert.True(
-                    File.Exists(imported) || !Directory.Exists(Path.GetDirectoryName(imported)!),
-                    $"An imported level directory must carry its pack descriptor: {imported}");
+                    generated.Length > 0 || !Directory.Exists(Path.Combine(root, "abyss", "imports")),
+                    $"A generated pack must carry its descriptor: {id}");
+                if (generated.Length > 0)
+                {
+                    using JsonDocument generatedDescriptor = JsonDocument.Parse(File.ReadAllText(generated));
+                    string generatedPayload = generatedDescriptor.RootElement.GetProperty("payload").GetString()!;
+                    Assert.True(
+                        File.Exists(Path.Combine(root, generatedPayload)),
+                        $"Missing generated payload {generatedPayload}.");
+                }
+
                 continue;
             }
 
