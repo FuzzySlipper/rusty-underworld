@@ -50,5 +50,22 @@ test('Esc toggles menu; console forwards unknown commands as intents', () => {
   input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   assert.equal(ctx.claimed.length, 1);
   assert.equal(ctx.claimed[0].intent, 'abyss.debug');
+
+  // Menu buttons claim the product lifecycle intents.
+  const buttons = [...dom.window.document.querySelectorAll('.abyss-menu button')];
+  buttons[0].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  buttons[1].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert.deepEqual(
+    ctx.claimed.slice(1).map((c) => c.intent),
+    ['abyss.lifecycle.resume', 'abyss.lifecycle.pause']);
+
+  // Metrics toggle flips visibility; malformed projections are ignored.
+  const metrics = dom.window.document.querySelector('.abyss-debug button');
+  const metricsOut = dom.window.document.querySelectorAll('.abyss-debug output')[0];
+  assert.equal(metricsOut.hidden, true);
+  metrics.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
+  assert.equal(metricsOut.hidden, false);
+  ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: { hp: 'a lot' } }));
+  ctx.listeners.forEach((fn) => fn({ contract: 'nope', value: {} }));
   ui.dispose();
 });

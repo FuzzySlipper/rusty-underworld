@@ -28,9 +28,9 @@ interface ProductUiContext {
 
 const HUD_CONTRACT = 'abyss.ui.snapshot.v1';
 const MAP_CONTRACT = 'abyss.ui.map.v1';
-const UI_ACTION_INTENT = 'abyss.ui';
-const UI_ACTION_CONTRACT = 'abyss.ui.action.v1';
+const LIFECYCLE_INTENT_CONTRACT = 'abyss.lifecycle.v1';
 const DEBUG_INTENT = 'abyss.debug';
+const DEBUG_CONTRACT = 'abyss.ui.action.v1';
 
 interface HudView {
   readonly hp: number;
@@ -101,7 +101,7 @@ function bar(className: string): { root: HTMLElement; fill: HTMLElement } {
 
 /**
  * Mounts the companion into `root` and returns a disposer. The Esc menu
- * exits pointer lock (unlocking the mouse) and offers pause/resume;
+ * releases pointer lock (unlocking the mouse) and offers pause/resume;
  * metrics and console ride in the debug panel.
  */
 export function mountProductUi(root: HTMLElement, context: ProductUiContext): { dispose(): void } {
@@ -149,21 +149,23 @@ export function mountProductUi(root: HTMLElement, context: ProductUiContext): { 
 
   root.append(style, hud, menu, debug);
 
-  const claim = (name: string): void => {
-    context.intents?.claim(UI_ACTION_INTENT, {
+  // Lifecycle intent names match AbyssProductEntry.LifecycleIntents exactly;
+  // the debug intent is proposed (no product consumer yet; the app host owns it).
+  const claimLifecycle = (name: 'pause' | 'resume'): void => {
+    context.intents?.claim(`abyss.lifecycle.${name}`, {
       kind: 'product-payload',
-      contract: UI_ACTION_CONTRACT,
-      data: { action: name },
+      contract: LIFECYCLE_INTENT_CONTRACT,
+      data: {},
     });
   };
 
   resumeButton.addEventListener('click', () => {
     root.requestPointerLock?.();
-    claim('session.resume');
+    claimLifecycle('resume');
     menu.hidden = true;
   });
   pauseButton.addEventListener('click', () => {
-    claim('session.pause');
+    claimLifecycle('pause');
   });
   metricsButton.addEventListener('click', () => {
     const pressed = metricsButton.getAttribute('aria-pressed') === 'true';
@@ -190,13 +192,17 @@ export function mountProductUi(root: HTMLElement, context: ProductUiContext): { 
     }
     context.intents?.claim(DEBUG_INTENT, {
       kind: 'product-payload',
-      contract: UI_ACTION_CONTRACT,
+      contract: DEBUG_CONTRACT,
       data: { command: line },
     });
     consoleOut.textContent += `> ${line}\n`;
   });
   const onKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') menu.hidden = !menu.hidden;
+    if (event.key !== 'Escape') return;
+    menu.hidden = !menu.hidden;
+    // In real pointer lock the browser consumes Esc before it reaches us;
+    // cover the unlocked case by explicitly releasing on open.
+    if (!menu.hidden) document.exitPointerLock?.();
   };
   document.addEventListener('keydown', onKey);
 
