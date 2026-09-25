@@ -142,6 +142,30 @@ public sealed class UuCritterAdmissionTests
     }
 
     [Fact]
+    public void A_restored_save_removes_the_actor_of_a_placement_it_says_is_gone()
+    {
+        UuLevelPlacements placements = Placements();
+        var level = new AdmittedLevel(1, placements.Tiles, placements.Objects);
+        using UuSession played = NewSession(level);
+        UuCritterAdmission.AdmitLevel(played, level, placements, Tables());
+        Assert.Single(played.Actors.All);
+
+        // The fight records the kill in the level state, which is what a save
+        // carries; without that the same critter stands there after a load.
+        played.Dungeon.Current.RemoveObject(501);
+        UuSessionSnapshot snapshot = played.CaptureSnapshot(new AvatarPoseDto(4, 0, 4, 0f));
+
+        using UuSession restored = NewSession(level);
+        UuCritterAdmission.AdmitLevel(restored, level, placements, Tables());
+        Assert.Single(restored.Actors.All);
+
+        restored.RestoreSnapshot(snapshot);
+        Assert.Empty(restored.Actors.All);
+        Assert.False(restored.TryGetPlacedActor(501, out _));
+        Assert.False(restored.Dungeon.Current.IsLive(501));
+    }
+
+    [Fact]
     public void A_placed_critter_removed_from_the_level_is_not_admitted()
     {
         UuLevelPlacements placements = Placements();
