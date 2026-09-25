@@ -141,6 +141,7 @@ public sealed record AbyssUiSnapshot(
 public sealed class AbyssUiProjection : IDisposable
 {
     private readonly IUiService? _ui;
+    private readonly AbyssProductEntry _entry;
     private UiStream? _stream;
     private uint _sequence;
     private bool _disposed;
@@ -148,7 +149,7 @@ public sealed class AbyssUiProjection : IDisposable
     public AbyssUiProjection(IEngineContext engine, AbyssProductEntry entry)
     {
         ArgumentNullException.ThrowIfNull(engine);
-        ArgumentNullException.ThrowIfNull(entry);
+        _entry = entry ?? throw new ArgumentNullException(nameof(entry));
         try
         {
             _ui = engine.Ui;
@@ -164,8 +165,8 @@ public sealed class AbyssUiProjection : IDisposable
         ArgumentNullException.ThrowIfNull(snapshot);
         if (_disposed || _ui is null) return;
         _stream ??= _ui.OpenStream(new UiStreamRequest(
-            AbyssProductEntry.Default.UiProjectionStream,
-            AbyssProductEntry.Default.UiProjectionContract));
+            _entry.UiProjectionStream,
+            _entry.UiProjectionContract));
         var builder = new UiValueBuilder();
         uint root = AbyssUiSnapshot.Write(builder, snapshot);
         _ui.PublishProjection(new UiProjection(_stream, ++_sequence, builder.Build(root)));

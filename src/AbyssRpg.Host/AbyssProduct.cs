@@ -391,7 +391,14 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     public bool Respawn()
     {
         ThrowIfShutdown();
-        if (_session is not IRespawnableGameSession respawnable) return false;
+        if (_session is not IRespawnableGameSession respawnable)
+        {
+            // The companion asked for gameplay focus with this action; publish
+            // the refusal so the projection settles the shell's mode again.
+            _hostOutcome = "This session cannot return to the anchor.";
+            Publish();
+            return false;
+        }
         respawnable.RespawnAtAnchor();
         _mode = ProductMode.Playing;
         ApplyMode();

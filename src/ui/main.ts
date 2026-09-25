@@ -54,6 +54,9 @@ const HUD_CONTRACT = 'abyss.ui.snapshot.v1';
 /** Declared direct intents; AbyssProductEntry and the csproj declare the same names. */
 const INTENTS = {
   start: 'abyss.lifecycle.start',
+  // Declared and consumed, but not claimed from here: the menu only exists while
+  // the product is paused, so its pause producer is the pointer-lock loss the
+  // Engine reports to the product.
   pause: 'abyss.lifecycle.pause',
   resume: 'abyss.lifecycle.resume',
   stop: 'abyss.lifecycle.stop',
@@ -130,8 +133,7 @@ const STYLES = `
 .abyss-menu button { display: block; width: 100%; margin: 0.2rem 0; }
 .abyss-menu .tools { display: block; margin-top: 0.4rem; }
 .abyss-menu .slots { margin: 0.4rem 0 0; padding: 0; list-style: none; opacity: 0.8; font-size: 12px; }
-.abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
-.abyss-debug { top: 14rem; }
+.abyss-debug { left: 0.75rem; top: 14rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
 .abyss-debug[hidden] { display: none; }
 .abyss-metrics { left: 0.75rem; top: 3.5rem; padding: 0.4rem 0.6rem; }
 .abyss-metrics .panel:empty { display: none; }
@@ -271,7 +273,9 @@ export function mountProductUi(
 
   const metrics = document.createElement('section');
   metrics.className = 'abyss-metrics';
-  metrics.hidden = !metricsVisible;
+  // Shown only once a widget is mounted: before that, and after a load failure,
+  // an empty bordered box would be a placeholder for nothing.
+  metrics.hidden = true;
   metrics.setAttribute('data-rusty-ui-interactive', '');
   const metricsHost = document.createElement('div');
   metricsHost.className = 'panel';
@@ -373,17 +377,20 @@ export function mountProductUi(
   let disposed = false;
   const loadLiveDebug = dependencies.loadLiveDebug ?? loadEngineLiveDebug;
 
-  // The renderer-metrics widget reads the Engine renderer's own widget state, so
-  // the toggle asks the Engine to show or hide it by re-mounting with the wanted
-  // state rather than hiding a DOM node the Engine would keep updating.
+  // The renderer-metrics widget follows the Engine renderer's own widget state,
+  // so the toggle asks the Engine to show or hide it by re-mounting with the
+  // wanted state instead of hiding a DOM node the Engine would keep updating.
+  // The mount that carries the hide command stays alive so the request lands.
   const setMetricsVisible = (visible: boolean): void => {
     metricsVisible = visible;
     metricsToggle.setAttribute('aria-pressed', String(visible));
+    metrics.hidden = !visible;
     metricsMount?.dispose();
     metricsMount = null;
     void ready.then((module) => {
-      if (disposed || module === null || !metricsVisible) return;
-      metricsMount = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: true });
+      if (disposed || module === null) return;
+      metricsMount = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: visible });
+      metrics.hidden = !metricsVisible;
     });
   };
 

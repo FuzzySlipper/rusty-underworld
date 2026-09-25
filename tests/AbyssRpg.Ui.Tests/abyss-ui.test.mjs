@@ -226,15 +226,20 @@ test('the Engine live-debug panel and metrics widget are mounted and disposed', 
   const toggle = (label) => [...document.querySelectorAll('.abyss-menu button')]
     .find((b) => b.textContent.startsWith(label));
   toggle('Renderer metrics').dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(metrics.hidden, true);
+  // Hiding asks the Engine to hide its widget rather than dropping the request.
+  assert.deepEqual(debug.metricsMounts.at(-1).options, { initiallyVisible: false });
+  assert.equal(debug.metricsMounts.at(-1).disposed, 0);
   toggle('Engine console').dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
   assert.equal(document.querySelector('.abyss-debug').hidden, false);
 
   ui.dispose();
   assert.equal(debug.panelMounts[0].disposed, 1);
-  // The hide toggle disposes the first widget and mounts nothing in its place.
-  assert.equal(debug.metricsMounts.length, 1);
+  // The show mount was replaced by the hide mount, and disposal ends the last one.
+  assert.equal(debug.metricsMounts.length, 2);
   assert.equal(debug.metricsMounts[0].disposed, 1);
+  assert.equal(debug.metricsMounts[1].disposed, 1);
 });
 
 test('the menu keys open the Engine console and hide the metrics widget', async (t) => {

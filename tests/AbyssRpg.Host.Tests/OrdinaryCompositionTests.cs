@@ -344,6 +344,14 @@ public sealed class OrdinaryCompositionTests
         Assert.True(product.Respawn());
         Assert.Equal(ProductMode.Playing, product.Mode);
         Assert.False(HudBoolean(ui.LastProjection!.Value.Value, "defeated"));
+
+        // A session that cannot return still answers, so the companion's
+        // gameplay focus is corrected by the next projection.
+        using AbyssProduct released = Product(out UiDouble releasedUi, out _, out _, out _);
+        released.Start();
+        released.Update(new ProductUpdate(Facts(1), [Intent("abyss.lifecycle.stop")]));
+        Assert.False(released.Respawn());
+        Assert.Contains("cannot return", HudString(releasedUi.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
     }
 
     private static ProductUpdateFacts Facts(ulong step) => new(
