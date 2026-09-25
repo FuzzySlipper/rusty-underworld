@@ -150,10 +150,11 @@ public static class UuLevelContent
         at = 0;
         foreach (JsonElement row in objectsElement.EnumerateArray())
         {
-            if (row.GetArrayLength() != 10)
+            if (row.GetArrayLength() != 11)
             {
                 throw new InvalidOperationException(
-                    $"'{payloadLabel}' object rows must be [index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY].");
+                    $"'{payloadLabel}' object rows must be "
+                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading].");
             }
 
             objects[at++] = new AdmittedObject(
@@ -165,7 +166,8 @@ public static class UuLevelContent
                 Quality: (int)row[4].GetDouble(),
                 Mobile: row[1].GetDouble() != 0d,
                 HomeTileX: (int)row[8].GetDouble(),
-                HomeTileY: (int)row[9].GetDouble());
+                HomeTileY: (int)row[9].GetDouble(),
+                Heading: (int)row[10].GetDouble());
         }
 
         return new UuLevelPlacements(unitsPerTile, heightUnitsPerStep, tiles, objects);

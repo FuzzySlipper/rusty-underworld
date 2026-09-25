@@ -21,7 +21,7 @@ public static class LevelPlacements
     /// </summary>
     public sealed record PlacedObject(
         int Index, bool Mobile, int ItemId, int Flags, int Quality, int Next, int Owner, int Link,
-        int HomeTileX, int HomeTileY);
+        int HomeTileX, int HomeTileY, int Heading);
 
     public sealed record Placements(
         int Level,
@@ -34,6 +34,9 @@ public static class LevelPlacements
 
     /// <summary>Byte offset of the mobile record's home-tile word (donor: uwobject npc_xhome/npc_yhome).</summary>
     private const int MobileHomeOffset = 0x16;
+
+    /// <summary>Byte offset of the mobile record's heading (donor: uwobject npc_heading).</summary>
+    private const int MobileHeadingOffset = 0x18;
 
     public static Placements Emit(LevArkReader.LevelPack pack, LevelRenderMesh.Options? options = null)
     {
@@ -48,7 +51,7 @@ public static class LevelPlacements
                 (int homeX, int homeY) = HomeTile(obj);
                 return new PlacedObject(
                     obj.Index, obj.IsMobile, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
-                    homeX, homeY);
+                    homeX, homeY, Heading(obj));
             })
             .ToArray();
         return new Placements(
@@ -59,6 +62,26 @@ public static class LevelPlacements
             objects,
             objects.Count(obj => obj.ItemId != 0),
             objects.Count(obj => obj.ItemId != 0 && obj.Mobile));
+    }
+
+    /// <summary>
+    /// The facing a record carries: a mobile keeps it in the low five bits at
+    /// offset 0x18 (donor: <c>uwobject.npc_heading</c>), and a static object in
+    /// bits 7-9 of the word at offset 2 (donor: <c>uwobject.heading</c>). Both
+    /// are in 32 steps per full turn; -1 means the record holds none.
+    /// </summary>
+    private static int Heading(LevArkReader.LevelObject obj)
+    {
+        if (obj.IsMobile)
+        {
+            return obj.Raw.Length > MobileHeadingOffset
+                ? obj.Raw[MobileHeadingOffset] & 0x1F
+                : -1;
+        }
+
+        if (obj.Raw.Length < 4) return -1;
+        int word = obj.Raw[2] | (obj.Raw[3] << 8);
+        return (word >> 7) & 0x7;
     }
 
     /// <summary>
@@ -92,12 +115,13 @@ public static class LevelPlacements
                 tile.X, tile.Y, tile.Type, tile.ObjectHead, tile.FloorHeight, tile.Door ? 1 : 0,
             }),
             // One row per object slot: index, mobile, item id, flags, quality,
-            // next in the chain, owner (container), link (first content), and
-            // the mobile's own tile (-1 when the record holds none).
+            // next in the chain, owner (container), link (first content), the
+            // mobile's own tile (-1 when the record holds none), and the
+            // record's facing in its own 32-step units (-1 when it holds none).
             objects = placements.Objects.Select(obj => new[]
             {
                 obj.Index, obj.Mobile ? 1 : 0, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
-                obj.HomeTileX, obj.HomeTileY,
+                obj.HomeTileX, obj.HomeTileY, obj.Heading,
             }),
         };
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = false });

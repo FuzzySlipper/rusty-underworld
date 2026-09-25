@@ -24,6 +24,8 @@ public sealed class LevelPlacementsTests
         }
 
         byte[] mobileRaw = new byte[LevArkReader.MobileRecordSize];
+        // Heading 8 of 32 steps sits in the low five bits at offset 0x18.
+        mobileRaw[0x18] = 8;
         // Home tile (9, 5): x is bits 10-15 and y is bits 4-9 of the word at 0x16.
         int home = (9 << 10) | (5 << 4);
         mobileRaw[0x16] = (byte)(home & 0xFF);
@@ -68,6 +70,7 @@ public sealed class LevelPlacementsTests
         Assert.Equal(64, critter.ItemId);
         Assert.Equal(9, critter.HomeTileX);
         Assert.Equal(5, critter.HomeTileY);
+        Assert.Equal(8, critter.Heading);
         // A static slot has no home tile: it is placed by its tile chain.
         Assert.Equal(-1, placements.Objects[1].HomeTileX);
     }
@@ -83,7 +86,7 @@ public sealed class LevelPlacementsTests
         Assert.Equal(1.0, root.GetProperty("heightUnitsPerStep").GetDouble());
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
-        Assert.Equal(10, root.GetProperty("objects")[0].GetArrayLength());
+        Assert.Equal(11, root.GetProperty("objects")[0].GetArrayLength());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }
 

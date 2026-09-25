@@ -72,10 +72,10 @@ public sealed class UuCritterAdmissionTests
           "liveObjects": 2, "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
-            [500,0,200,0,0,0,0,0,-1,-1],
-            [501,1,64,0,0,0,0,0,2,3],
-            [502,0,128,0,0,0,0,503,-1,-1],
-            [503,0,200,0,0,0,502,0,-1,-1]
+            [500,0,200,0,0,0,0,0,-1,-1,3],
+            [501,1,64,0,0,0,0,0,2,3,8],
+            [502,0,128,0,0,0,0,503,-1,-1,-1],
+            [503,0,200,0,0,0,502,0,-1,-1,-1]
           ]
         }
         """;
@@ -101,6 +101,8 @@ public sealed class UuCritterAdmissionTests
         Assert.True(admission.ByObjectIndex.ContainsKey(501));
         // Tile (2,3) at floor height 1: the world center of that tile.
         Assert.Equal(new WorldPoint(20f, 1f, 28f), critter.Position);
+        // Heading 8 of 32 steps is a quarter turn.
+        Assert.Equal(Math.PI / 2, critter.HeadingYawRadians, 4);
         Assert.Single(session.Actors.All);
     }
 

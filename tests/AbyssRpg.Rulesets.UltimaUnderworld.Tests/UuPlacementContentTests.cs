@@ -102,7 +102,7 @@ public sealed class UuPlacementContentTests
     public void Placements_read_tiles_objects_and_the_world_scale()
     {
         UuLevelPlacements placements = UuLevelContent.ReadPlacements(
-            Encoding.UTF8.GetBytes(Placements("[500,0,200,0,0,0,0,0,-1,-1]")), "placements");
+            Encoding.UTF8.GetBytes(Placements("[500,0,200,0,0,0,0,0,-1,-1,12]")), "placements");
 
         Assert.Equal(8.0, placements.UnitsPerTile);
         Assert.Equal(UuLevelPlacements.TileDimension * UuLevelPlacements.TileDimension, placements.Tiles.Length);
@@ -123,7 +123,7 @@ public sealed class UuPlacementContentTests
     {
         // One row short of a full grid: the runtime indexes tiles by position,
         // so a short artifact would mis-place every object.
-        string truncated = Placements("[500,0,200,0,0,0,0,0,-1,-1]")
+        string truncated = Placements("[500,0,200,0,0,0,0,0,-1,-1,12]")
             .Replace(",[63,63,0,0,0,0]", "", StringComparison.Ordinal);
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(
             () => UuLevelContent.ReadPlacements(Encoding.UTF8.GetBytes(truncated), "placements"));

@@ -16,6 +16,16 @@ public static class UuCritterAdmission
 {
     public sealed record Admission(IReadOnlyList<ActorState> Actors, IReadOnlyDictionary<int, ActorState> ByObjectIndex);
 
+    /// <summary>Steps per full turn in the record's own heading units.</summary>
+    public const int HeadingSteps = 32;
+
+    /// <summary>
+    /// The facing to stand an actor at: a record heading is in 32 steps per
+    /// turn, and a record that carries none faces along the level's own zero.
+    /// </summary>
+    public static float Facing(int heading) =>
+        heading < 0 ? 0f : (float)(heading % HeadingSteps * (2d * Math.PI / HeadingSteps));
+
     public static Admission AdmitLevel(
         Session.UuSession session,
         AdmittedLevel level,
@@ -39,7 +49,7 @@ public static class UuCritterAdmission
             AdmittedTile? tile = placements.Tile(placed.HomeTileX, placed.HomeTileY);
             if (tile is null) continue;
 
-            var pose = new ActorPose(position(tile.X, tile.Y, tile.FloorHeight), 0f);
+            var pose = new ActorPose(position(tile.X, tile.Y, tile.FloorHeight), Facing(placed.Heading));
             ActorState actor = UuCritterFactory.CreateCritter(
                 session.Actors, session.ActorIdentities, pose, definition);
             actors.Add(actor);

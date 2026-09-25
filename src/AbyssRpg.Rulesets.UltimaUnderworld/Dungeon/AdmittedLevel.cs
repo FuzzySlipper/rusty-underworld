@@ -21,6 +21,7 @@ public sealed record AdmittedObject(
     int Quality = 0,
     bool Mobile = false,
     int HomeTileX = -1,
-    int HomeTileY = -1);
+    int HomeTileY = -1,
+    int Heading = -1);
 
 public sealed record AdmittedLevel(int LevelNumber, AdmittedTile[] Tiles, AdmittedObject[] Objects);

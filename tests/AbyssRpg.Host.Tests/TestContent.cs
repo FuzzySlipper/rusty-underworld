@@ -166,7 +166,7 @@ internal static class TestContent
         }
 
         string critterRow = withCritter
-            ? $"[{CritterObjectIndex},1,{CritterItemId},0,0,0,0,0,0,0],\n            "
+            ? $"[{CritterObjectIndex},1,{CritterItemId},0,0,0,0,0,0,0,0],\n            "
             : "";
         return $$"""
         {
@@ -178,9 +178,9 @@ internal static class TestContent
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
-            {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1],
-            [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1],
-            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1]
+            {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1,5],
+            [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
+            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1,-1]
           ]
         }
         """;
