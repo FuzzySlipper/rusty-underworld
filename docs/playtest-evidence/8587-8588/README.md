@@ -55,6 +55,21 @@ outcome), `abyss.slots` (autosave plus quicksaves), and after a load
 `lifecycle=Running mode=Playing` again with the world at `x=44.00 y=0.92
 z=36.00`, the imported spawn tile.
 
+## After the review round
+
+A second run on revision `b018566` repeated the launch, look, move, pause and
+Journey Onward load after the review's lifetime and save-boundary fixes:
+
+- [Journey Onward after the review fixes](08-after-review-load.png) — artifact
+  `15ccd175-2fe4-4fca-9887-04275dd52f95`, session
+  `8f09b1bd-2c39-4ad4-8d5e-5c5a0da4a85e`. The menu's Journey Onward replaced the
+  world from the autosave, the product reported `mode=Playing` with the clock
+  restarted, the pointer was re-captured, and the renderer still reports the
+  imported mesh (`triangles: 26104`). The product refused the loads the review
+  reproduced as destructive before this revision; its own suite now asserts
+  that a corrupt payload, a foreign ruleset's slot and a save of another level
+  all leave the live session in place.
+
 ## What these captures establish
 
 - The ordinary launch path composes: bundle → packs → tuning → imported level →

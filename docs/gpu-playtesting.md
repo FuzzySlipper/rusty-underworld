@@ -95,8 +95,9 @@ otherwise swallow.
 
 The first slice imports a level's collision, visible geometry, and spawn. Object,
 critter, and conversation placements are not imported yet, so melee resolves
-against no opponent, and the conversation, barter, loot, and NPC owners are
-composed but unreachable in play — nothing dispatches an interaction into them.
+against no opponent, and the conversation, barter, loot and NPC owners exist but
+are neither composed into the admitted session nor dispatched to — nothing
+routes an interaction into them.
 Casting is reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather
 than from collected world runes. Survival pressure exists but has little to act
 on without placed items. Den #8590 carries all of that as one piece of work:
