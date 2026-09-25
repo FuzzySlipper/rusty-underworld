@@ -34,6 +34,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     private IReadOnlyList<AbyssSlotSummary> _slotCache = [];
     private bool _slotsDirty = true;
     private bool _shutdown;
+    private bool _pointerCaptured;
     private bool _disposed;
 
     public BuiltInSelection Selection => _selection;
@@ -247,12 +248,21 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     private void HandleIntent(ProductInputEvent input)
     {
         // Losing pointer lock is the Escape path: the world pauses and the menu
-        // becomes authoritative, instead of the DOM guessing at menu state.
-        if (input.Kind == InputEventKind.Clear && input.ClearReason == InputClearReason.PointerLockLoss)
+        // becomes authoritative, instead of the DOM guessing at menu state. The
+        // lane also reports one loss while the pointer was never captured, so
+        // only a loss after real gameplay input pauses.
+        if (input.Kind == InputEventKind.Clear)
         {
-            PausePlay();
+            if (input.ClearReason == InputClearReason.PointerLockLoss && _pointerCaptured)
+            {
+                _pointerCaptured = false;
+                PausePlay();
+            }
+
             return;
         }
+
+        if (input.Provenance == InputProvenance.Physical) _pointerCaptured = true;
 
         if (input.Kind is not (InputEventKind.DirectDigital or InputEventKind.MappedDigital)) return;
         // A direct UI intent carries its active fact in X with no edge; a mapped
@@ -265,19 +275,23 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         switch (intent)
         {
             case "abyss.lifecycle.start":
+                _pointerCaptured = true;
                 BeginPlay();
                 break;
             case "abyss.lifecycle.pause":
                 PausePlay();
                 break;
             case "abyss.lifecycle.resume":
+                // The shell re-captures gameplay focus for this intent, so a
+                // following lock loss is another Escape rather than launch.
+                _pointerCaptured = true;
                 ResumePlay();
                 break;
             case "abyss.lifecycle.stop":
                 QuitToMenu();
                 break;
             case "abyss.action.quicksave":
-                if (_mode == ProductMode.Playing) Quicksave();
+                Quicksave();
                 break;
             case "abyss.action.journey-onward":
                 LoadJourneyOnward();

@@ -215,6 +215,9 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(ProductMode.Paused, product.Mode);
         Assert.Equal(AbyssModes.Paused, HudString(ui.LastProjection!.Value.Value, "mode"));
         Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "menu.canResume"));
+        // A paused world is still savable: the pause menu owns the save action.
+        Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "menu.canSave"));
+        Assert.Equal("quicksave/0", product.Quicksave());
 
         product.Update(new ProductUpdate(Facts(2), [Intent("abyss.lifecycle.resume")]));
         Assert.Equal(ProductMode.Playing, product.Mode);
@@ -263,25 +266,39 @@ public sealed class OrdinaryCompositionTests
         product.Update(SixtyHzUpdate(1));
         Assert.Equal(ProductMode.Playing, product.Mode);
 
-        // Escape releases pointer lock; the Engine reports it as a clear fact.
-        product.Update(new ProductUpdate(Facts(2), [Event(InputEventKind.Clear, InputEdge.None) with
+        // A real key press means the pointer was captured, so a loss is Escape.
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyW, InputEdge.Pressed) with
         {
-            ClearReason = InputClearReason.PointerLockLoss,
+            Provenance = InputProvenance.Physical,
         }]));
+        product.Update(new ProductUpdate(Facts(3), [Clear(InputClearReason.PointerLockLoss)]));
         Assert.Equal(ProductMode.Paused, product.Mode);
         Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "menu.visible"));
         Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "menu.canResume"));
         Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "ready"));
 
-        // A focus-loss clear is not a menu request.
-        product.Update(new ProductUpdate(Facts(3), [Intent("abyss.lifecycle.resume")]));
+        // A focus-loss clear is not a menu request, and neither is the launch
+        // clear the lane sends before the pointer was ever captured.
+        product.Update(new ProductUpdate(Facts(4), [Intent("abyss.lifecycle.resume")]));
         Assert.Equal(ProductMode.Playing, product.Mode);
-        product.Update(new ProductUpdate(Facts(4), [Event(InputEventKind.Clear, InputEdge.None) with
-        {
-            ClearReason = InputClearReason.FocusLoss,
-        }]));
+        product.Update(new ProductUpdate(Facts(5), [Clear(InputClearReason.FocusLoss)]));
         Assert.Equal(ProductMode.Playing, product.Mode);
+
+        using AbyssProduct fresh = Product(out UiDouble freshUi, out _, out _, out _);
+        fresh.Start();
+        fresh.Update(new ProductUpdate(Facts(1), [Clear(InputClearReason.PointerLockLoss)]));
+        Assert.Equal(ProductMode.Playing, fresh.Mode);
+        Assert.False(HudBoolean(freshUi.LastProjection!.Value.Value, "menu.visible"));
+
+        // Resume asks the shell for gameplay focus, so the next loss pauses.
+        fresh.Update(new ProductUpdate(Facts(2), [Intent("abyss.lifecycle.pause")]));
+        fresh.Update(new ProductUpdate(Facts(3), [Intent("abyss.lifecycle.resume")]));
+        fresh.Update(new ProductUpdate(Facts(4), [Clear(InputClearReason.PointerLockLoss)]));
+        Assert.Equal(ProductMode.Paused, fresh.Mode);
     }
+
+    private static ProductInputEvent Clear(InputClearReason reason) =>
+        Event(InputEventKind.Clear, InputEdge.None) with { ClearReason = reason };
 
     [Fact]
     public void Debug_commands_register_the_product_and_the_live_session()

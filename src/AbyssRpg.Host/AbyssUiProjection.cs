@@ -40,7 +40,9 @@ public sealed record AbyssMenuState(
             Mode: mode,
             CanStart: !sessionPresent,
             CanResume: !playing && !defeated && sessionPresent,
-            CanSave: playing && sessionPresent,
+            // Saving a paused world is the ordinary pause-menu save; a defeated
+            // or released session has nothing worth capturing.
+            CanSave: sessionPresent && !defeated,
             CanLoad: sessionPresent && journeyOnward.Length > 0,
             CanRespawn: defeated,
             JourneyOnward: journeyOnward,
