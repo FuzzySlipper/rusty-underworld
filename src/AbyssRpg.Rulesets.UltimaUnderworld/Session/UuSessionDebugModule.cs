@@ -28,7 +28,7 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
         return string.Create(CultureInfo.InvariantCulture,
             $"level={status.Level} hp={status.Hp}/{status.MaxHp} mana={status.Mana}/{status.MaxMana} "
             + $"charge={status.ChargeFraction:F2} clock={session.ClockTicks} mode={session.Mode} "
-            + $"defeated={status.Defeated} outcome=\"{status.Outcome}\"");
+            + $"actors={status.PresentActors} defeated={status.Defeated} outcome=\"{status.Outcome}\"");
     }
 
     [DebugCommand("abyss.where", Description = "Avatar position and heading in Engine units and radians.")]

@@ -117,7 +117,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private readonly UuLevelPlacements? _placements;
 
-    private int PresentActors
+    /// <summary>Live placed actors around the avatar; the status line reports it.</summary>
+    public int PresentActors
     {
         get
         {
