@@ -1,0 +1,6 @@
+{
+  "id": "abyssrpg.starting-kit",
+  "provenance": "authored",
+  "note": "Starting equipment by class family until per-class kits are authored.",
+  "items": ["torch", "bedroll", "waterskin", "dagger", "bread"]
+}

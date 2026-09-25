@@ -1,0 +1,8 @@
+{
+  "id": "abyssrpg.avatar-options",
+  "provenance": "authored",
+  "genders": ["male", "female"],
+  "handedness": ["left", "right"],
+  "classes": ["fighter", "mage", "ranger", "bard", "tinker", "druid", "paladin", "shepherd"],
+  "difficulties": ["standard", "easy"]
+}

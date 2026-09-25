@@ -1,0 +1,10 @@
+{
+  "id": "abyssrpg.stygian-abyss",
+  "ruleset": "abyssrpg.ultima-underworld",
+  "tuning": "abyssrpg.stygian-default",
+  "contentPacks": [
+    "abyssrpg.avatar-options",
+    "abyssrpg.starting-kit",
+    "abyssrpg.level-1"
+  ]
+}
