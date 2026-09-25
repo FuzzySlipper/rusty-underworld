@@ -54,17 +54,60 @@ is separate evidence. Keep original captures, action receipts, and cleanup
 receipts. The maintained reference is
 `/home/dev/crew-services/docs/playtest.md`.
 
+## Import the level the product launches
+
+Original game data is operator-supplied and never committed, so the level pack
+is generated into the ignored content tree before the product can compose a
+world:
+
+```bash
+scripts/import-level.sh            # level 1 from local/extracted/uw/UW/DATA
+scripts/import-level.sh 2 path/to/UW/DATA
+```
+
+The script emits the Engine collision artifact, the visible geometry, the level
+manifest with its declared content identity, and the content-pack descriptor
+that the default bundle selects. Launching without it fails with the command to
+run. Importing a second level is a second descriptor; the bundle lists the packs
+it composes.
+
+## Reading the running product
+
+The packaged host admits the Engine live-debug route when the product declares
+it, and the companion mounts the Engine's own panel over it. The same route is
+the fastest way to read live state from a script:
+
+```bash
+curl -s -X POST -H 'content-type: text/plain; charset=utf-8' \
+  --data-binary 'abyss.status' \
+  http://127.0.0.1:4177/__rusty/product/runtime/debug/execute
+curl -s -X POST -H 'content-type: application/json' -d '{}' \
+  http://127.0.0.1:4177/__rusty/product/runtime/diagnostics/read
+```
+
+`abyss.product`, `abyss.status`, `abyss.where`, `abyss.slots`, `abyss.play`,
+`abyss.pause`, `abyss.load`, `abyss.save`, `abyss.respawn`, `abyss.damage`,
+`abyss.rune <index>` and `abyss.cast <spellId>` answer from the live session;
+the diagnostics route reports product-callback failures the browser would
+otherwise swallow.
+
 ## Current product limitations
 
-The packaged entry constructs `AbyssProduct`, but does not attach a `UuSession`
-or `AbyssSpatialSession`. `Attach` is empty, and `Update` exits while the session
-is absent. `AbyssSceneBootstrap` prepares a collision artifact; it does not create
-rendering. No ordinary launch caller loads the default level bundle and publishes
-a world scene. The imported level artifact also needs runtime bundle admission.
+The first slice imports a level's collision, visible geometry, and spawn. Object,
+critter, and conversation placements are not imported yet, so melee resolves
+against no opponent, and the conversation, barter, loot, and NPC owners are
+composed but unreachable in play. Casting is reachable through the debug lane
+(`abyss.rune`, `abyss.cast`) rather than from collected world runes. Survival
+pressure exists but has little to act on without placed items.
 
-Combat, conversation, casting, and menu helper tests do not supply those missing
-callers. The staged input manifest has no intents/mappings. The DOM debug control
-forwards an undeclared intent, and its metrics text is a placeholder; those need
-real Engine debug/metrics integration. A connected Wolf session therefore must
-not be reported as a playable dungeon. The task evidence record tracks the
-observations and receiving work separately.
+Judge-side pointer input did not reliably reach the product's DOM below roughly
+the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)
+and `m` (renderer metrics). The renderer reports `GPU timer: unavailable` on
+this host, and the metrics readout is the only frame-pacing evidence available
+from the product side.
+
+A connected Wolf session is still not by itself gameplay acceptance: the
+captures and the state reads in
+[the slice evidence](playtest-evidence/8587-8588/README.md) are what establish
+the visible result, and the earlier failed run remains recorded in
+[task 8576's evidence](playtest-evidence/8576/README.md).

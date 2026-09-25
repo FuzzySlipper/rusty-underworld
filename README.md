@@ -17,12 +17,19 @@ remains donor context for formats and divergences; it is not a target.
 The working formula is: **Engine guarantees. Kit shapes. Ruleset decides.
 Bundle assembles. Host launches.**
 
-> **Current state: component implementations and a launchable Engine shell.**
-> Kit, ruleset, Host, importer, and DOM companion projects build and have tests.
-> The ordinary CoreCLR entry and companion can be served for Crew GPU playtests.
-> The entry does not yet compose a dungeon session, load the default level, or
-> publish a world scene. Component tests do not establish a playable slice.
-> See [GPU playtesting](docs/gpu-playtesting.md) for setup and observed limitations.
+> **Current state: a playable, imported first slice of the dungeon.**
+> The ordinary entry resolves the shipped game bundle, creates the compiled
+> ruleset session over an operator-imported level, publishes the visible level
+> and a first-person camera, and routes admitted updates into the combat,
+> casting, survival, menu, and save/load owners. The companion renders the
+> product's one projection and mounts the Engine's own live-debug panel.
+> What is imported so far is the level's collision, visible geometry, and a
+> spawn: objects, critters, and conversations are not placed yet, so melee has
+> no opponent and the conversation and barter owners are composed but
+> unreachable. Start with `scripts/import-level.sh`; the operator step, the Crew
+> profile, and the observed limits are in
+> [GPU playtesting](docs/gpu-playtesting.md), and the captures behind this claim
+> are in [the slice evidence](docs/playtest-evidence/8587-8588/README.md).
 
 ## Ownership
 
@@ -123,7 +130,7 @@ Two documents fix the shape before implementation starts:
 | [`tests/`](tests/README.md) | The planned suites, including the architecture suite that will enforce the ownership laws. |
 | [`content/`](content/README.md) | Loaded content: bundles, authored content packs, and per-level imports produced offline. |
 | [`data/`](data/README.md) | Small checked-in reference tables a person maintains. |
-| `scripts/` | Engine pair installation and pin movement, and `verify.sh`. |
+| `scripts/` | Engine pair installation and pin movement, the operator level import, and `verify.sh`. |
 
 For every task, identify:
 
@@ -166,12 +173,20 @@ Routine verification:
 ./scripts/verify.sh
 ```
 
-Today that verifies the installed pair identity and installs the product UI
-dependencies, then builds the checked-in projects and runs the architecture
-suite. NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
+Today that verifies the installed pair identity, installs the product UI
+dependencies, builds the TypeScript companion and runs its DOM suite, then
+builds every product project and runs each semantic suite plus the architecture
+laws. NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
 first project lands, add it to `product_projects` and its suite to
 `test_projects` in the script — the lists are explicit on purpose, because a
 discovery-based loop silently stops covering a project that moved.
+
+Import a level before launching; the product's default bundle selects it and the
+launch fails with the command to run when it is absent:
+
+```bash
+scripts/import-level.sh          # operator data under local/extracted/uw
+```
 
 Start the Engine host after installing the pair and UI dependencies:
 
