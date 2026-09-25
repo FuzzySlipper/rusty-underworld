@@ -98,8 +98,9 @@ Journey Onward load after the review's lifetime and save-boundary fixes:
   tests, not by these captures.
 - Only collision, visible geometry and a spawn are imported today. There are no
   object, critter or conversation placements, so melee resolves against no
-  opponent (`Your swing meets empty air.`) and the conversation, barter, loot
-  and NPC owners are composed but unreachable in play; Den #8590 carries the
+  opponent (`Your swing meets empty air.`), and the conversation, barter, loot
+  and NPC owners exist but are neither composed into the admitted session nor
+  dispatched to; Den #8590 carries the
   placement import, the admitted Use/interact dispatch, combat against a real
   opponent, and world-reachable casting. Den #8576 carries the repeat acceptance
   run.
