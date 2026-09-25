@@ -27,8 +27,11 @@ Bundle assembles. Host launches.**
 > object placements and the object tables: the placed props become durable
 > entities, the placed critters become actors standing on their own tiles, a
 > swing damages and can drop one (the kill is recorded in the saved level
-> state), and the use channel opens a placed door through that state. Placed
-> things are simulated but not drawn yet, and the talk, barter and loot owners
+> state), and the use channel opens a placed door through that state. Every
+> imported level is admitted on arrival when the avatar travels, with its own
+> collision, geometry and inhabitants, while the level left behind keeps its
+> state. Placed things are simulated but not drawn yet, and the talk, barter and
+> loot owners
 > are still neither composed nor dispatched to because they need imported
 > conversation content and an item catalog. Start with
 > `scripts/import-level.sh`; the operator step, the Crew profile, and the

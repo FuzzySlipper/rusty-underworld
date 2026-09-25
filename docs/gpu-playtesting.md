@@ -86,9 +86,9 @@ curl -s -X POST -H 'content-type: application/json' -d '{}' \
 ```
 
 `abyss.product`, `abyss.status`, `abyss.where`, `abyss.actors`, `abyss.goto`,
-`abyss.slots`, `abyss.play`, `abyss.pause`, `abyss.load`, `abyss.save`,
-`abyss.respawn`, `abyss.damage`, `abyss.rune <index>` and `abyss.cast <spellId>`
-answer from the live session; the diagnostics route reports product-callback
+`abyss.travel <level>`, `abyss.slots`, `abyss.play`, `abyss.pause`, `abyss.load`,
+`abyss.save`, `abyss.respawn`, `abyss.damage`, `abyss.rune <index>` and
+`abyss.cast <spellId>` answer from the live session; the diagnostics route reports product-callback
 failures the browser would otherwise swallow.
 
 ## Current product limitations
@@ -103,10 +103,15 @@ until its tile's collision is replaced, and talk and barter need imported
 conversation content (#8592, #8614); loot needs an item catalog and casting is
 reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather than from a
 collected world rune (#8615); a travelled-to level admits no actors yet (#8616).
-`abyss.goto` and `abyss.actors` are operator probes for placing the avatar on a
-tile and reading nearby actors; they are not a gameplay path, and the probe
-refuses a tile the level does not admit as open, because a capsule inside solid
-geometry makes the Engine refuse the next step and taints the runtime.
+`abyss.goto`, `abyss.actors` and `abyss.travel` are operator probes for placing
+the avatar on a tile, reading nearby actors, and entering another imported level;
+they are not a gameplay path. The tile probe refuses a tile the level does not
+admit as open, because a capsule inside solid geometry makes the Engine refuse the
+next step and taints the runtime, and `abyss.travel` moves without a clock cost
+because the gameplay caller that owns a transition decides what it costs (#8620).
+Importing a level admits it in the shipped bundle: `scripts/import-level.sh <level>`
+writes the level, its placements and the object tables, and adds the pack, so a
+second imported level is reachable by travel without editing the bundle by hand.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly
 the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)
