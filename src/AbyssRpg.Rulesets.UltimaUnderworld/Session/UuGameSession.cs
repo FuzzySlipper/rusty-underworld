@@ -578,8 +578,24 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_placements is null) throw new InvalidOperationException("This session admits no placements.");
         AdmittedTile? tile = _placements.Tile(tileX, tileY)
             ?? throw new ArgumentOutOfRangeException(nameof(tileX), $"Tile ({tileX},{tileY}) is outside the level.");
-        _player.Restore(
-            _placements.TileCenter(tile.X, tile.Y, tile.FloorHeight), DetachedMotion(tile.FloorHeight));
+        // The Engine's controller stands on the floor by its own half-height,
+        // so a placed avatar is the tile center raised to the capsule's
+        // standing center; a capsule placed at floor level is inside geometry
+        // and the next step proposal is refused.
+        WorldPoint center = _placements.TileCenter(tile.X, tile.Y, tile.FloorHeight);
+        var standing = new WorldPoint(center.X, center.Y + _movement.StandingCenterOffset, center.Z);
+        _player.Restore(standing, DetachedMotion(standing.Y));
+    }
+
+    /// <summary>The nearest placed actors to the avatar, with their distance.</summary>
+    public IReadOnlyList<(ActorState Actor, float Distance)> NearestActors(int take)
+    {
+        WorldPoint origin = _player.Position ?? _level.Spawn.Position;
+        return _session.Actors.All
+            .Select(actor => (Actor: actor, Distance: actor.Position.HorizontalDistanceTo(origin)))
+            .OrderBy(entry => entry.Distance)
+            .Take(take)
+            .ToArray();
     }
 
     /// <summary>The door tiles this session's level state has opened.</summary>

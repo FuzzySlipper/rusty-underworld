@@ -41,6 +41,17 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
             : "position unavailable";
     }
 
+    [DebugCommand("abyss.actors", Description = "The nearest placed actors with their distance from the avatar.")]
+    public string Actors()
+    {
+        if (Live is not { } session) return "no live session";
+        var nearest = session.NearestActors(5);
+        return nearest.Count == 0
+            ? "no actors"
+            : string.Join("; ", nearest.Select(entry =>
+                $"x={entry.Actor.Position.X:F1} z={entry.Actor.Position.Z:F1} d={entry.Distance:F2}"));
+    }
+
     [DebugCommand("abyss.goto", Description = "Operator probe: stand the avatar on a level tile.")]
     public string Goto(int tileX, int tileY)
     {
