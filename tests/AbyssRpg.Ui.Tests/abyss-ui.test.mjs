@@ -15,9 +15,10 @@ function context() {
   const claimed = [];
   const ui = {
     focused: 0,
+    modes: [],
     focusGameplay() { this.focused += 1; },
-    interactionMode: () => 'gameplay',
-    setInteractionMode: () => {},
+    interactionMode: () => ui.modes.at(-1) ?? 'interface',
+    setInteractionMode(mode) { ui.modes.push(mode); },
     active: () => true,
     allowsGameplayInput: () => true,
   };
@@ -157,6 +158,23 @@ test('menu visibility and availability follow the projection, not local state', 
   // A projection that hides the menu hides it again: nothing is DOM-local.
   ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
   assert.equal(menu.hidden, true);
+
+  // The Engine shell owns cursor capture, so the mode follows the projection
+  // and repeats are not re-issued.
+  assert.deepEqual(ctx.ui.modes, ['interface', 'gameplay']);
+  ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
+  assert.deepEqual(ctx.ui.modes, ['interface', 'gameplay']);
+
+  // Resume and respawn ask for gameplay focus again.
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({ mode: 'paused', menu: { ...baseMenu(), visible: true, canResume: true } }),
+  }));
+  ctx.ui.focused = 0;
+  const resume = [...menu.querySelectorAll('button')].find((b) => b.textContent.startsWith('Resume'));
+  resume.dispatchEvent(new (document.defaultView.MouseEvent)('click', { bubbles: true }));
+  assert.deepEqual(ctx.ui.modes, ['interface', 'gameplay', 'interface', 'gameplay']);
+  assert.equal(ctx.ui.focused, 1);
 });
 
 test('every control claims a declared intent', (t) => {
@@ -181,8 +199,10 @@ test('every control claims a declared intent', (t) => {
     assert.ok(declared.has(claim.intent), `${claim.intent} is not a declared intent`);
     assert.deepEqual(claim.value, { kind: 'digital', active: true });
   }
-  // Resume, start and respawn re-capture gameplay focus; the plain menu actions do not.
-  assert.equal(ctx.ui.focused, 3);
+  // The projection into gameplay captures once, and resume, start and respawn
+  // re-capture even though the mode already reads gameplay.
+  assert.equal(ctx.ui.focused, 4);
+  assert.equal(ctx.ui.modes.at(-1), 'gameplay');
 });
 
 test('the Engine live-debug panel and metrics widget are mounted and disposed', async (t) => {

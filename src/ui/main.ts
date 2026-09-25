@@ -291,20 +291,32 @@ export function mountProductUi(
     context.intents?.claim(intent, { kind: 'digital', active: true });
   };
 
-  resumeButton.addEventListener('click', () => {
-    claim(INTENTS.resume);
+  // The Engine's shell owns cursor capture: while it stays in gameplay mode a
+  // pointer-locked click belongs to the canvas, so an open menu could never be
+  // clicked. The projection decides the mode, and a redundant switch is skipped.
+  let appliedMode: string | null = null;
+  const applyInteractionMode = (mode: 'gameplay' | 'interface'): void => {
+    if (appliedMode === mode) return;
+    appliedMode = mode;
+    context.ui?.setInteractionMode(mode);
+    if (mode === 'gameplay') context.ui?.focusGameplay();
+  };
+
+  // Entering play always asks for gameplay mode and pointer capture: the menu
+  // was interactive, and the shell must hand the pointer back even if the last
+  // projection already said gameplay.
+  const enterPlay = (intent: string): void => {
+    claim(intent);
+    appliedMode = 'gameplay';
+    context.ui?.setInteractionMode('gameplay');
     context.ui?.focusGameplay();
-  });
-  startButton.addEventListener('click', () => {
-    claim(INTENTS.start);
-    context.ui?.focusGameplay();
-  });
+  };
+
+  resumeButton.addEventListener('click', () => enterPlay(INTENTS.resume));
+  startButton.addEventListener('click', () => enterPlay(INTENTS.start));
   saveButton.addEventListener('click', () => claim(INTENTS.quicksave));
   loadButton.addEventListener('click', () => claim(INTENTS.journeyOnward));
-  respawnButton.addEventListener('click', () => {
-    claim(INTENTS.respawn);
-    context.ui?.focusGameplay();
-  });
+  respawnButton.addEventListener('click', () => enterPlay(INTENTS.respawn));
   stopButton.addEventListener('click', () => claim(INTENTS.stop));
 
   debugToggle.addEventListener('click', () => {
@@ -371,6 +383,7 @@ export function mountProductUi(
     hpBar.fill.style.width = percent(view.hp, view.maxHp);
     manaBar.fill.style.width = percent(view.mana, view.maxMana);
     chargeBar.fill.style.width = `${100 * Math.max(0, Math.min(1, view.charge))}%`;
+    applyInteractionMode(view.menu.visible ? 'interface' : 'gameplay');
     const vitals = `${Math.round(view.hp)}/${Math.round(view.maxHp)} hp · ${Math.round(view.mana)}/${Math.round(view.maxMana)} mana`;
     status.textContent = view.outcome === ''
       ? `${view.ready ? vitals : 'No live session'} · level ${view.level}`
