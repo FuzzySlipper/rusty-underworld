@@ -1,12 +1,14 @@
 /**
- * The Abyss product's DOM companion: HUD, menus, debug console, and
- * renderer-metrics toggle over Engine-delivered projections.
+ * The Abyss product's DOM companion: vitals and charge from the product's one
+ * projection, the product-owned pause menu, and the Engine's own live-debug
+ * panel and renderer-metrics widget.
  *
- * It owns no state, evaluates no rules, and starts no loop or timer. Every
- * value it shows arrived in the last projection from the product, and every
- * action it sends is an intent the product defines. Patterns follow the
- * sibling `src/ui` companions (crawler/rifles); nothing is copied from game
- * donors.
+ * It owns no state, evaluates no rules, and starts no loop or timer. Values are
+ * rendered only from the last admitted projection, and every control sends one
+ * of the product's declared intents — the same names the staged manifest
+ * declares, so a control cannot send something nothing handles. The debug
+ * console is the Engine panel over the Engine's live-debug route: this file
+ * forwards no commands of its own and keeps no transcript.
  */
 
 interface ProjectionEnvelope {
@@ -21,25 +23,76 @@ interface ProductUiContext {
   readonly intents?: {
     claim(
       intent: string,
-      value: { kind: 'product-payload'; contract: string; data: Record<string, unknown> },
+      value: { kind: 'digital'; active: boolean },
     ): void;
+  };
+  readonly ui?: {
+    readonly active: () => boolean;
+    readonly allowsGameplayInput: (event: Event) => boolean;
+    readonly focusGameplay: () => void;
+    readonly interactionMode: () => string;
+    readonly setInteractionMode: (mode: string) => void;
   };
 }
 
-const HUD_CONTRACT = 'abyss.ui.snapshot.v1';
-const MAP_CONTRACT = 'abyss.ui.map.v1';
-const LIFECYCLE_INTENT_CONTRACT = 'abyss.lifecycle.v1';
-const DEBUG_INTENT = 'abyss.debug';
-const DEBUG_CONTRACT = 'abyss.ui.action.v1';
+/**
+ * The Engine browser shell publishes the live-debug panel at this stable
+ * specifier through its import map. The packaged typings live in the installed
+ * runtime pack, which a checkout without that pack cannot type-check against,
+ * so the two members this companion uses are declared here.
+ */
+type LiveDebugModule = typeof import('@rusty-engine/live-debug');
+type LiveDebugMount = import('@rusty-engine/live-debug').LiveDebugMount;
 
-interface HudView {
+export interface ProductUiDependencies {
+  /** Overridden in DOM tests, which cannot run the Engine panel bundle. */
+  readonly loadLiveDebug?: () => Promise<LiveDebugModule>;
+}
+
+const HUD_CONTRACT = 'abyss.ui.snapshot.v1';
+
+/** Declared direct intents; AbyssProductEntry and the csproj declare the same names. */
+const INTENTS = {
+  start: 'abyss.lifecycle.start',
+  pause: 'abyss.lifecycle.pause',
+  resume: 'abyss.lifecycle.resume',
+  stop: 'abyss.lifecycle.stop',
+  quicksave: 'abyss.action.quicksave',
+  journeyOnward: 'abyss.action.journey-onward',
+  respawn: 'abyss.action.respawn',
+} as const;
+
+interface SlotView {
+  readonly key: string;
+  readonly label: string;
+  readonly savedAtUtc: string;
+}
+
+interface MenuView {
+  readonly visible: boolean;
+  readonly mode: string;
+  readonly canStart: boolean;
+  readonly canResume: boolean;
+  readonly canSave: boolean;
+  readonly canLoad: boolean;
+  readonly canRespawn: boolean;
+  readonly journeyOnward: string;
+  readonly slots: readonly SlotView[];
+}
+
+interface SnapshotView {
+  readonly ready: boolean;
+  readonly mode: string;
   readonly hp: number;
   readonly maxHp: number;
   readonly mana: number;
   readonly maxMana: number;
   readonly charge: number;
-  readonly yaw: number;
   readonly outcome: string;
+  readonly level: number;
+  readonly avatar: string;
+  readonly defeated: boolean;
+  readonly menu: MenuView;
 }
 
 const STYLES = `
@@ -53,13 +106,17 @@ const STYLES = `
   background: rgba(18, 16, 14, 0.82);
   color: #e8e0cc;
   font: 13px/1.45 system-ui, sans-serif;
+  min-width: 14rem;
 }
 .abyss-hud .bar { width: 12rem; height: 0.55rem; background: #2c2822; border-radius: 0.2rem; }
-.abyss-hud .bar > div { height: 100%; border-radius: 0.2rem; }
-.abyss-hud .hp > div { background: #b04434; }
-.abyss-hud .mana > div { background: #3f6fb5; }
-.abyss-hud .charge > div { background: #c9a13b; }
-.abyss-menu, .abyss-debug {
+.abyss-hud .bar .track { height: 100%; }
+.abyss-hud .bar .fill { height: 100%; width: 0; border-radius: 0.2rem; }
+.abyss-hud .hp .fill { background: #b04434; }
+.abyss-hud .mana .fill { background: #3f6fb5; }
+.abyss-hud .charge .fill { background: #c9a13b; }
+.abyss-hud .label { display: block; opacity: 0.75; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+.abyss-hud[data-ready="false"] .bar { opacity: 0.35; }
+.abyss-menu, .abyss-debug, .abyss-metrics {
   position: fixed;
   border: 1px solid rgba(210, 196, 158, 0.35);
   border-radius: 0.35rem;
@@ -67,174 +124,286 @@ const STYLES = `
   color: #e8e0cc;
   font: 13px/1.45 system-ui, sans-serif;
 }
-.abyss-menu { top: 0.75rem; right: 0.75rem; padding: 0.6rem 0.75rem; min-width: 12rem; }
+.abyss-menu { top: 0.75rem; right: 0.75rem; padding: 0.6rem 0.75rem; min-width: 13rem; }
+.abyss-menu[hidden] { display: none; }
 .abyss-menu button { display: block; width: 100%; margin: 0.2rem 0; }
-.abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; min-width: 18rem; }
-.abyss-debug output { display: block; white-space: pre-wrap; max-height: 12rem; overflow: auto; }
+.abyss-menu .slots { margin: 0.4rem 0 0; padding: 0; list-style: none; opacity: 0.8; font-size: 12px; }
+.abyss-debug { left: 0.75rem; top: 0.75rem; padding: 0.5rem 0.75rem; max-width: 24rem; }
+.abyss-debug[hidden] { display: none; }
+.abyss-metrics { left: 0.75rem; top: 3.5rem; padding: 0.4rem 0.6rem; }
+.abyss-metrics[hidden] { display: none; }
 `;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function readHud(value: unknown): HudView | null {
+function readSlots(value: unknown): SlotView[] {
+  if (!Array.isArray(value)) return [];
+  const slots: SlotView[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const { key, label, savedAtUtc } = entry;
+    if (typeof key !== 'string' || typeof label !== 'string' || typeof savedAtUtc !== 'string') continue;
+    slots.push({ key, label, savedAtUtc });
+  }
+  return slots;
+}
+
+function readMenu(value: unknown): MenuView | null {
   if (!isRecord(value)) return null;
-  const { hp, maxHp, mana, maxMana, charge, yawRadians, outcome } = value;
+  const {
+    visible, mode, canStart, canResume, canSave, canLoad, canRespawn, journeyOnward, slots,
+  } = value;
   if (
-    typeof hp !== 'number' || typeof maxHp !== 'number' ||
-    typeof mana !== 'number' || typeof maxMana !== 'number' ||
-    typeof charge !== 'number' || typeof yawRadians !== 'number' ||
-    typeof outcome !== 'string'
+    typeof visible !== 'boolean' || typeof mode !== 'string' ||
+    typeof canStart !== 'boolean' || typeof canResume !== 'boolean' ||
+    typeof canSave !== 'boolean' || typeof canLoad !== 'boolean' ||
+    typeof canRespawn !== 'boolean' || typeof journeyOnward !== 'string'
   ) {
     return null;
   }
-  return { hp, maxHp, mana, maxMana, charge, yaw: yawRadians, outcome };
+  return {
+    visible, mode, canStart, canResume, canSave, canLoad, canRespawn, journeyOnward,
+    slots: readSlots(slots),
+  };
 }
 
-function bar(className: string): { root: HTMLElement; fill: HTMLElement } {
+/** Rejects a snapshot that is not the declared contract in full. */
+function readSnapshot(value: unknown): SnapshotView | null {
+  if (!isRecord(value)) return null;
+  const {
+    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu,
+  } = value;
+  if (
+    typeof ready !== 'boolean' || typeof mode !== 'string' ||
+    typeof hp !== 'number' || typeof maxHp !== 'number' ||
+    typeof mana !== 'number' || typeof maxMana !== 'number' ||
+    typeof charge !== 'number' || typeof outcome !== 'string' ||
+    typeof level !== 'number' || typeof avatar !== 'string' ||
+    typeof defeated !== 'boolean'
+  ) {
+    return null;
+  }
+  const view = readMenu(menu);
+  if (view === null) return null;
+  return { ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu: view };
+}
+
+function bar(className: string, label: string): { root: HTMLElement; fill: HTMLElement } {
   const root = document.createElement('div');
   root.className = `bar ${className}`;
+  const caption = document.createElement('span');
+  caption.className = 'label';
+  caption.textContent = label;
+  const track = document.createElement('div');
+  track.className = 'track';
   const fill = document.createElement('div');
-  root.append(fill);
+  fill.className = 'fill';
+  track.append(fill);
+  root.append(caption, track);
   return { root, fill };
 }
 
+async function loadEngineLiveDebug(): Promise<LiveDebugModule> {
+  return import('@rusty-engine/live-debug');
+}
+
 /**
- * Mounts the companion into `root` and returns a disposer. The Esc menu
- * releases pointer lock (unlocking the mouse) and offers pause/resume;
- * metrics and console ride in the debug panel.
+ * Mounts the companion into `root` and returns a disposer. The Engine panel is
+ * mounted asynchronously; the disposer waits for it so a fast unmount cannot
+ * leak a panel.
  */
-export function mountProductUi(root: HTMLElement, context: ProductUiContext): { dispose(): void } {
+export function mountProductUi(
+  root: HTMLElement,
+  context: ProductUiContext,
+  dependencies: ProductUiDependencies = {},
+): { dispose(): void } {
   const style = document.createElement('style');
   style.textContent = STYLES;
 
   const hud = document.createElement('section');
   hud.className = 'abyss-hud';
-  const hpBar = bar('hp');
-  const manaBar = bar('mana');
-  const chargeBar = bar('charge');
+  hud.dataset['ready'] = 'false';
+  const hpBar = bar('hp', 'health');
+  const manaBar = bar('mana', 'mana');
+  const chargeBar = bar('charge', 'charge');
   const status = document.createElement('p');
+  status.className = 'status';
+  // Before the first projection there is nothing to show. Say so instead of
+  // rendering full bars, which is what an unset width looks like.
+  status.textContent = 'Waiting for the first session snapshot…';
   hud.append(hpBar.root, manaBar.root, chargeBar.root, status);
 
   const menu = document.createElement('nav');
   menu.className = 'abyss-menu';
   menu.hidden = true;
-  const resumeButton = document.createElement('button');
-  resumeButton.type = 'button';
-  resumeButton.textContent = 'Resume (lock mouse)';
-  const pauseButton = document.createElement('button');
-  pauseButton.type = 'button';
-  pauseButton.textContent = 'Pause';
-  menu.append(resumeButton, pauseButton);
+  menu.setAttribute('data-rusty-ui-interactive', '');
+  const menuTitle = document.createElement('p');
+  menuTitle.className = 'title';
+  const resumeButton = button('Resume');
+  const startButton = button('Start a new session');
+  const saveButton = button('Save (quicksave)');
+  const loadButton = button('Journey Onward');
+  const respawnButton = button('Respawn at the anchor');
+  const stopButton = button('Quit to menu');
+  const slotList = document.createElement('ul');
+  slotList.className = 'slots';
+  menu.append(menuTitle, resumeButton, startButton, saveButton, loadButton, respawnButton, stopButton, slotList);
 
   const debug = document.createElement('aside');
   debug.className = 'abyss-debug';
-  const metricsButton = document.createElement('button');
-  metricsButton.type = 'button';
-  metricsButton.textContent = 'Renderer metrics';
-  metricsButton.setAttribute('aria-pressed', 'false');
-  const metricsOut = document.createElement('output');
-  metricsOut.hidden = true;
-  metricsOut.textContent = 'Renderer metrics arrive in Engine projections; none published yet.';
-  const consoleInput = document.createElement('input');
-  consoleInput.type = 'text';
-  consoleInput.placeholder = 'debug console: help';
-  consoleInput.setAttribute('aria-label', 'Debug console');
-  const consoleOut = document.createElement('output');
-  const isolate = (event: Event): void => event.stopPropagation();
-  for (const name of ['pointerdown', 'keydown', 'keyup', 'click', 'wheel']) {
-    debug.addEventListener(name, isolate);
-  }
-  debug.append(metricsButton, metricsOut, consoleInput, consoleOut);
+  debug.hidden = true;
+  debug.setAttribute('data-rusty-ui-interactive', '');
+  const debugTitle = document.createElement('p');
+  debugTitle.className = 'title';
+  debugTitle.textContent = 'Engine live debug';
+  const debugHost = document.createElement('div');
+  debugHost.className = 'panel';
+  debug.append(debugTitle, debugHost);
 
-  root.append(style, hud, menu, debug);
+  const metrics = document.createElement('section');
+  metrics.className = 'abyss-metrics';
+  metrics.hidden = true;
+  metrics.setAttribute('data-rusty-ui-interactive', '');
+  const metricsHost = document.createElement('div');
+  metricsHost.className = 'panel';
+  metrics.append(metricsHost);
 
-  // Lifecycle intent names match AbyssProductEntry.LifecycleIntents exactly;
-  // the debug intent is proposed (no product consumer yet; the app host owns it).
-  const claimLifecycle = (name: 'pause' | 'resume'): void => {
-    context.intents?.claim(`abyss.lifecycle.${name}`, {
-      kind: 'product-payload',
-      contract: LIFECYCLE_INTENT_CONTRACT,
-      data: {},
-    });
+  const controls = document.createElement('section');
+  controls.className = 'abyss-controls';
+  controls.setAttribute('data-rusty-ui-interactive', '');
+  controls.style.position = 'fixed';
+  controls.style.right = '0.75rem';
+  controls.style.bottom = '0.75rem';
+  controls.style.display = 'flex';
+  controls.style.gap = '0.4rem';
+  const debugToggle = button('Debug console');
+  const metricsToggle = button('Renderer metrics');
+  debugToggle.setAttribute('aria-pressed', 'false');
+  metricsToggle.setAttribute('aria-pressed', 'false');
+  controls.append(debugToggle, metricsToggle);
+
+  root.append(style, hud, menu, debug, metrics, controls);
+
+  const claim = (intent: string): void => {
+    context.intents?.claim(intent, { kind: 'digital', active: true });
   };
 
   resumeButton.addEventListener('click', () => {
-    root.requestPointerLock?.();
-    claimLifecycle('resume');
-    menu.hidden = true;
+    claim(INTENTS.resume);
+    context.ui?.focusGameplay();
   });
-  pauseButton.addEventListener('click', () => {
-    claimLifecycle('pause');
+  startButton.addEventListener('click', () => {
+    claim(INTENTS.start);
+    context.ui?.focusGameplay();
   });
-  metricsButton.addEventListener('click', () => {
-    const pressed = metricsButton.getAttribute('aria-pressed') === 'true';
-    metricsButton.setAttribute('aria-pressed', String(!pressed));
-    metricsOut.hidden = pressed;
+  saveButton.addEventListener('click', () => claim(INTENTS.quicksave));
+  loadButton.addEventListener('click', () => claim(INTENTS.journeyOnward));
+  respawnButton.addEventListener('click', () => {
+    claim(INTENTS.respawn);
+    context.ui?.focusGameplay();
   });
-  consoleInput.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
-    const line = consoleInput.value.trim();
-    consoleInput.value = '';
-    if (line === '') return;
-    if (line === 'help') {
-      consoleOut.textContent = 'help | clear | metrics | <command forwarded as abyss.debug intent>';
-      return;
-    }
-    if (line === 'clear') {
-      consoleOut.textContent = '';
-      return;
-    }
-    if (line === 'metrics') {
-      metricsOut.hidden = false;
-      metricsButton.setAttribute('aria-pressed', 'true');
-      return;
-    }
-    context.intents?.claim(DEBUG_INTENT, {
-      kind: 'product-payload',
-      contract: DEBUG_CONTRACT,
-      data: { command: line },
-    });
-    consoleOut.textContent += `> ${line}\n`;
-  });
-  const onKey = (event: KeyboardEvent): void => {
-    if (event.key !== 'Escape') return;
-    menu.hidden = !menu.hidden;
-    // In real pointer lock the browser consumes Esc before it reaches us;
-    // cover the unlocked case by explicitly releasing on open.
-    if (!menu.hidden) document.exitPointerLock?.();
-  };
-  document.addEventListener('keydown', onKey);
+  stopButton.addEventListener('click', () => claim(INTENTS.stop));
 
-  const renderHud = (view: HudView): void => {
-    hpBar.fill.style.width = `${(100 * view.hp) / Math.max(1, view.maxHp)}%`;
-    manaBar.fill.style.width = `${(100 * view.mana) / Math.max(1, view.maxMana)}%`;
-    chargeBar.fill.style.width = `${100 * Math.min(1, Math.max(0, view.charge))}%`;
-    status.textContent =
-      view.outcome === '' ? `${view.hp}/${view.maxHp} hp · ${view.mana}/${view.maxMana} mana` : view.outcome;
+  debugToggle.addEventListener('click', () => {
+    debug.hidden = !debug.hidden;
+    debugToggle.setAttribute('aria-pressed', String(!debug.hidden));
+  });
+  metricsToggle.addEventListener('click', () => {
+    metrics.hidden = !metrics.hidden;
+    metricsToggle.setAttribute('aria-pressed', String(!metrics.hidden));
+  });
+
+  // A lost pointer lock is a real interaction change: the product decides what
+  // it means (it pauses and publishes the menu) and the shell re-locks only
+  // when gameplay input is requested again.
+  const onPointerLockChange = (): void => {
+    const locked = typeof document !== 'undefined' && document.pointerLockElement !== null;
+    root.dataset['pointerLocked'] = String(locked);
+  };
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerlockchange', onPointerLockChange);
+    onPointerLockChange();
+  }
+
+  let panelMount: LiveDebugMount | null = null;
+  let metricsMount: LiveDebugMount | null = null;
+  let disposed = false;
+  const loadLiveDebug = dependencies.loadLiveDebug ?? loadEngineLiveDebug;
+  void (async () => {
+    try {
+      const module = await loadLiveDebug();
+      if (disposed) return;
+      const panel = await module.mountLiveDebugPanel(debugHost, { enabled: true, presentation: 'inline' });
+      if (disposed) {
+        panel.dispose();
+        return;
+      }
+      panelMount = panel;
+      metricsMount = module.mountRendererMetricsWidget(metricsHost, { initiallyVisible: false });
+    } catch {
+      debugTitle.textContent = 'Engine live debug unavailable';
+    }
+  })();
+
+  const renderMenu = (view: MenuView, defeated: boolean): void => {
+    menu.hidden = !view.visible;
+    menuTitle.textContent = defeated ? 'You have fallen' : `Session ${view.mode}`;
+    resumeButton.disabled = !view.canResume;
+    startButton.disabled = !view.canStart;
+    saveButton.disabled = !view.canSave;
+    loadButton.disabled = !view.canLoad;
+    loadButton.textContent = view.journeyOnward === '' ? 'Journey Onward' : `Journey Onward (${view.journeyOnward})`;
+    respawnButton.disabled = !view.canRespawn;
+    slotList.replaceChildren(...view.slots.map((slot) => {
+      const item = document.createElement('li');
+      item.textContent = `${slot.label} — ${slot.savedAtUtc}`;
+      return item;
+    }));
+  };
+
+  const renderSnapshot = (view: SnapshotView): void => {
+    hud.dataset['ready'] = String(view.ready);
+    const percent = (value: number, maximum: number): string =>
+      `${maximum > 0 ? (100 * Math.max(0, Math.min(value, maximum))) / maximum : 0}%`;
+    hpBar.fill.style.width = percent(view.hp, view.maxHp);
+    manaBar.fill.style.width = percent(view.mana, view.maxMana);
+    chargeBar.fill.style.width = `${100 * Math.max(0, Math.min(1, view.charge))}%`;
+    const vitals = `${Math.round(view.hp)}/${Math.round(view.maxHp)} hp · ${Math.round(view.mana)}/${Math.round(view.maxMana)} mana`;
+    status.textContent = view.outcome === ''
+      ? `${view.ready ? vitals : 'No live session'} · level ${view.level}`
+      : view.outcome;
+    renderMenu(view.menu, view.defeated);
   };
 
   const unsubscribe = context.projection?.subscribe((projection) => {
-    if (projection?.contract === HUD_CONTRACT) {
-      const view = readHud(projection.value);
-      if (view !== null) renderHud(view);
-    }
-    // Map-contract menu surfaces render as status text until dedicated
-    // panels land; the shell never refuses the HUD over them.
-    if (projection?.contract === MAP_CONTRACT && isRecord(projection.value)) {
-      const journey = projection.value['journey'];
-      if (typeof journey === 'string' && journey !== '') status.textContent = `Journey: ${journey}`;
-    }
+    if (projection?.contract !== HUD_CONTRACT) return;
+    const view = readSnapshot(projection.value);
+    if (view === null) return;
+    renderSnapshot(view);
   });
 
   return {
     dispose(): void {
+      disposed = true;
       unsubscribe?.();
-      document.removeEventListener('keydown', onKey);
+      if (typeof document !== 'undefined') document.removeEventListener('pointerlockchange', onPointerLockChange);
+      panelMount?.dispose();
+      metricsMount?.dispose();
       style.remove();
       hud.remove();
       menu.remove();
       debug.remove();
+      metrics.remove();
+      controls.remove();
     },
   };
+}
+
+function button(label: string): HTMLButtonElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.textContent = label;
+  return element;
 }

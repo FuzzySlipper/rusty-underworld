@@ -10,5 +10,5 @@
     "outDir": "./generated",
     "rootDir": "."
   },
-  "include": ["main.ts"]
+  "include": ["main.ts", "live-debug.d.ts"]
 }
