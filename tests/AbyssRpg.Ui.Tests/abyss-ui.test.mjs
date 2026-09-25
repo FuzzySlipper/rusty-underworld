@@ -237,6 +237,32 @@ test('the Engine live-debug panel and metrics widget are mounted and disposed', 
   assert.equal(debug.metricsMounts[0].disposed, 1);
 });
 
+test('the menu keys open the Engine console and hide the metrics widget', async (t) => {
+  const debug = liveDebug();
+  const { ctx, document } = mount(t, context(), { loadLiveDebug: async () => debug.module });
+  await new Promise((resolve) => setImmediate(resolve));
+  const key = (k) => document.defaultView.document.dispatchEvent(
+    new (document.defaultView.KeyboardEvent)('keydown', { key: k, bubbles: true }),
+  );
+
+  // Closed menu: the keys are gameplay keys, not tool keys.
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, true);
+
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({ mode: 'paused', menu: { ...baseMenu(), visible: true, canResume: true } }),
+  }));
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, false);
+  key('c');
+  assert.equal(document.querySelector('.abyss-debug').hidden, true);
+
+  assert.equal(document.querySelector('.abyss-metrics').hidden, false);
+  key('m');
+  assert.equal(document.querySelector('.abyss-metrics').hidden, true);
+});
+
 test('interactive surfaces are marked for the Engine input lane', (t) => {
   const { document } = mount(t);
   for (const selector of ['.abyss-menu', '.abyss-debug', '.abyss-metrics']) {

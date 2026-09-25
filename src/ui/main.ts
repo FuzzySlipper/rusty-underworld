@@ -267,6 +267,7 @@ export function mountProductUi(
   debug.append(debugTitle, debugHost);
 
   let metricsVisible = true;
+  let menuVisible = false;
 
   const metrics = document.createElement('section');
   metrics.className = 'abyss-metrics';
@@ -279,8 +280,15 @@ export function mountProductUi(
   // The Engine console and the renderer metrics readout are menu-time tools:
   // while the product is playing the Engine keeps the pointer captured, so a
   // control outside the menu could not be clicked.
-  const debugToggle = button('Engine console');
-  const metricsToggle = button('Renderer metrics');
+  const toggleDebug = (): void => {
+    debug.hidden = !debug.hidden;
+    debugToggle.setAttribute('aria-pressed', String(!debug.hidden));
+  };
+
+  // While the product plays, the Engine keeps the pointer captured and a click
+  // belongs to the canvas, so the menu also offers single-key access.
+  const debugToggle = button('Engine console (c)');
+  const metricsToggle = button('Renderer metrics (m)');
   debugToggle.setAttribute('aria-pressed', 'false');
   metricsToggle.setAttribute('aria-pressed', String(metricsVisible));
   menu.append(debugToggle, metricsToggle);
@@ -319,14 +327,28 @@ export function mountProductUi(
   respawnButton.addEventListener('click', () => enterPlay(INTENTS.respawn));
   stopButton.addEventListener('click', () => claim(INTENTS.stop));
 
-  debugToggle.addEventListener('click', () => {
-    debug.hidden = !debug.hidden;
-    debugToggle.setAttribute('aria-pressed', String(!debug.hidden));
-  });
+  debugToggle.addEventListener('click', toggleDebug);
   metricsToggle.addEventListener('click', () => {
     metrics.hidden = metricsVisible;
     setMetricsVisible(!metricsVisible);
   });
+
+  const onMenuKey = (event: KeyboardEvent): void => {
+    if (!menuVisible || event.ctrlKey || event.altKey || event.metaKey) return;
+    const target = event.target as { closest?: (selector: string) => Element | null } | null;
+    if (typeof target?.closest === 'function'
+      && target.closest('input, textarea, [contenteditable="true"]') !== null) {
+      return;
+    }
+    if (event.key === 'c' || event.key === 'C') {
+      toggleDebug();
+      event.preventDefault();
+    } else if (event.key === 'm' || event.key === 'M') {
+      metrics.hidden = metricsVisible;
+      setMetricsVisible(!metricsVisible);
+      event.preventDefault();
+    }
+  };
 
   // A lost pointer lock is a real interaction change: the product decides what
   // it means (it pauses and publishes the menu) and the shell re-locks only
@@ -337,6 +359,7 @@ export function mountProductUi(
   };
   if (typeof document !== 'undefined') {
     document.addEventListener('pointerlockchange', onPointerLockChange);
+    document.addEventListener('keydown', onMenuKey);
     onPointerLockChange();
   }
 
@@ -383,6 +406,7 @@ export function mountProductUi(
 
   const renderMenu = (view: MenuView, defeated: boolean): void => {
     menu.hidden = !view.visible;
+    menuVisible = view.visible;
     menuTitle.textContent = defeated ? 'You have fallen' : `Session ${view.mode}`;
     resumeButton.disabled = !view.canResume;
     startButton.disabled = !view.canStart;
@@ -423,7 +447,10 @@ export function mountProductUi(
     dispose(): void {
       disposed = true;
       unsubscribe?.();
-      if (typeof document !== 'undefined') document.removeEventListener('pointerlockchange', onPointerLockChange);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('pointerlockchange', onPointerLockChange);
+        document.removeEventListener('keydown', onMenuKey);
+      }
       panelMount?.dispose();
       metricsMount?.dispose();
       style.remove();
