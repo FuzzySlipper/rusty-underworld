@@ -208,12 +208,12 @@ public sealed class HostEntryTests
         SupportPointVelocity: System.Numerics.Vector3.Zero,
         FallOriginY: peakY, PeakY: peakY, LastCommandSequence: 0, CollisionWorldHash: 0);
 
-    private static ProductUpdate SixtyHzUpdate(ulong step) => new(        new ProductUpdateFacts(
+    internal static ProductUpdate SixtyHzUpdate(ulong step) => new(        new ProductUpdateFacts(
             ProductUpdateMode.Realtime, ProductLifecycleState.Running,
             step, step, step, step, 60, 1, 0, 1d / 60d),
         ReadOnlySpan<ProductInputEvent>.Empty);
 
-    private static AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSession TestSession()
+    internal static AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSession TestSession()
     {
         var tables = new AbyssRpg.Rulesets.UltimaUnderworld.Creation.CreationTables(
             [new(20, 16, 12, 12)], [1, 7, 2, 11, 12]);
