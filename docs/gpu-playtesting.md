@@ -85,24 +85,26 @@ curl -s -X POST -H 'content-type: application/json' -d '{}' \
   http://127.0.0.1:4177/__rusty/product/runtime/diagnostics/read
 ```
 
-`abyss.product`, `abyss.status`, `abyss.where`, `abyss.slots`, `abyss.play`,
-`abyss.pause`, `abyss.load`, `abyss.save`, `abyss.respawn`, `abyss.damage`,
-`abyss.rune <index>` and `abyss.cast <spellId>` answer from the live session;
-the diagnostics route reports product-callback failures the browser would
-otherwise swallow.
+`abyss.product`, `abyss.status`, `abyss.where`, `abyss.actors`, `abyss.goto`,
+`abyss.slots`, `abyss.play`, `abyss.pause`, `abyss.load`, `abyss.save`,
+`abyss.respawn`, `abyss.damage`, `abyss.rune <index>` and `abyss.cast <spellId>`
+answer from the live session; the diagnostics route reports product-callback
+failures the browser would otherwise swallow.
 
 ## Current product limitations
 
-The first slice imports a level's collision, visible geometry, and spawn. Object,
-critter, and conversation placements are not imported yet, so melee resolves
-against no opponent, and the conversation, barter, loot and NPC owners exist but
-are neither composed into the admitted session nor dispatched to — nothing
-routes an interaction into them.
+The slice imports a level's collision, visible geometry, spawn, object
+placements and the object tables. Placed props become durable entities and
+placed critters become actors on their own tiles, so melee resolves against a
+real opponent and the use channel opens a placed door through saved level state.
+Two limits remain in that area: placed objects and actors are simulated but not
+drawn, and the conversation, barter and loot owners are neither composed nor
+dispatched to, because talk needs imported conversation content and loot needs an
+item catalog; the door also stays solid until its tile's collision is replaced.
 Casting is reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather
-than from collected world runes. Survival pressure exists but has little to act
-on without placed items. Den #8590 carries all of that as one piece of work:
-placement admission, the admitted Use/interact dispatch, combat against a real
-opponent, and world-reachable casting.
+than from collected world runes. `abyss.goto` and `abyss.actors` are operator
+probes for placing the avatar on a tile and reading nearby actors; they are not a
+gameplay path.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly
 the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)

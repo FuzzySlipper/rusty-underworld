@@ -23,14 +23,18 @@ Bundle assembles. Host launches.**
 > and a first-person camera, and routes admitted updates into the combat,
 > casting, survival, menu, and save/load owners. The companion renders the
 > product's one projection and mounts the Engine's own live-debug panel.
-> What is imported so far is the level's collision, visible geometry, and a
-> spawn: objects, critters, and conversations are not placed yet, so melee has
-> no opponent, and the conversation, barter, loot and NPC owners exist but are
-> neither composed into the admitted session nor dispatched to. Start with
+> What is imported is the level's collision, visible geometry, a spawn, its
+> object placements and the object tables: the placed props become durable
+> entities, the placed critters become actors standing on their own tiles, and
+> the use channel opens a placed door through saved level state. Placed things
+> are simulated but not drawn yet, and the conversation, barter and loot owners
+> are still neither composed nor dispatched to because they need imported
+> conversation content and an item catalog. Start with
 > `scripts/import-level.sh`; the operator step, the Crew profile, and the
-> observed limits are in
-> [GPU playtesting](docs/gpu-playtesting.md), and the captures behind this claim
-> are in [the slice evidence](docs/playtest-evidence/8587-8588/README.md).
+> observed limits are in [GPU playtesting](docs/gpu-playtesting.md), the slice
+> captures in [the composition evidence](docs/playtest-evidence/8587-8588/README.md),
+> and the placement captures in
+> [the placement evidence](docs/playtest-evidence/8590/README.md).
 
 ## Ownership
 
