@@ -57,6 +57,7 @@ public sealed class AbyssProduct : IEngineProduct
         _session?.Dispose();
         _session = session;
         _tickCarry = 0;
+        _lastAutosaveLevel = -1;
     }
 
     /// <summary>Attach (or replace) the spatial session locomotion steps through.</summary>
@@ -162,7 +163,8 @@ public sealed class AbyssProduct : IEngineProduct
     }
 
     /// <summary>
-    /// Autosave when the avatar reaches a level with no save yet. Spell
+    /// Autosave when the avatar reaches a new level (re-entry rewrites).
+    /// Spell
     /// upkeep and NPC/schedule updates ride with P03-P05 hosting, which
     /// owns that runtime state.
     /// </summary>

@@ -32,6 +32,22 @@ public sealed class UpdateWiringTests
         Assert.True(session.Survival.HungerTimer < 60.0); // survival ticked
         Assert.Equal(UuMusicPolicy.Situation.Exploring, product.CurrentMusicSituation);
 
+        // A starving avatar takes defeat damage and the music turns to Death.
+        session.Survival.Hunger = AbyssRpg.Rulesets.UltimaUnderworld.Survival.UuSurvivalState.HungerCap;
+        session.Avatar.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current = 1.0;
+        for (ulong step = 4000; step < 8000; step++)
+            product.Update(HostEntryTests.SixtyHzUpdate(step));
+        Assert.Equal(UuMusicPolicy.Situation.Death, product.CurrentMusicSituation);
+
+        // Replacing the session re-arms the autosave guard.
+        using var fresh = HostEntryTests.TestSession();
+        product.AttachSession(fresh);
+        product.Update(HostEntryTests.SixtyHzUpdate(8000));
+        ProductStateLoad<AbyssSaveEnvelope> reloaded =
+            new AbyssSaveStore(engine, "abyssrpg.saves").Load(AbyssSaveSlots.AutosaveKey(1));
+        Assert.True(reloaded.Present);
+
         // Autosave fired for level 1 with a decodable snapshot.
         ProductStateLoad<AbyssSaveEnvelope> loaded =
             new AbyssSaveStore(engine, "abyssrpg.saves").Load(AbyssSaveSlots.AutosaveKey(1));
