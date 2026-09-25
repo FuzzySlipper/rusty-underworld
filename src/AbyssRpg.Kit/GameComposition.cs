@@ -269,6 +269,55 @@ public sealed class GameSessionContext(IEngineContext engine, ResolvedGameCompos
 public interface IGameRuleset { RulesetId Id { get; } IGameSession CreateSession(GameSessionContext context); }
 public interface IGameSession : IDisposable { void PublishInitial(); ProductUpdateResult Update(ProductUpdate update); }
 
+/// <summary>
+/// Live session facts a product projects without reading rules: vitals, charge,
+/// heading, condition and the ruleset's own outcome line. Ruleset-neutral by
+/// construction so the Host can publish a HUD without naming a ruleset type.
+/// </summary>
+public sealed record SessionStatus(
+    int Level,
+    ulong ClockTicks,
+    string AvatarName,
+    int Hp,
+    int MaxHp,
+    int Mana,
+    int MaxMana,
+    float ChargeFraction,
+    float YawRadians,
+    int WindIndex,
+    string Outcome,
+    bool Defeated,
+    bool Swimming,
+    bool Flying,
+    int PresentActors);
+
+/// <summary>Optional seam for a session whose state a product projects each update.</summary>
+public interface ISessionStatusSource
+{
+    /// <summary>Cheap live facts; a projection must not perform Engine work.</summary>
+    SessionStatus Status { get; }
+}
+
+/// <summary>
+/// Optional seam exposing the session's own live-debug module. The product
+/// registers it with the Engine's generated catalog; the commands stay owned by
+/// the ruleset that knows what they mean.
+/// </summary>
+public interface IDebuggableGameSession : IGameSession
+{
+    Rusty.Engine.Debugging.IDebugCommandModule DebugModule { get; }
+}
+
+/// <summary>
+/// Optional seam for a session that can return its avatar to the level anchor.
+/// The Host owns when that happens (a defeat outcome or a menu action); the
+/// ruleset owns what returning means for its own state.
+/// </summary>
+public interface IRespawnableGameSession : IGameSession
+{
+    void RespawnAtAnchor();
+}
+
 /// <summary>Optional ruleset seam for recognizing its own entry-screen action.</summary>
 public interface IEntryScreenSession
 {

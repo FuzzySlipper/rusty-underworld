@@ -1,104 +1,212 @@
-using AbyssRpg.Rulesets.UltimaUnderworld.Session;
+using AbyssRpg.Kit;
 using Rusty.Engine;
+using Rusty.Engine.Debugging;
+using Rusty.Engine.Persistence;
 
 namespace AbyssRpg.Host;
 
 /// <summary>
-/// The stageable product: Engine update admission over an attached UW
-/// session. Each admitted update while running advances the session clock
-/// (the product game-time inside admitted updates the dungeon needs);
-/// paused updates admit nothing. Locomotion stepping and presentation plug
-/// in with the spatial session; session→bytes save codecs ride with UW-T25.
+/// The stageable product: one Engine-admitted update over the composed session
+/// the built-in ruleset builds. This type resolves the default bundle, creates
+/// the session, routes admitted input and time into it, publishes the one UI
+/// projection the shell is bound to, and owns the Host's save slots and
+/// lifecycle. It interprets no Ultima Underworld rules and names no ruleset
+/// type: everything game-shaped arrives through the Kit seams
+/// (<see cref="IGameRuleset"/>, <see cref="IGameSession"/>,
+/// <see cref="ISessionStatusSource"/>, <see cref="ISaveableGameSession"/>).
 /// </summary>
-public sealed class AbyssProduct : IEngineProduct
+public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, IDebugCommandModule
 {
-    public const double ClockTicksPerSecond = 15300.0 / 60.0;
-
-    private readonly AbyssSaveStore _store;
-    private readonly AbyssProductLifecycle _lifecycle = new();
     private readonly IEngineContext _context;
-    private UuSession? _session;
-    private AbyssSpatialSession? _spatial;
-    private UiStream? _hud;
-    private ulong _hudSequence;
-    private double _tickCarry;
-    private readonly Random _rng = new();
+    private readonly BuiltInSelection _selection;
+    private readonly IGameRuleset _ruleset;
+    private readonly ProductContent _content;
+    private readonly AbyssSaveStore _store;
     private readonly AbyssSaveSlots _slots;
+    private readonly AbyssUiProjection _projection;
+    private readonly AbyssOptions _options = AbyssOptions.Defaults;
+    private readonly ResolvedGameComposition _composition;
+    private IGameSession? _session;
+    private AbyssLifecycleMode _lifecycle = AbyssLifecycleMode.Stopped;
+    private ProductMode _mode = ProductMode.Playing;
     private int _lastAutosaveLevel = -1;
+    private string _hostOutcome = "";
+    private IReadOnlyList<AbyssSlotSummary> _slotCache = [];
+    private bool _slotsDirty = true;
     private bool _shutdown;
     private bool _disposed;
 
-    public BuiltInSelection Selection { get; }
+    public BuiltInSelection Selection => _selection;
 
-    /// <summary>Engine composition entry: default built-in selection.</summary>
+    /// <summary>The resolved bundle, packs and tuning this product launched with.</summary>
+    public ResolvedCompositionIdentity CompositionIdentity => _composition.Identity;
+
+    /// <summary>Engine composition entry: the default built-in selection over admitted content.</summary>
     public AbyssProduct(ProductCreateContext context)
         : this(
             context?.Engine ?? throw new ArgumentNullException(nameof(context)),
+            context.Content,
             BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld))
     {
     }
 
-    public AbyssProduct(IEngineContext context, BuiltInSelection selection)
+    public AbyssProduct(IEngineContext context, ProductContent content, BuiltInSelection selection)
     {
         ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(selection);
-        Selection = selection;
+        _selection = selection;
         _context = context;
+        _content = content;
+        _composition = ResolveComposition(content, selection.Bundle);
+        _ruleset = BuiltInRulesets.CreateRuleset(selection.Ruleset);
         _store = new AbyssSaveStore(context, "abyssrpg.saves");
         _slots = new AbyssSaveSlots(_store);
+        _projection = new AbyssUiProjection(context, AbyssProductEntry.Default);
+        _session = CreateSession(null);
     }
 
-    public AbyssLifecycleMode Mode => _lifecycle.Mode;
-
-    /// <summary>Attach (or replace) the session this product admits updates into.</summary>
-    public void AttachSession(UuSession? session)
+    /// <summary>
+    /// Resolves the default authored bundle over the admitted content. A bundle
+    /// that cannot resolve is a launch failure with its diagnostics attached,
+    /// because playing without content would be a silently empty dungeon.
+    /// </summary>
+    public static ResolvedGameComposition ResolveComposition(ProductContent content, GameBundleId bundle)
     {
-        ThrowIfShutdown();
-        _session?.Dispose();
-        _session = session;
-        _tickCarry = 0;
-        _lastAutosaveLevel = -1;
+        ArgumentNullException.ThrowIfNull(content);
+        GameCompositionResolution resolution = GameCompositionResolver.Resolve(content, bundle);
+        if (resolution.Composition is { } composition && resolution.IsResolved) return composition;
+        string diagnostics = resolution.Diagnostics.Count == 0
+            ? "no diagnostics were reported"
+            : string.Join(" ", resolution.Diagnostics.Select(diagnostic => diagnostic.Message));
+        throw new InvalidOperationException(
+            $"Game bundle '{bundle.Value}' did not resolve over the admitted content: {diagnostics} "
+            + "An imported level pack is operator-produced: run scripts/import-level.sh, then rebuild.");
     }
 
-    /// <summary>Attach (or replace) the spatial session locomotion steps through.</summary>
-    public void AttachSpatialSession(AbyssSpatialSession? spatial)
-    {
-        ThrowIfShutdown();
-        _spatial?.Dispose();
-        _spatial = spatial;
-    }
+    public AbyssLifecycleMode LifecycleMode => _lifecycle;
+
+    public ProductMode Mode => _mode;
+
+    /// <summary>The live ruleset session.</summary>
+    public IGameSession? Session => _session;
 
     public void Start()
     {
         ThrowIfShutdown();
-        _lifecycle.Start();
+        if (_lifecycle != AbyssLifecycleMode.Stopped)
+            throw new InvalidOperationException($"Cannot start from {_lifecycle}.");
+        _lifecycle = AbyssLifecycleMode.Running;
+        _mode = ProductMode.Playing;
+        _session ??= CreateSession(null);
+        ApplyMode();
+        _session.PublishInitial();
+        Publish();
     }
 
     public void Attach()
     {
+        // Renderer attachment reads committed Engine state; the session publishes
+        // its scene and camera when it starts, so there is nothing to attach.
     }
 
     public void Pause()
     {
         ThrowIfShutdown();
-        _lifecycle.Pause();
+        if (_lifecycle != AbyssLifecycleMode.Running)
+            throw new InvalidOperationException($"Cannot pause from {_lifecycle}.");
+        _lifecycle = AbyssLifecycleMode.Paused;
+        _mode = ProductMode.Paused;
+        ApplyMode();
+        Publish();
     }
 
     public void Resume()
     {
         ThrowIfShutdown();
-        _lifecycle.Resume();
+        if (_lifecycle != AbyssLifecycleMode.Paused)
+            throw new InvalidOperationException($"Cannot resume from {_lifecycle}.");
+        _lifecycle = AbyssLifecycleMode.Running;
+        _mode = ProductMode.Playing;
+        ApplyMode();
+        Publish();
+    }
+
+    /// <summary>
+    /// Menu-driven pause: the world holds still while the product keeps admitting
+    /// input and publishing, because a resume has to arrive through the same
+    /// admitted update that this pause came from. The Engine lifecycle stays
+    /// running; only <see cref="Pause"/> stops Engine admission, and then no
+    /// update can resume anything.
+    /// </summary>
+    public void PausePlay()
+    {
+        ThrowIfShutdown();
+        if (_mode == ProductMode.Paused) return;
+        _mode = ProductMode.Paused;
+        ApplyMode();
+        Publish();
+    }
+
+    /// <summary>
+    /// Begins or continues play from the menu: a released session is built again
+    /// from the composition, and a paused one resumes. The Engine lifecycle is
+    /// untouched, because it is already admitting this intent.
+    /// </summary>
+    public void BeginPlay()
+    {
+        ThrowIfShutdown();
+        if (_session is null)
+        {
+            _session = CreateSession(null);
+            _session.PublishInitial();
+        }
+
+        _mode = ProductMode.Playing;
+        ApplyMode();
+        Publish();
+    }
+
+    /// <summary>Menu-driven resume back into the live session.</summary>
+    public void ResumePlay()
+    {
+        ThrowIfShutdown();
+        if (_mode == ProductMode.Playing) return;
+        _mode = ProductMode.Playing;
+        ApplyMode();
+        Publish();
+    }
+
+    /// <summary>
+    /// Quits to the menu: the world is released and a later Start builds a fresh
+    /// session from the composition. This slice has no title screen, so the
+    /// paused menu is the title.
+    /// </summary>
+    public void QuitToMenu()
+    {
+        ThrowIfShutdown();
+        ReleaseSession();
+        _mode = ProductMode.Paused;
+        _hostOutcome = "Session stopped.";
+        Publish();
+    }
+
+    private void ReleaseSession()
+    {
+        _session?.Dispose();
+        _session = null;
+        _lastAutosaveLevel = -1;
+        MarkSlotsDirty();
     }
 
     public void Restart()
     {
         ThrowIfShutdown();
-        _session?.Dispose();
-        _session = null;
-        _spatial?.Dispose();
-        _spatial = null;
-        _tickCarry = 0;
-        _lifecycle.Stop();
+        ReleaseSession();
+        _lifecycle = AbyssLifecycleMode.Stopped;
+        _mode = ProductMode.Playing;
+        _hostOutcome = "Session restarted.";
+        Start();
     }
 
     public void Shutdown()
@@ -107,114 +215,307 @@ public sealed class AbyssProduct : IEngineProduct
         _shutdown = true;
         _session?.Dispose();
         _session = null;
-        _spatial?.Dispose();
-        _spatial = null;
-        _hud?.Dispose();
-        _hud = null;
+        _projection.Dispose();
         _store.Dispose();
     }
 
     public ProductUpdateResult Update(ProductUpdate update)
     {
-        if (_shutdown || _lifecycle.Mode != AbyssLifecycleMode.Running || _session is null)
-            return ProductUpdateResult.None;
-        double seconds = update.Facts.FixedDeltaSeconds;
-        if (!double.IsFinite(seconds) || seconds <= 0d)
-            throw new ArgumentOutOfRangeException(nameof(update));
-        _tickCarry += seconds * ClockTicksPerSecond;
-        ulong whole = (ulong)_tickCarry;
-        _tickCarry -= whole;
-        if (whole > 0) _session.Clock.Advance(whole);
-        if (_spatial is not null)
+        if (_shutdown || _lifecycle != AbyssLifecycleMode.Running) return ProductUpdateResult.None;
+
+        // Menu actions arrive through the admitted lane and are handled first,
+        // so a paused or released session can still be resumed or restarted.
+        foreach (ProductInputEvent input in update.Input) HandleIntent(input);
+        if (_session is null || _mode != ProductMode.Playing) return ProductUpdateResult.None;
+
+        ProductUpdateResult result = _session.Update(update);
+        if (_session is IModeAwareGameSession modes && modes.PendingModeRequest is { } request && request != _mode)
         {
-            var state = new AbyssRpg.Kit.Controls.ProductUpdateState((float)seconds);
-            foreach (ProductInputEvent input in update.Input) state.Add(input);
-            AbyssSpatialSession.LocomotionStepResult step = _spatial.StepLocomotion(
-                _session.Locomotion, update.Input, state, _session.MovementTuning,
-                canMove: true, _session.Swimming, _session.Flying);
-            // Landing injuries land on the avatar's health track. Defeat
-            // itself rides with the defeat outcome owner.
-            if (step.FallDamage > 0f)
-                _session.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack)
-                    .Spend(step.FallDamage);
+            _mode = request;
+            ApplyMode();
         }
 
-        TickSurvival(seconds);
         AutosaveOnLevelChange();
-        PublishHud();
-        return ProductUpdateResult.None;
-    }
-
-    /// <summary>Current music situation: Death on defeat, else Exploring.
-    /// Combat/map situations ride with P03-P06 hosting.</summary>
-    public AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuMusicPolicy.Situation CurrentMusicSituation =>
-        _session is not null && _session.Avatar.IsDefeated
-            ? AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuMusicPolicy.Situation.Death
-            : AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuMusicPolicy.Situation.Exploring;
-
-    private void TickSurvival(double seconds)
-    {
-        if (_session is null) return;
-        var result = AbyssRpg.Rulesets.UltimaUnderworld.Survival.UuSurvivalPolicy.Tick(
-            _session.Survival, seconds, _rng);
-        int damage = result.HungerDamage + result.FatigueDamage + result.PoisonDamage;
-        if (damage > 0)
-        {
-            var track = _session.Avatar.Stats.GetTrack(
-                AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack);
-            // Clamp: starvation can exceed remaining health; Spend throws on shortfall.
-            track.Current = Math.Max(0, track.Current - damage);
-        }
+        Publish();
+        return result;
     }
 
     /// <summary>
-    /// Autosave when the avatar reaches a new level (re-entry rewrites).
-    /// Spell
-    /// upkeep and NPC/schedule updates ride with P03-P05 hosting, which
-    /// owns that runtime state.
+    /// Declared direct intents the shell may claim. Physical mappings deliver the
+    /// same intents, so a menu button and a key reach one code path.
     /// </summary>
-    private void AutosaveOnLevelChange()
+    private void HandleIntent(ProductInputEvent input)
     {
-        if (_session is null || _spatial is null) return;
-        int level = _session.Dungeon.CurrentLevel;
-        if (level == _lastAutosaveLevel) return;
-        _lastAutosaveLevel = level;
-        var position = _spatial.Player.Position;
-        var snapshot = _session.CaptureSnapshot(new AbyssRpg.Rulesets.UltimaUnderworld.Session.AvatarPoseDto(
-            position?.X ?? 0f, position?.Y ?? 0f, position?.Z ?? 0f,
-            _spatial.Player.YawRadians));
-        _slots.Autosave(level, AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionSnapshotCodec.Encode(snapshot));
-    }
-
-    /// <summary>
-    /// Publish the HUD snapshot. The stream opens lazily so headless
-    /// operation never requires a UI service. Charge reads empty until
-    /// attack state integrates; the outcome line rides with presentation.
-    /// </summary>
-    private void PublishHud()
-    {
-        if (_session is null) return;
-        IUiService ui;
-        try
+        // Losing pointer lock is the Escape path: the world pauses and the menu
+        // becomes authoritative, instead of the DOM guessing at menu state.
+        if (input.Kind == InputEventKind.Clear && input.ClearReason == InputClearReason.PointerLockLoss)
         {
-            ui = _context.Ui;
-        }
-        catch (NotSupportedException)
-        {
+            PausePlay();
             return;
         }
 
-        _hud ??= ui.OpenStream(new UiStreamRequest("abyss.hud", "abyss.ui.snapshot.v1"));
-        var builder = new AbyssRpg.Kit.Presentation.UiValueBuilder();
-        var values = AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuHudProjection.Read(
-            _session.Avatar.Stats,
-            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack,
-            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.ManaTrack,
-            chargeFraction: 0f,
-            yawRadians: _spatial?.Player.YawRadians ?? 0f,
-            outcome: "");
-        uint root = AbyssRpg.Rulesets.UltimaUnderworld.Presentation.UuHudProjection.WriteUi(builder, values);
-        ui.PublishProjection(new UiProjection(_hud, ++_hudSequence, builder.Build(root)));
+        if (input.Kind is not (InputEventKind.DirectDigital or InputEventKind.MappedDigital)) return;
+        // A direct UI intent carries its active fact in X with no edge; a mapped
+        // intent carries the physical edge instead.
+        bool active = input.Kind == InputEventKind.DirectDigital
+            ? input.X > 0f
+            : input.Edge is InputEdge.Pressed or InputEdge.Held;
+        if (!active) return;
+        string intent = System.Text.Encoding.UTF8.GetString(input.Intent.Span);
+        switch (intent)
+        {
+            case "abyss.lifecycle.start":
+                BeginPlay();
+                break;
+            case "abyss.lifecycle.pause":
+                PausePlay();
+                break;
+            case "abyss.lifecycle.resume":
+                ResumePlay();
+                break;
+            case "abyss.lifecycle.stop":
+                QuitToMenu();
+                break;
+            case "abyss.action.quicksave":
+                if (_mode == ProductMode.Playing) Quicksave();
+                break;
+            case "abyss.action.journey-onward":
+                LoadJourneyOnward();
+                break;
+            case "abyss.action.respawn":
+                Respawn();
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void ApplyMode()
+    {
+        if (_session is IModeAwareGameSession modes) modes.ApplyProductMode(_mode);
+    }
+
+    private IGameSession CreateSession(RulesetSavePayload? saved)
+    {
+        var context = new GameSessionContext(_context, _composition);
+        return saved is null
+            ? _ruleset.CreateSession(context)
+            : ((ISaveableGameRuleset)_ruleset).CreateSession(context, saved);
+    }
+
+    /// <summary>
+    /// Autosave when the avatar reaches a new level (re-entry rewrites). The
+    /// payload is ruleset-owned; the Host chooses the slot and the moment.
+    /// </summary>
+    private void AutosaveOnLevelChange()
+    {
+        if (_session is not ISaveableGameSession saveable || _session is not ISessionStatusSource status) return;
+        int level = status.Status.Level;
+        if (level == _lastAutosaveLevel) return;
+        _lastAutosaveLevel = level;
+        _slots.Autosave(level, saveable.CaptureSave().Bytes.ToArray());
+        MarkSlotsDirty();
+    }
+
+    /// <summary>Writes the next quicksave slot and reports the slot it wrote.</summary>
+    public string Quicksave()
+    {
+        ThrowIfShutdown();
+        if (_session is not ISaveableGameSession saveable) return "This session cannot be saved yet.";
+        string key = _slots.Quicksave(saveable.CaptureSave().Bytes.ToArray());
+        MarkSlotsDirty();
+        _hostOutcome = $"Saved to {key}.";
+        Publish();
+        return key;
+    }
+
+    /// <summary>
+    /// Loads the newest autosave, else the respawn anchor, by replacing the whole
+    /// session from its ruleset-owned payload.
+    /// </summary>
+    public bool LoadJourneyOnward()
+    {
+        ThrowIfShutdown();
+        string? key = AbyssSaveUx.JourneyOnward(
+            Slots().Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label)).ToArray());
+        if (key is null)
+        {
+            _hostOutcome = "No save to journey onward from.";
+            Publish();
+            return false;
+        }
+
+        ProductStateLoad<AbyssSaveEnvelope> loaded = _store.Load(key);
+        if (!loaded.Present || loaded.State is null)
+        {
+            _hostOutcome = $"Save '{key}' could not be read.";
+            Publish();
+            return false;
+        }
+
+        try
+        {
+            ReplaceSession(new RulesetSavePayload(new RulesetId(loaded.State.Ruleset), loaded.State.Payload));
+        }
+        catch (Exception error) when (error is InvalidOperationException or ArgumentException or AbyssSaveFormatException)
+        {
+            _hostOutcome = $"Save '{key}' could not be loaded: {error.Message}";
+            Publish();
+            return false;
+        }
+
+        _hostOutcome = $"Resumed {key}.";
+        _lifecycle = AbyssLifecycleMode.Running;
+        _mode = ProductMode.Playing;
+        ApplyMode();
+        _session?.PublishInitial();
+        Publish();
+        return true;
+    }
+
+    /// <summary>Returns the avatar to the level anchor: the defeat outcome this slice offers.</summary>
+    public bool Respawn()
+    {
+        ThrowIfShutdown();
+        if (_session is not IRespawnableGameSession respawnable) return false;
+        respawnable.RespawnAtAnchor();
+        _mode = ProductMode.Playing;
+        ApplyMode();
+        Publish();
+        return true;
+    }
+
+    private void ReplaceSession(RulesetSavePayload? saved)
+    {
+        ReleaseSession();
+        _hostOutcome = "";
+        _session = CreateSession(saved);
+    }
+
+    /// <summary>The slots this product owns, newest first: what Journey Onward resolves over.</summary>
+    public IReadOnlyList<AbyssSlotSummary> Slots()
+    {
+        if (!_slotsDirty) return _slotCache;
+        List<AbyssSlotSummary> slots = [];
+        foreach (string key in AbyssSaveSlots.Keys())
+        {
+            ProductStateLoad<AbyssSaveEnvelope> loaded;
+            try
+            {
+                loaded = _store.Load(key);
+            }
+            catch (AbyssSaveFormatException)
+            {
+                continue;
+            }
+
+            if (!loaded.Present || loaded.State is null) continue;
+            slots.Add(new AbyssSlotSummary(
+                key,
+                AbyssSaveSlots.Describe(key),
+                loaded.State.SavedAtUtc,
+                loaded.State.Ruleset));
+        }
+
+        slots.Sort((left, right) => right.SavedAtUtc.CompareTo(left.SavedAtUtc));
+        _slotCache = slots;
+        _slotsDirty = false;
+        return _slotCache;
+    }
+
+    private void MarkSlotsDirty() => _slotsDirty = true;
+
+    private void Publish()
+    {
+        SessionStatus? status = (_session as ISessionStatusSource)?.Status;
+        string mode = _lifecycle switch
+        {
+            AbyssLifecycleMode.Stopped => AbyssModes.Stopped,
+            AbyssLifecycleMode.Paused => AbyssModes.Paused,
+            _ => _mode switch
+            {
+                ProductMode.Dead => AbyssModes.Dead,
+                ProductMode.Modal => AbyssModes.Modal,
+                ProductMode.Paused => AbyssModes.Paused,
+                _ => AbyssModes.Playing,
+            },
+        };
+        bool defeated = status?.Defeated ?? false;
+        IReadOnlyList<AbyssSlotSummary> slots = Slots();
+        string journey = AbyssSaveUx.JourneyOnward(
+            slots.Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label)).ToArray()) ?? "";
+        AbyssMenuState menu = AbyssMenuState.From(mode, defeated, _session is not null, journey, slots, _options);
+        string outcome = _hostOutcome.Length > 0 ? _hostOutcome : status?.Outcome ?? "";
+        _projection.Publish(new AbyssUiSnapshot(
+            Ready: status is not null,
+            Mode: mode,
+            Menu: menu,
+            Level: status?.Level ?? 0,
+            Avatar: status?.AvatarName ?? "",
+            Hp: status?.Hp ?? 0,
+            MaxHp: status?.MaxHp ?? 0,
+            Mana: status?.Mana ?? 0,
+            MaxMana: status?.MaxMana ?? 0,
+            Charge: status?.ChargeFraction ?? 0f,
+            YawRadians: status?.YawRadians ?? 0f,
+            Wind: status?.WindIndex ?? 0,
+            Outcome: outcome,
+            Defeated: defeated,
+            Swimming: status?.Swimming ?? false,
+            Flying: status?.Flying ?? false,
+            PresentActors: status?.PresentActors ?? 0,
+            Slots: slots.Count));
+    }
+
+    /// <summary>Registers this product's commands plus the live session's own module.</summary>
+    public void RegisterDebugCommands(IDebugCommandModuleRegistrar registrar)
+    {
+        ArgumentNullException.ThrowIfNull(registrar);
+        registrar.Register(this);
+        if (_session is IDebuggableGameSession debuggable) registrar.Register(debuggable.DebugModule);
+    }
+
+    [DebugCommand("abyss.product", Description = "Product identity, bundle, mode and resolved composition.")]
+    public string ProductInfo()
+    {
+        ResolvedCompositionIdentity identity = _composition.Identity;
+        string packs = string.Join(",", identity.ContentPacks.Select(pack => pack.Value));
+        return $"id={AbyssProductEntry.Default.Id} bundle={identity.Bundle.Value} ruleset={identity.Ruleset.Value} "
+            + $"tuning={identity.Tuning.Value} packs=[{packs}] lifecycle={_lifecycle} mode={_mode}";
+    }
+
+    [DebugCommand("abyss.save", Description = "Write a quicksave slot and report its key.")]
+    public string Save() => Quicksave();
+
+    [DebugCommand("abyss.load", Description = "Load the newest autosave, else the respawn anchor.")]
+    public string Load()
+    {
+        LoadJourneyOnward();
+        return _hostOutcome;
+    }
+
+    [DebugCommand("abyss.slots", Description = "List the save slots this product owns, newest first.")]
+    public string SlotList()
+    {
+        IReadOnlyList<AbyssSlotSummary> slots = Slots();
+        return slots.Count == 0
+            ? "no saves"
+            : string.Join("; ", slots.Select(slot => $"{slot.Key} ({slot.Label}, {slot.SavedAtUtc:O}, {slot.Ruleset})"));
+    }
+
+    [DebugCommand("abyss.pause", Description = "Pause play and show the menu.")]
+    public string PauseCommand()
+    {
+        if (_lifecycle == AbyssLifecycleMode.Running) Pause();
+        return $"lifecycle={_lifecycle} mode={_mode}";
+    }
+
+    [DebugCommand("abyss.play", Description = "Resume play: the paused menu's resume path.")]
+    public string PlayCommand()
+    {
+        if (_lifecycle == AbyssLifecycleMode.Paused) Resume();
+        else if (_lifecycle == AbyssLifecycleMode.Stopped) Start();
+        return $"lifecycle={_lifecycle} mode={_mode}";
     }
 
     public void Dispose()

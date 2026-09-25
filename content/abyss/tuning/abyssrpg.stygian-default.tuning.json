@@ -1,0 +1,6 @@
+{
+  "kind": "abyssrpg.tuning-profile",
+  "id": "abyssrpg.stygian-default",
+  "ruleset": "abyssrpg.ultima-underworld",
+  "payload": "abyss/content-packs/stygian-default-tuning.json"
+}

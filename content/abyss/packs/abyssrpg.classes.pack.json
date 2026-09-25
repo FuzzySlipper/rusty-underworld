@@ -1,0 +1,7 @@
+{
+  "kind": "abyssrpg.content-pack",
+  "id": "abyssrpg.classes",
+  "ruleset": "abyssrpg.ultima-underworld",
+  "dependencies": [],
+  "payload": "abyss/content-packs/classes.json"
+}

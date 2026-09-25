@@ -4,5 +4,6 @@
   "genders": ["male", "female"],
   "handedness": ["left", "right"],
   "classes": ["fighter", "mage", "ranger", "bard", "tinker", "druid", "paladin", "shepherd"],
-  "difficulties": ["standard", "easy"]
+  "difficulties": ["standard", "easy"],
+  "defaultName": "Avatar"
 }

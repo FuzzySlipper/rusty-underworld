@@ -59,10 +59,10 @@ public sealed class AbyssSaveStore : IDisposable
 
     public void Dispose() => _state.Dispose();
 
-    internal sealed record PersistedEnvelope(string Ruleset, byte[] Payload)
+    internal sealed record PersistedEnvelope(string Ruleset, byte[] Payload, DateTime SavedAtUtc)
     {
         internal static PersistedEnvelope From(AbyssSaveEnvelope value) =>
-            new(value.Ruleset, value.Payload.ToArray());
+            new(value.Ruleset, value.Payload.ToArray(), value.SavedAtUtc);
 
         internal AbyssSaveEnvelope ToEnvelope()
         {
@@ -70,13 +70,25 @@ public sealed class AbyssSaveStore : IDisposable
                 throw new ArgumentException("The save ruleset is required.");
             if (Payload is null || Payload.Length == 0)
                 throw new ArgumentException("The save payload is required.");
-            return new AbyssSaveEnvelope(Ruleset, Payload);
+            return new AbyssSaveEnvelope(Ruleset, Payload, SavedAtUtc);
         }
     }
 }
 
-/// <summary>Ruleset save payload with its identity. Payload meaning is ruleset-owned.</summary>
-public sealed record AbyssSaveEnvelope(string Ruleset, byte[] Payload);
+/// <summary>
+/// Ruleset save payload with its identity and write time. Payload meaning stays
+/// ruleset-owned; the timestamp is what the Host's slot list orders by, because
+/// the Engine persistence service reports no write time of its own.
+/// </summary>
+public sealed record AbyssSaveEnvelope(string Ruleset, byte[] Payload, DateTime SavedAtUtc)
+{
+    public AbyssSaveEnvelope(string ruleset, byte[] payload)
+        : this(ruleset, payload, default) { }
+
+    /// <summary>A payload written now under this product's ruleset identity.</summary>
+    public static AbyssSaveEnvelope Create(byte[] payload, DateTime? savedAtUtc = null) =>
+        new("abyssrpg.ultima-underworld", payload, savedAtUtc ?? DateTime.UtcNow);
+}
 
 /// <summary>Corrupt persisted save data, rejected before anything is built from it.</summary>
 public sealed class AbyssSaveFormatException : InvalidOperationException

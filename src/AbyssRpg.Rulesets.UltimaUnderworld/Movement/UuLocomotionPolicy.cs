@@ -17,10 +17,10 @@ public sealed class UuLocomotionPolicy
     private readonly UuMovementTuning _tuning;
     private FpsInput _input;
 
-    public UuLocomotionPolicy(UuMovementTuning tuning)
+    public UuLocomotionPolicy(UuMovementTuning tuning, FpsInputConfig? config = null)
     {
         _tuning = (tuning ?? throw new ArgumentNullException(nameof(tuning))).Validate();
-        _input = new FpsInput(FpsInputConfig.Standard with { Bindings = UuBindings });
+        _input = new FpsInput((config ?? FpsInputConfig.Standard) with { Bindings = UuBindings });
     }
 
     /// <summary>
@@ -42,12 +42,51 @@ public sealed class UuLocomotionPolicy
         bool JumpRequested,
         float Ascend);
 
+    /// <summary>
+    /// One admitted input slice read through the product's selected FPS
+    /// configuration: locomotion controls, the movement intent, the integrated
+    /// look receipt, and the primary attack button facts combat consumes.
+    /// </summary>
+    public readonly record struct UuPlayerStep(
+        CharacterStepControls Controls,
+        UuMoveIntent Intent,
+        LookReceipt Look,
+        bool AttackHeld,
+        bool AttackPressed,
+        bool AttackReleased);
+
     public (CharacterStepControls Controls, UuMoveIntent Intent) BeginStep(
         ReadOnlySpan<ProductInputEvent> inputs, float seconds, bool canMove, bool swimming, bool flying)
+    {
+        UuPlayerStep step = ReadStep(new LookState(0f, 0f), inputs, seconds, canMove, swimming, flying);
+        return (step.Controls, step.Intent);
+    }
+
+    /// <summary>
+    /// Reads one slice and commits look to the authoritative player control
+    /// state. Pointer and controller look integrate through Engine Look, so the
+    /// selected sensitivity, invert and pitch clamps apply once per update.
+    /// </summary>
+    public UuPlayerStep BeginPlayerStep(
+        PlayerControlState player, ReadOnlySpan<ProductInputEvent> inputs, float seconds,
+        bool canMove, bool swimming, bool flying)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        UuPlayerStep step = ReadStep(
+            new LookState(player.YawRadians, player.PitchRadians), inputs, seconds, canMove, swimming, flying);
+        player.YawRadians = step.Look.After.YawRadians;
+        player.PitchRadians = step.Look.After.PitchRadians;
+        return step;
+    }
+
+    private UuPlayerStep ReadStep(
+        LookState look, ReadOnlySpan<ProductInputEvent> inputs, float seconds,
+        bool canMove, bool swimming, bool flying)
     {
         if (!float.IsFinite(seconds) || seconds <= 0f)
             throw new ArgumentOutOfRangeException(nameof(seconds));
         FpsInputFrame frame = _input.Consume(inputs, seconds);
+        LookReceipt receipt = _input.IntegrateLook(look, frame);
 
         bool moving = frame.Movement != System.Numerics.Vector2.Zero;
         bool running = canMove && !swimming && frame.SprintHeld && moving;
@@ -70,7 +109,11 @@ public sealed class UuLocomotionPolicy
             JumpSpeed: _tuning.JumpSpeed,
             VerticalVelocity: flying && canMove ? ascend : null);
         var intent = new UuMoveIntent(running, swimming, flying, jump, ascend);
-        return (controls, intent);
+        return new UuPlayerStep(
+            controls, intent, receipt,
+            AttackHeld: _input.Physical.Held(PointerButton.Primary),
+            AttackPressed: _input.Physical.Pressed(PointerButton.Primary),
+            AttackReleased: _input.Physical.Released(PointerButton.Primary));
     }
 }
 

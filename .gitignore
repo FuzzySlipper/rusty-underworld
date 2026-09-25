@@ -27,3 +27,7 @@ tests/**/Temp*Tests.cs
 # disposable so one committed probe cannot happen again.
 tests/**/[Tt]mp*.cs
 tests/**/Temp*.cs
+
+# Operator-imported level packs are derived from the original game's data and
+# are never committed. Regenerate them with scripts/import-level.sh.
+/content/abyss/imports/

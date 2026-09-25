@@ -1,0 +1,16 @@
+{
+  "id": "abyssrpg.classes",
+  "provenance": "authored",
+  "note": "Base attributes and the bonus pool per class, plus the shared skill-choice walk the creation flow consumes. Values are Ours (small, readable); the original's SKILLS.DAT class rows are importer work that has not landed, and this pack claims no fidelity.",
+  "classes": [
+    { "id": "fighter", "strength": 20, "dexterity": 16, "intelligence": 12, "bonusPool": 12 },
+    { "id": "mage", "strength": 12, "dexterity": 14, "intelligence": 22, "bonusPool": 12 },
+    { "id": "ranger", "strength": 17, "dexterity": 18, "intelligence": 13, "bonusPool": 12 },
+    { "id": "bard", "strength": 15, "dexterity": 17, "intelligence": 16, "bonusPool": 12 },
+    { "id": "tinker", "strength": 16, "dexterity": 15, "intelligence": 17, "bonusPool": 12 },
+    { "id": "druid", "strength": 14, "dexterity": 14, "intelligence": 20, "bonusPool": 12 },
+    { "id": "paladin", "strength": 18, "dexterity": 14, "intelligence": 16, "bonusPool": 12 },
+    { "id": "shepherd", "strength": 16, "dexterity": 16, "intelligence": 16, "bonusPool": 12 }
+  ],
+  "skillChoiceTable": [1, 7, 2, 11, 12]
+}

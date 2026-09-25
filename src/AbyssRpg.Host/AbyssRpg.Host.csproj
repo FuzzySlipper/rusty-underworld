@@ -33,6 +33,26 @@
     <ProjectReference Include="../AbyssRpg.Kit/AbyssRpg.Kit.csproj" />
     <ProjectReference Include="../AbyssRpg.Rulesets.UltimaUnderworld/AbyssRpg.Rulesets.UltimaUnderworld.csproj" />
   </ItemGroup>
+
+  <!--
+    Direct intents the browser shell may claim, and the physical mappings that
+    deliver the same intents from the keyboard. The names must match
+    AbyssProductEntry.LifecycleIntents/ActionIntents and the intent handling in
+    AbyssProduct: the staged manifest is what the shell receives, so an intent
+    absent here is one the DOM cannot send.
+  -->
+  <ItemGroup>
+    <RustyEngineProductInputIntent Include="abyss.lifecycle.start" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.lifecycle.pause" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.lifecycle.resume" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.lifecycle.stop" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.quicksave" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.journey-onward" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.respawn" Value="digital" />
+    <RustyEngineProductInputMapping Include="abyss.action.quicksave.chord" Intent="abyss.action.quicksave" Trigger="key:key-s:pressed:chord=alt-left" />
+    <RustyEngineProductInputMapping Include="abyss.action.journey-onward.chord" Intent="abyss.action.journey-onward" Trigger="key:key-l:pressed:chord=alt-left" />
+  </ItemGroup>
+
   <Target Name="BuildAbyssProductUi" BeforeTargets="GenerateRustyEngineProductComposition">
     <Delete Files="$(RustyEngineProductUiRoot)/main.js.map;$(RustyEngineProductUiRoot)/main.d.ts" />
     <Exec Command="npm --prefix &quot;$(MSBuildThisFileDirectory)../..&quot; exec -- tsc -p &quot;$(MSBuildThisFileDirectory)../ui&quot;" />

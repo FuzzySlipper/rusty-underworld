@@ -1,0 +1,12 @@
+{
+  "kind": "abyssrpg.game-bundle",
+  "id": "abyssrpg.stygian-abyss",
+  "ruleset": "abyssrpg.ultima-underworld",
+  "contentPacks": [
+    { "id": "abyssrpg.avatar-options" },
+    { "id": "abyssrpg.classes" },
+    { "id": "abyssrpg.starting-kit" },
+    { "id": "abyssrpg.level-1" }
+  ],
+  "tuning": { "id": "abyssrpg.stygian-default" }
+}
