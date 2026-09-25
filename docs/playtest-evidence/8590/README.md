@@ -42,8 +42,9 @@ closes a door tile the import placed, through the level state the save carries.
   `You close the door.`, so the verb toggles real state rather than printing one
   line.
 - [The world after Journey Onward](05-door-state-survives-the-save.png) — artifact
-  `f88dd6fb-b1f1-4115-8606-42e2d7cc75d0`. `abyss.load` resumes the newest autosave, following the product's
-  Journey Onward rule; the autosave is written at level change, so it predates
+  `f88dd6fb-b1f1-4115-8606-42e2d7cc75d0`. `abyss.load` resumes the newest
+  autosave, following the product's Journey Onward rule; the autosave is written
+  at level change, so it predates
   the door use and the door is shut again (`You open the door.`). The door state
   does round-trip through a save: the quicksave written here carries it, and
   `UuSessionTests.A_snapshot_round_trip_keeps_the_levels_own_changes` pins the
