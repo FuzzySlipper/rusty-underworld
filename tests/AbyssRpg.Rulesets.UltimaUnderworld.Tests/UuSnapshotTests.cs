@@ -9,7 +9,7 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Tests;
 
 public sealed class UuSnapshotTests
 {
-    private static UuSession TestSession(long seed = 1234)
+    internal static UuSession TestSession(long seed = 1234)
     {
         var tables = new CreationTables([new(20, 16, 12, 12)], [1, 7, 2, 11, 12]);
         var flow = new UuCreationFlow(tables, new Random(7));

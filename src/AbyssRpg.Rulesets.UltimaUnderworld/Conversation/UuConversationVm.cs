@@ -85,6 +85,9 @@ public sealed class UuConversationVm
         _memory[_stackBase + _stackPtr] = (short)value;
     }
 
+    /// <summary>Peek a call argument without popping (depth 0 = top).</summary>
+    public short PeekArg(int depth) => At(_stackBase + _stackPtr - depth);
+
     public short Pop()
     {
         // Lenient underflow (0 via At) where the donor throws: only
