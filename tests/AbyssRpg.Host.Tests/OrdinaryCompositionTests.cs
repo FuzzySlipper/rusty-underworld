@@ -481,6 +481,49 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void Every_use_verb_resolves_through_one_in_reach()
+    {
+        // One resolution answers what the verb applies to and what that target
+        // accepts: a creature is talkable, the sack is usable, a floor object is
+        // takeable, and nothing out of reach is anything at all.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // Standing on the creature the fixture places.
+        AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachTarget creature =
+            session.InReach(new AbyssRpg.Kit.Controls.WorldPoint(4f, 1f, 4f));
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachKind.Creature, creature.Kind);
+        Assert.True(creature.Accepts(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.Talk));
+        Assert.False(creature.Accepts(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.Take));
+
+        // Standing on the sack, which is a container.
+        AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachTarget sack =
+            session.InReach(new AbyssRpg.Kit.Controls.WorldPoint(12f, 1f, 4f));
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachKind.Container, sack.Kind);
+        Assert.True(sack.Accepts(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.Use));
+
+        // Standing on the torch, which is a loose thing.
+        AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachTarget torch =
+            session.InReach(new AbyssRpg.Kit.Controls.WorldPoint(4f, 1f, 12f));
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachKind.Item, torch.Kind);
+        Assert.True(torch.Accepts(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.Take));
+
+        // The door tile the fixture marks: it opens rather than being taken.
+        AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachTarget door =
+            session.InReach(new AbyssRpg.Kit.Controls.WorldPoint(12f, 1f, 12f));
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachKind.Door, door.Kind);
+        Assert.True(door.Accepts(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.Open));
+
+        // Far from everything, nothing is in reach and no verb is accepted.
+        AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachTarget nothing =
+            session.InReach(new AbyssRpg.Kit.Controls.WorldPoint(400f, 1f, 400f));
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuReachKind.None, nothing.Kind);
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuVerbs.None, nothing.Verbs);
+    }
+
+    [Fact]
     public void Looting_a_placed_container_moves_its_imported_contents_into_the_avatar()
     {
         // The fixture's sack (item 128) hangs on tile (1,0) and holds one object,

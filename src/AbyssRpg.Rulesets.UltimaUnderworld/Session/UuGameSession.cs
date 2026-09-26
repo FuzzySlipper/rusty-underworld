@@ -976,38 +976,34 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
-        // A living creature is talked to: the conversation owner runs the script
-        // its own record names, and the transcript is what the projection shows.
-        if (LiveOpponentInReach(position) is { } talker)
+        // One resolution decides what is in reach and what it accepts; the verbs
+        // below call their owning policy and nothing scans the level for itself.
+        UuReachTarget target = InReach(position);
+        switch (target.Kind)
         {
-            Talk(talker);
-            return;
-        }
+            // A living creature is talked to: the conversation owner runs the script
+            // its own record names, and the transcript is what the projection shows.
+            case UuReachKind.Creature when target.Actor is { } talker:
+                Talk(talker);
+                return;
 
-        // A fallen opponent is looted where it lies: what it carried is held by
-        // its own record, so the same transfer serves a corpse and a container.
-        if (_levelItems is { } carried && FallenOpponentInReach(position) is { } fallen)
-        {
-            InventoryContainerTransferReceipt looted = carried.Loot(fallen.Actor.Entity, _session.Avatar.Actor.Entity);
-            int count = looted.UniqueItems.Count;
-            _outcome = count == 0
-                ? $"The {Describe(FallenItemId(fallen))} carries nothing."
-                : $"You loot {count} item{(count == 1 ? "" : "s")} from the {Describe(FallenItemId(fallen))}.";
-            return;
-        }
+            // A fallen opponent is looted where it lies: what it carried is held by
+            // its own record, so the same transfer serves a corpse and a container.
+            case UuReachKind.Corpse when target.Actor is { } fallen:
+                LootFallen(fallen);
+                return;
 
-        if (_placements.TileAt(position) is { Door: true } tile)
-        {
-            bool open = !_session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y));
-            _session.Dungeon.Current.SetDoor(tile.X, tile.Y, open);
-            _outcome = open ? "You open the door." : "You close the door.";
-            return;
-        }
+            // A door tile opens and closes through the level state the save carries,
+            // so the change survives a load.
+            case UuReachKind.Door when target.Door is { } door:
+                bool open = !_session.Dungeon.Current.OpenedDoors.Contains((door.X, door.Y));
+                _session.Dungeon.Current.SetDoor(door.X, door.Y, open);
+                _outcome = open ? "You open the door." : "You close the door.";
+                return;
 
-        if (PlacedObjectInReach(position) is { } placed)
-        {
-            Use(placed);
-            return;
+            case UuReachKind.Container or UuReachKind.Item when target.Object is { } placed:
+                Use(placed);
+                return;
         }
 
         _outcome = "There is nothing here to use.";
@@ -1077,23 +1073,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         }
 
         _outcome = $"You take the {Describe(placed.ItemId)}.";
-    }
-
-    /// <summary>The nearest living creature within a hand's reach, if any.</summary>
-    private ActorState? LiveOpponentInReach(WorldPoint position)
-    {
-        ActorState? nearest = null;
-        float nearestDistance = InteractionReach;
-        foreach (ActorState actor in PlacedCritters.Values)
-        {
-            if (actor.IsDefeated) continue;
-            float distance = actor.Position.HorizontalDistanceTo(position);
-            if (distance > nearestDistance) continue;
-            nearest = actor;
-            nearestDistance = distance;
-        }
-
-        return nearest;
     }
 
     /// <summary>
@@ -1218,6 +1197,22 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return nearest;
     }
 
+    /// <summary>Loots a fallen opponent through the inventory owner that holds what it carried.</summary>
+    private void LootFallen(ActorState fallen)
+    {
+        if (_levelItems is not { } carried)
+        {
+            _outcome = $"The {Describe(FallenItemId(fallen))} carries nothing.";
+            return;
+        }
+
+        InventoryContainerTransferReceipt looted = carried.Loot(fallen.Actor.Entity, _session.Avatar.Actor.Entity);
+        int count = looted.UniqueItems.Count;
+        _outcome = count == 0
+            ? $"The {Describe(FallenItemId(fallen))} carries nothing."
+            : $"You loot {count} item{(count == 1 ? "" : "s")} from the {Describe(FallenItemId(fallen))}.";
+    }
+
     /// <summary>The item id a placed opponent was admitted from, for naming it.</summary>
     private int FallenItemId(ActorState actor)
     {
@@ -1232,11 +1227,40 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return 0;
     }
 
-    /// <summary>The nearest object the level placed, within a hand's reach.</summary>
-    private AdmittedObject? PlacedObjectInReach(WorldPoint position)
+    /// <summary>
+    /// What the avatar's use verb applies to: the nearest thing in reach, and what
+    /// it accepts. One resolution for every verb, so a creature, a corpse, a door
+    /// and an object on the floor are found the same way and a target's reach is
+    /// decided in one place.
+    /// </summary>
+    /// <remarks>
+    /// A living creature, then a fallen one, then the door tile underfoot, then what
+    /// lies on the floor: the order the use channel has always resolved in, kept so
+    /// that standing on a corpse with a creature in reach still talks rather than
+    /// loots. Within a family, the nearest wins, and a tie keeps the object the
+    /// level's chain names first -- the one on top of what the tile carries.
+    /// </remarks>
+    public UuReachTarget InReach(WorldPoint position)
     {
-        AdmittedObject? nearest = null;
-        float nearestDistance = InteractionReach;
+        UuReachTarget found = UuReachTarget.Nothing;
+
+        foreach (ActorState actor in PlacedCritters.Values)
+        {
+            float distance = actor.Position.HorizontalDistanceTo(position);
+            if (distance > InteractionReach) continue;
+            if (distance >= found.Distance) continue;
+            found = UuReachTarget.AtActor(actor, distance, actor.IsDefeated);
+        }
+
+        if (found.Kind is UuReachKind.Creature or UuReachKind.Corpse) return found;
+
+        if (_placements?.TileAt(position) is { Door: true } door)
+        {
+            found = UuReachTarget.AtDoor(door, 0f);
+        }
+
+        float nearest = InteractionReach;
+        AdmittedObject? nearestObject = null;
         foreach (int index in _session.PlacedObjectIndexes(_session.Dungeon.CurrentLevel))
         {
             // What the level no longer admits is not in reach: a taken or
@@ -1244,23 +1268,30 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (!_session.Dungeon.Current.IsLive(index)) continue;
             if (_session.PlacedObjectAt(_session.Dungeon.CurrentLevel, index, out (int X, int Y) tile) is not { } obj)
                 continue;
-            // Only what lies on the floor is in reach: a container's contents
-            // are reached by using the container.
+            // Only what lies on the floor is in reach: a container's contents are
+            // reached by using the container.
             if (tile.X < 0) continue;
             AdmittedTile? on = _placements?.Tile(tile.X, tile.Y);
             if (on is null) continue;
             WorldPoint center = _placements!.TileCenter(on.X, on.Y, on.FloorHeight);
             float distance = center.HorizontalDistanceTo(position);
-            // Out of reach, or farther than what is already in hand.
-            if (distance > nearestDistance) continue;
-            // A tie keeps the object the chain names first: that is the one on
-            // top of what the tile carries, so a stack is taken from the top.
-            if (nearest is not null && distance >= nearestDistance) continue;
-            nearest = obj;
-            nearestDistance = distance;
+            if (distance > nearest) continue;
+            // A tie keeps the object the chain names first: that is the one on top
+            // of what the tile carries, so a stack is taken from the top.
+            if (nearestObject is not null && distance >= nearest) continue;
+            nearestObject = obj;
+            nearest = distance;
         }
 
-        return nearest;
+        // A door tile is underfoot where an object on it is at the tile's centre, so
+        // the doorway is the closer of the two and the object is what stands in it.
+        if (nearestObject is not null)
+        {
+            bool container = Content.UuObjectTablesContent.IsContainerItem(nearestObject.ItemId);
+            found = UuReachTarget.AtObject(nearestObject, nearest, container);
+        }
+
+        return found;
     }
 
     /// <summary>What the avatar calls an item it can see: its imported name, or its kind.</summary>
