@@ -51,6 +51,9 @@ public sealed class UuCastingHosting
 
     public void Upkeep(ulong nowTicks)
     {
+        // A held spell ends at its own deadline, in the owner that holds it, as well
+        // as when the effect carrying it expires.
+        _maintained.Expire(nowTicks);
         var expired = _effects.Where(e => UuCastingWorkflow.IsExpired(e, nowTicks)).ToList();
         _effects.RemoveAll(expired.Contains);
         foreach (UuCastingWorkflow.SpellEffectInstance e in expired) _maintained.Dismiss(e.SpellId);
@@ -85,11 +88,14 @@ public sealed class UuCastingHosting
         UuCastingWorkflow.SpellEffectInstance? effect = null;
         if (spell.Icon >= 0)
         {
-            evicted = UuSpellEffects.AdmitMaintained(_maintained, spell, spellId);
-            // Duration-0 maintained (Curse) holds until dismissed.
-            ulong expires = spell.Duration > 0
+            // Duration-0 maintained (Curse) holds until dismissed: its effect never
+            // expires, and the held spell carries no deadline of its own. Anything else
+            // ends at its table duration with the game's spread.
+            bool held = spell.Duration > 0;
+            ulong expires = held
                 ? nowTicks + UuCastingWorkflow.DurationTicks(spell.Duration, ticksPerSecond, _rng)
                 : ulong.MaxValue;
+            evicted = UuSpellEffects.AdmitMaintained(_maintained, spell, spellId, held ? expires : 0);
             (_, effect) = UuCastingWorkflow.Apply(
                 false, spellId, expires,
                 stability: 1 /* stable class; per-spell classes ride with UuSpellStability */);

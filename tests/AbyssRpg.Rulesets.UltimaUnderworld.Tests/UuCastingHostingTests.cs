@@ -82,4 +82,34 @@ public sealed class UuCastingHostingTests
         Assert.True(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
         Assert.False(hosting.MaintainsFamily(UuSpellCatalog.Family.Damage));
     }
+
+    [Fact]
+    public void A_maintained_light_ends_when_its_own_duration_runs_out()
+    {
+        // The maintained list is the casting owner's, and a spell it holds ends when
+        // the effect carrying it expires: the light a player cast does not burn
+        // forever, and nothing else has to time it.
+        UuCastingHosting hosting = Shelf(FindRune('I'), FindRune('L'));
+        for (int attempt = 0; attempt < 50
+            && hosting.AttemptCast(10, 30, 30, false, 0, 255, 1).Gate != UuCastGates.GateResult.Cast; attempt++)
+        {
+            hosting = Shelf(FindRune('I'), FindRune('L'));
+        }
+
+        Assert.True(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
+        UuSpellCatalog.SpellEntry light = UuSpellCatalog.FindByRunes("IL")!;
+        // It holds a deadline of its own rather than relying on an effect to end it.
+        Assert.True(
+            hosting.Panel().Maintained[0].ExpiresAtTicks > 0,
+            "the held spell carries the deadline its duration gives it");
+
+        // The deadline is the spell's own duration with the game's spread (0.8 to 1.1
+        // of the table value, at the 255 ticks a second this cast was made with), so
+        // short of the spread's floor it holds and past its ceiling it does not.
+        double ticks = light.Duration * 255d;
+        hosting.Upkeep((ulong)(0.7 * ticks));
+        Assert.True(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
+        hosting.Upkeep((ulong)(1.2 * ticks));
+        Assert.False(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
+    }
 }

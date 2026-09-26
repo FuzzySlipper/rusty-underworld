@@ -770,10 +770,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (!_session.Dungeon.Current.IsLive(index)) continue;
             if (admission.Holders.TryGetValue(index, out int heldBy) && heldBy != 0) continue;
             if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile)) continue;
-            // The item catalog gives each light its own radius; the session does not
-            // hold that catalog yet, so every burning light reaches the same distance
-            // until it does. Recorded in #8666.
-            int reach = DefaultLightReach;
+            // The item catalog gives each light its own radius; a light the catalog
+            // does not define reaches the default rather than nothing.
+            int reach = _items?.Find(obj.ItemId)?.Radius is int radius and > 0
+                ? radius
+                : DefaultLightReach;
             AdmittedTile? placed = _placements.Tile(tile.X, tile.Y);
             yield return (_placements.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0), reach);
         }

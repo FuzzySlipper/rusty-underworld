@@ -12,7 +12,12 @@ public sealed class UuMaintainedSpells
 {
     public const int MaxMaintained = 3;
 
-    public sealed record MaintainedSpell(int SpellId, string Runes, int Cost);
+    /// <summary>
+    /// A spell the caster is holding. It ends at its own deadline, which is the
+    /// spell's table duration with the game's spread applied; a spell whose duration
+    /// is zero (Curse) holds until it is dismissed or replaced.
+    /// </summary>
+    public sealed record MaintainedSpell(int SpellId, string Runes, int Cost, ulong ExpiresAtTicks = 0);
 
     private static readonly string[][] SimilarGroups =
     [
@@ -28,7 +33,7 @@ public sealed class UuMaintainedSpells
     public IReadOnlyList<MaintainedSpell> Spells => _spells;
 
     /// <summary>Admit a maintained spell; returns the evicted spell, if any.</summary>
-    public MaintainedSpell? Admit(int spellId, string runes, int cost)
+    public MaintainedSpell? Admit(int spellId, string runes, int cost, ulong expiresAtTicks = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runes);
         MaintainedSpell? evicted = null;
@@ -61,8 +66,15 @@ public sealed class UuMaintainedSpells
             _spells.RemoveAt(lowest);
         }
 
-        _spells.Add(new MaintainedSpell(spellId, runes, cost));
+        _spells.Add(new MaintainedSpell(spellId, runes, cost, expiresAtTicks));
         return evicted;
+    }
+
+    /// <summary>Drops every held spell whose deadline has passed; a deadline of zero never ends.</summary>
+    public int Expire(ulong nowTicks)
+    {
+        int removed = _spells.RemoveAll(spell => spell.ExpiresAtTicks != 0 && nowTicks >= spell.ExpiresAtTicks);
+        return removed;
     }
 
     public bool Dismiss(int spellId)

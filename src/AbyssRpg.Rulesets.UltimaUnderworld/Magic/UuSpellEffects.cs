@@ -19,11 +19,14 @@ public static class UuSpellEffects
 
     /// <summary>Admit a maintained family spell; returns the evicted spell, if any.</summary>
     public static UuMaintainedSpells.MaintainedSpell? AdmitMaintained(
-        UuMaintainedSpells maintained, UuSpellCatalog.SpellEntry spell, int spellId)
+        UuMaintainedSpells maintained,
+        UuSpellCatalog.SpellEntry spell,
+        int spellId,
+        ulong expiresAtTicks = 0)
     {
         ArgumentNullException.ThrowIfNull(maintained);
         ArgumentNullException.ThrowIfNull(spell);
         if (spell.Icon < 0) throw new ArgumentOutOfRangeException(nameof(spell), "Instant spells are not maintained.");
-        return maintained.Admit(spellId, spell.Runes, spell.Cost);
+        return maintained.Admit(spellId, spell.Runes, spell.Cost, expiresAtTicks);
     }
 }
