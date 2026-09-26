@@ -869,13 +869,33 @@ public sealed class OrdinaryCompositionTests
         int drawn = graphics.LastSnapshot.Count;
         Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == torch);
 
-        // Taking the torch is a real interaction in this fixture, and the scene it
-        // should change is #8664: the redraw follows the inventory world, which the
-        // take path updates, but the published signature has not been made to see
-        // it yet. What this test holds is the drawn world as admitted.
+        // Taking the torch stops drawing it: it is in the avatar's pack, and the
+        // scene is one description of what stands on the level.
         UseAt(product, spatial, 2, 4f, 12f);
         Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
-        Assert.Equal(drawn, graphics.LastSnapshot.Count);
+        product.Update(SixtyHzUpdate(6));
+        Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == torch);
+        Assert.Equal(drawn - 1, graphics.LastSnapshot.Count);
+
+        // A wounded opponent is still drawn; one that is struck down is not. It
+        // takes as many charged swings as it takes.
+        int withCreature = graphics.LastSnapshot.Count;
+        // Stand on the opponent's tile without using it: using a creature talks to
+        // it, and a conversation is not where swings land.
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        ulong step = 12;
+        product.Update(SixtyHzUpdate(step++));
+        for (int swing = 0; swing < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; swing++)
+        {
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Pressed)]));
+            for (int held = 0; held < 30; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Released)]));
+            product.Update(SixtyHzUpdate(step++));
+        }
+
+        Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "the opponent can be struck down");
+        Assert.Equal(withCreature - 1, graphics.LastSnapshot.Count);
     }
 
     [Fact]

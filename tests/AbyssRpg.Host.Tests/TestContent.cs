@@ -135,6 +135,16 @@ internal static class TestContent
     /// <summary>The critter item id the second level places, distinct from the first level's.</summary>
     public const int SecondLevelCritterItemId = 66;
 
+    /// <summary>
+    /// The door tile the first level places. The tile is a door: the fixture puts no
+    /// door object on it, so a doorway here is drawn by the level's own geometry.
+    /// </summary>
+    public const int FirstLevelDoorX = 1;
+
+    public const int FirstLevelDoorY = 1;
+
+    public static readonly (int X, int Y) FirstLevelDoorTile = (FirstLevelDoorX, FirstLevelDoorY);
+
     /// <summary>The door tile the second level places, distinct from the first level's.</summary>
     public static readonly (int X, int Y) SecondLevelDoorTile = (1, 2);
 

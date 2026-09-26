@@ -577,12 +577,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             foreach ((int index, EntityId _) in admission.ByIndex.OrderBy(entry => entry.Key))
             {
                 if (!admission.Objects.TryGetValue(index, out AdmittedObject? obj)) continue;
-                // What a record holds is inside it, and what an owner carries is on
-                // them: only what stands loose on the level is drawn here.
-                if (admission.Holders.ContainsKey(index) && obj.Owner != 0) continue;
-                if (admission.Holders.Values.Contains(index) && !obj.Mobile && !IsContainerItem(obj.ItemId))
+                // What the level state says is gone is not drawn; what a record
+                // holds is inside it; and what the avatar carries is on them. The
+                // inventory world answers the last of those, so it is the same
+                // authority a save reads rather than a second list to keep.
+                if (!_session.Dungeon.Current.IsLive(index)) continue;
+                if (obj.Owner != 0) continue;
+                if (admission.Holders.TryGetValue(index, out int heldBy) && heldBy != 0) continue;
+                if (admission.ByIndex.TryGetValue(index, out EntityId drawn)
+                    && IsCarriedOff(admission, level, drawn))
                 {
-                    // A held item: inside a container or on a creature, not drawn.
                     continue;
                 }
 
@@ -648,9 +652,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             level,
             LiveObjectCount(level),
             _session.Dungeon.Current.OpenedDoors.Count,
-            CarriedItems.UniqueItems.Count);
+            CarriedItems.UniqueItems.Count,
+            StandingCreatureCount(level));
     }
 
+
+    /// <summary>Whether the avatar carries an admitted object away from its level.</summary>
+    private bool IsCarriedOff(UuEntityAdmission.Admission admission, int level, EntityId item) =>
+        _session.HeldItems is { } held
+        && held.TryGetContainer(item, out EntityId holder)
+        && !LevelOwns(admission, level, holder);
 
     /// <summary>Whether an owner belongs to the level: its floor, its records, its creatures.</summary>
     private bool LevelOwns(UuEntityAdmission.Admission admission, int level, EntityId owner) =>
@@ -658,6 +669,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         || admission.ByIndex.Values.Any(candidate => candidate.Value == owner.Value)
         || (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)
             && actors.Values.Any(actor => actor.Actor.Entity.Value == owner.Value));
+
+    /// <summary>How many of a level's creatures are still standing.</summary>
+    private int StandingCreatureCount(int level) =>
+        _placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures)
+            ? creatures.Values.Count(creature => !creature.IsDefeated)
+            : 0;
 
     /// <summary>How many of a level's admitted records are still standing.</summary>
     private int LiveObjectCount(int level) =>
@@ -682,7 +699,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly Dictionary<UuObjectShapeKind, Appearance> _objectAppearances = [];
 
     /// <summary>What the published scene was drawn from, so it is redrawn only when it changes.</summary>
-    private (int Level, int Objects, int Doors, int Carried) _publishedScene = (-1, -1, -1, -1);
+    private (int Level, int Objects, int Doors, int Carried, int Creatures) _publishedScene = (-1, -1, -1, -1, -1);
 
     /// <summary>Keeps the generation being replaced until the session releases it.</summary>
     private void RetireLevelResources()
@@ -708,7 +725,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 _session.Dungeon.CurrentLevel,
                 LiveObjectCount(_session.Dungeon.CurrentLevel),
                 _session.Dungeon.Current.OpenedDoors.Count,
-                CarriedItems.UniqueItems.Count))
+                CarriedItems.UniqueItems.Count,
+                StandingCreatureCount(_session.Dungeon.CurrentLevel)))
         {
             PublishScene(_appearance);
         }
