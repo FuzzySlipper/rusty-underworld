@@ -92,9 +92,13 @@ public sealed class UuLevelItems
             if (!admission.ByIndex.TryGetValue(index, out EntityId item)) continue;
             AdmittedObject obj = admission.Objects[index];
             if (!_definitions.TryDefinition(obj.ItemId, out ItemDefinition definition)) continue;
-            // The record's own owner field decides: a container's contents name
-            // the container, a critter's carried objects name the critter.
-            EntityId holder = obj.Owner > 0 && _ownerEntity(obj.Owner) is { } owner ? owner : floor;
+            // What the level's own record links decides: a container holds what
+            // its link chain names and a creature holds what its own does, with
+            // the record's owner field as the fallback the format also allows.
+            int holderIndex = admission.Holders.TryGetValue(index, out int linked)
+                ? linked
+                : obj.Owner;
+            EntityId holder = holderIndex > 0 && _ownerEntity(holderIndex) is { } owner ? owner : floor;
             Place(item, definition, holder);
         }
     }

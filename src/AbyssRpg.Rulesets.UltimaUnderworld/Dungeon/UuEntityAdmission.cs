@@ -17,7 +17,8 @@ public static class UuEntityAdmission
         IReadOnlyDictionary<int, EntityId> ByIndex,
         IReadOnlyDictionary<int, DurableIdentityReference> Identities,
         IReadOnlyDictionary<int, AdmittedObject> Objects,
-        IReadOnlyDictionary<int, (int X, int Y)> Tiles);
+        IReadOnlyDictionary<int, (int X, int Y)> Tiles,
+        IReadOnlyDictionary<int, int> Holders);
 
     public static Admission AdmitLevel(EntityDirectory directory, AdmittedLevel level, UuLevelState state)
     {
@@ -31,6 +32,7 @@ public static class UuEntityAdmission
         var identities = new Dictionary<int, DurableIdentityReference>();
         var live = new Dictionary<int, AdmittedObject>();
         var tiles = new Dictionary<int, (int X, int Y)>();
+        var holders = new Dictionary<int, int>();
         var objects = level.Objects.ToDictionary(o => o.Index);
         foreach (AdmittedTile tile in level.Tiles)
         {
@@ -85,13 +87,16 @@ public static class UuEntityAdmission
                     byIndex[index] = entity;
                     identities[index] = identity;
                     live[index] = content;
+                    // What a record links is held by that record: the operator's
+                    // own level leaves the content's owner field unset.
+                    holders[index] = container.Index;
                 }
 
                 index = content.Next;
             }
         }
 
-        return new Admission(byIndex, identities, live, tiles);
+        return new Admission(byIndex, identities, live, tiles, holders);
     }
 
     private static bool IsCritter(AdmittedObject obj) =>
