@@ -37,12 +37,12 @@ public sealed record UuSessionSnapshot(
     UuCreatureDto[]? Creatures = null);
 
 /// <summary>
-/// What one owner holds, by the level and object index each item was admitted
-/// from: the durable identity the runtime assigns an admitted object is derived
-/// from exactly that pair, so the holding survives a rebuild and a later restore
-/// finds the same item rather than a copy.
+/// What one owner holds. The level and owner index locate the owner, which a
+/// level's own admission rebuilds from content; each item carries its durable
+/// identity and its definition, so an item the avatar carried off another level
+/// is put back as the same item rather than as a copy or a lookalike.
 /// </summary>
-public sealed record UuHoldingDto(int Level, int OwnerIndex, int[] ItemIndexes)
+public sealed record UuHoldingDto(int Level, int OwnerIndex, UuHeldItemDto[] Items)
 {
     /// <summary>The owner index of the avatar's own pack.</summary>
     public const int AvatarOwner = -1;
@@ -50,6 +50,9 @@ public sealed record UuHoldingDto(int Level, int OwnerIndex, int[] ItemIndexes)
     /// <summary>The owner index of a level's loose objects.</summary>
     public const int FloorOwner = -2;
 }
+
+/// <summary>One held item: the identity it keeps across a save, and what it is.</summary>
+public sealed record UuHeldItemDto(ulong Identity, string Definition);
 
 /// <summary>
 /// One admitted creature's own state: where it stands and how hurt it is. The

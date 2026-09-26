@@ -61,6 +61,7 @@ public sealed class UuLevelItems
     private readonly MechanicsInventoryContainerCoordinator _coordinator;
     private readonly UuItemDefinitions _definitions;
     private readonly Func<int, EntityId?> _ownerEntity;
+    private readonly HashSet<ulong> _owners = [];
 
     public UuLevelItems(
         InventoryStore store,
@@ -107,6 +108,7 @@ public sealed class UuLevelItems
     public InventoryContainerTransferReceipt Loot(EntityId owner, EntityId destination)
     {
         _ = Owner(owner);
+        _ = Owner(destination);
         return _coordinator.TransferAll(owner, destination);
     }
 
@@ -130,15 +132,21 @@ public sealed class UuLevelItems
     }
 
     /// <summary>
-    /// Ensures an admitted item is held by one owner: an item the store already
-    /// knows is transferred, and one it does not is materialized there. Answers
-    /// false only when the catalog has no definition for the item, which is the
-    /// same reason admission would not have placed it.
+    /// Ensures the item with one durable identity is held by one owner. An item
+    /// the session already knows is moved; one it does not -- a level it has not
+    /// admitted yet, or a payload restored before its level -- is created with
+    /// that identity and placed. Answers false only when the catalog has no
+    /// definition for it, which is the same reason admission would skip it.
     /// </summary>
-    public bool TryHold(EntityId item, int itemId, EntityId owner)
+    public bool TryHold(ulong identity, string definitionId, EntityId owner)
     {
-        if (!_definitions.TryDefinition(itemId, out ItemDefinition definition)) return false;
+        if (!_definitions.Definitions.TryGetValue(new InventoryItemId(definitionId), out ItemDefinition? definition))
+            return false;
         _ = Owner(owner);
+        var reference = new DurableIdentityReference(DurableIdentityKind.Item, identity);
+        EntityId item = _directory.TryResolve(reference, out EntityId existing)
+            ? existing
+            : _directory.CreateItemEntity(reference, new EntityTypeId(definitionId));
         if (!_store.TryGetContainer(item, out EntityId holder))
         {
             Place(item, definition, owner);
@@ -182,6 +190,7 @@ public sealed class UuLevelItems
     public EntityId Owner(EntityId owner)
     {
         if (!_store.TryGetInventory(owner, out _)) _coordinator.RegisterOwner(owner);
+        _owners.Add(owner.Value);
         return owner;
     }
 
@@ -189,8 +198,28 @@ public sealed class UuLevelItems
     {
         _ = Owner(holder);
         // A container holds its own contents while the floor holds the container,
-        // so only a loose object moves onto the floor.
-        if (_store.TryGetContainer(item, out _)) return;
+        // so only a loose object moves onto the floor. An item that is already in
+        // somebody's inventory is not placed again: a level admitted twice -- after
+        // travel, or after a load -- would otherwise hand the same item to the
+        // owner content names and to the owner play moved it to.
+        if (HeldSomewhere(item)) return;
         _coordinator.Entities.Store.Get<InventoryComponent>(holder).MaterializeUnique(new ItemState(item, definition));
+    }
+
+    /// <summary>Whether any registered owner already holds this item.</summary>
+    private bool HeldSomewhere(EntityId item)
+    {
+        if (_store.TryGetContainer(item, out _)) return true;
+        foreach (ulong owner in _owners)
+        {
+            if (!_coordinator.Entities.Store.IsAlive(new EntityId(owner))) continue;
+            foreach (Rusty.Engine.Mechanics.UniqueInventoryItem entry in
+                _coordinator.Read(new EntityId(owner)).UniqueItems)
+            {
+                if (entry.Entity.Value == item.Value) return true;
+            }
+        }
+
+        return false;
     }
 }
