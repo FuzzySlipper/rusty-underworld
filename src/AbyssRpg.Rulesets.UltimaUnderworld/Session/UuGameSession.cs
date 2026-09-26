@@ -194,6 +194,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     public WorldPoint? PlayerPosition => _player.Position;
 
+    /// <summary>What the avatar carries right now: the pack the Engine holds for it.</summary>
+    public Rusty.Engine.Mechanics.InventoryView CarriedItems =>
+        _session.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+
     public float PlayerYawRadians => _player.YawRadians;
 
     private string _outcome = "";

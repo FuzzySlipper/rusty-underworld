@@ -1323,6 +1323,7 @@ public sealed class OrdinaryCompositionTests
         var status = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionDebugModule)session;
         Assert.Contains("level=1", status.Status(), StringComparison.Ordinal);
         Assert.Contains("x=", status.Where(), StringComparison.Ordinal);
+        Assert.Contains("carried=0 items=[]", status.Pack(), StringComparison.Ordinal);
 
         // The product's own commands answer from live state and act on it.
         Assert.Contains("bundle=abyssrpg.stygian-abyss", product.ProductInfo(), StringComparison.Ordinal);

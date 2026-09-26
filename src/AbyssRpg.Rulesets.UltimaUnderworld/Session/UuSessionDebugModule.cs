@@ -31,6 +31,15 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
             + $"actors={status.PresentActors} defeated={status.Defeated} outcome=\"{status.Outcome}\"");
     }
 
+    [DebugCommand("abyss.pack", Description = "What the avatar carries, by item identity, and how much of it.")]
+    public string Pack()
+    {
+        if (Live is not { } session) return "no live session";
+        Rusty.Engine.Mechanics.InventoryView held = session.CarriedItems;
+        return string.Create(CultureInfo.InvariantCulture,
+            $"carried={held.UniqueItems.Count} items=[{string.Join(",", held.UniqueItems.Select(item => item.Definition.Value))}]");
+    }
+
     [DebugCommand("abyss.where", Description = "Avatar position and heading in Engine units and radians.")]
     public string Where()
     {
