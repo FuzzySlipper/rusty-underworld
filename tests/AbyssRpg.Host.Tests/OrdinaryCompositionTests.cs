@@ -86,7 +86,7 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
-        Assert.Equal(4, graphics.LastSnapshot.Count);
+        Assert.Equal(5, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -910,6 +910,36 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(2, ((ISessionStatusSource)reloaded).Status.Level);
         Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
         Assert.Single(reloaded.CarriedItems.UniqueItems);
+    }
+
+    [Fact]
+    public void A_burning_light_on_the_floor_lights_the_room_it_stands_in()
+    {
+        // The fixture places a burning light (majorclass 1, classindex 4) on tile
+        // (2,0) and the avatar spawns two tiles away. Walking off to the far side of
+        // the level must not take the light with it: the room stays lit, and what is
+        // in that room is still drawn.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        ulong lit = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+            .LevelObjectIdentity(1, TestContent.LitLightObjectIndex).Value;
+        Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == lit);
+
+        // Far enough that the avatar's own light cannot reach the light's tile.
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 60f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+        // Seven tiles away, against a radius of six: the light is out of the
+        // avatar's own reach now.
+        Assert.True(
+            session.LightRadius < 7,
+            $"the walk leaves the placed light outside the avatar's radius of {session.LightRadius}");
+
+        // What stands near the placed light is drawn from the light, and the light
+        // itself is still drawn where it stands.
+        Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == lit);
     }
 
     [Fact]

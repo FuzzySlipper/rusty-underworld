@@ -29,6 +29,12 @@ internal static class TestContent
     public const int ContainerContentIndex = 503;
     public const int PropObjectIndex = 500;
 
+    /// <summary>A burning light source (majorclass 1, classindex 4) the level places.</summary>
+    public const int LitLightItemId = 80;
+
+    /// <summary>The object index the burning light hangs on.</summary>
+    public const int LitLightObjectIndex = 510;
+
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
@@ -315,6 +321,7 @@ internal static class TestContent
                     (1, 0) => ContainerObjectIndex,
                     // The runestones hang on their own tile, chained together.
                     (0, 2) when withRunes => FirstRunestoneObjectIndex,
+                    (2, 0) => LitLightObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -344,13 +351,14 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 4,
+          "liveObjects": 5,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
             {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1,5],
             [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
-            [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
+            [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

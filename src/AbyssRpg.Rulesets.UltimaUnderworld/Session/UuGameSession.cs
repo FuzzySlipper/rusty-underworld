@@ -736,6 +736,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         float dz = z - position.Z;
         int band = Presentation.UuLightBands.Band(
             MathF.Sqrt((dx * dx) + (dz * dz)), LightRadius * TileUnits);
+        // A light standing on the floor lights the room around it too, so what is
+        // near one is drawn even when the avatar has walked away from it.
+        foreach ((WorldPoint where, int reach) in PlacedLights())
+        {
+            float lightX = x - where.X;
+            float lightZ = z - where.Z;
+            int near = Presentation.UuLightBands.Band(
+                MathF.Sqrt((lightX * lightX) + (lightZ * lightZ)), reach * TileUnits);
+            if (near < band) band = near;
+        }
+
         if (band >= Presentation.UuLightBands.Hidden) return band;
 
         // Light does not pass through walls: what is behind one is not drawn, however
@@ -744,6 +755,32 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             ? band
             : Presentation.UuLightBands.Hidden;
     }
+
+    /// <summary>
+    /// The lights standing on this level: admitted objects whose item id is a light
+    /// that is burning, with the radius the item catalog gives that item.
+    /// </summary>
+    private IEnumerable<(WorldPoint Where, int Reach)> PlacedLights()
+    {
+        if (_placements is null) yield break;
+        if (_session.PlacedAdmission(_session.Dungeon.CurrentLevel) is not { } admission) yield break;
+        foreach ((int index, AdmittedObject obj) in admission.Objects)
+        {
+            if (!Dungeon.UuLightSources.IsLit(obj.ItemId)) continue;
+            if (!_session.Dungeon.Current.IsLive(index)) continue;
+            if (admission.Holders.TryGetValue(index, out int heldBy) && heldBy != 0) continue;
+            if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile)) continue;
+            // The item catalog gives each light its own radius; the session does not
+            // hold that catalog yet, so every burning light reaches the same distance
+            // until it does. Recorded in #8666.
+            int reach = DefaultLightReach;
+            AdmittedTile? placed = _placements.Tile(tile.X, tile.Y);
+            yield return (_placements.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0), reach);
+        }
+    }
+
+    /// <summary>What a burning light on the floor reaches, in tiles.</summary>
+    public const int DefaultLightReach = 4;
 
     /// <summary>Whether the avatar has an unobstructed line to a tile.</summary>
     private bool SeesTile(int tileX, int tileY)
