@@ -309,7 +309,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
                 Respawn();
                 break;
             case var slot when slot.StartsWith(LoadSlotIntentPrefix, StringComparison.Ordinal):
-                LoadSlot(slot[LoadSlotIntentPrefix.Length..]);
+                LoadSlotAt(slot[LoadSlotIntentPrefix.Length..]);
                 break;
             default:
                 break;
@@ -317,7 +317,34 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     }
 
     /// <summary>The intent prefix a menu uses to name the slot it wants resumed.</summary>
-    public const string LoadSlotIntentPrefix = "abyss.action.load-slot:";
+    public const string LoadSlotIntentPrefix = "abyss.action.load-slot-";
+
+    /// <summary>
+    /// Resumes the slot at one position of the menu's own ordering (newest
+    /// first). A save written between the projection and the click shifts the
+    /// positions, so the slot that was actually resumed is reported by name.
+    /// </summary>
+    public bool LoadSlotAt(string position)
+    {
+        ThrowIfShutdown();
+        if (!int.TryParse(position, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int number)
+            || number < 1)
+        {
+            _hostOutcome = "That slot is not a save this product owns.";
+            Publish();
+            return false;
+        }
+
+        IReadOnlyList<AbyssSlotSummary> slots = Slots();
+        if (number > slots.Count)
+        {
+            _hostOutcome = "There is no save in that slot.";
+            Publish();
+            return false;
+        }
+
+        return LoadKey(slots[number - 1].Key);
+    }
 
     private void ApplyMode()
     {

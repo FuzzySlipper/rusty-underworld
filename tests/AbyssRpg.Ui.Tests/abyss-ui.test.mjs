@@ -192,20 +192,17 @@ test('every control claims a declared intent', (t) => {
 
   const declared = new Set([
     'abyss.lifecycle.start', 'abyss.lifecycle.pause', 'abyss.lifecycle.resume', 'abyss.lifecycle.stop',
-    'abyss.action.quicksave', 'abyss.action.journey-onward', 'abyss.action.load-slot:', 'abyss.action.respawn',
+    'abyss.action.quicksave', 'abyss.action.journey-onward',
+    ...Array.from({ length: 13 }, (_, index) => `abyss.action.load-slot-${index + 1}`),
+    'abyss.action.respawn',
   ]);
   assert.deepEqual(
     ctx.claimed.map((claim) => claim.intent).sort(),
-    ['abyss.action.journey-onward', 'abyss.action.load-slot:autosave/level-1', 'abyss.action.quicksave',
+    ['abyss.action.journey-onward', 'abyss.action.load-slot-1', 'abyss.action.quicksave',
       'abyss.action.respawn', 'abyss.lifecycle.resume', 'abyss.lifecycle.start', 'abyss.lifecycle.stop'].sort(),
   );
   for (const claim of ctx.claimed) {
-    // A declared intent ending in ':' is a prefix carrying a named target, which
-    // is how a listed save is resumed by key.
-    const declaredIntent = [...declared].some(
-      (entry) => entry === claim.intent || (entry.endsWith(':') && claim.intent.startsWith(entry)),
-    );
-    assert.ok(declaredIntent, `${claim.intent} is not a declared intent`);
+    assert.ok(declared.has(claim.intent), `${claim.intent} is not a declared intent`);
     assert.deepEqual(claim.value, { kind: 'digital', active: true });
   }
   // Every control that returns to play keeps the pointer-lock gesture alive by
@@ -445,5 +442,5 @@ test('a listed save can be resumed by name', (t) => {
   assert.equal(rows.length, 1);
   assert.match(rows[0].textContent, /Quicksave/);
   rows[0].dispatchEvent(new (globalThis.document.defaultView.MouseEvent)('click', { bubbles: true }));
-  assert.deepEqual(ctx.claimed.map((claim) => claim.intent), ['abyss.action.load-slot:quicksave/0']);
+  assert.deepEqual(ctx.claimed.map((claim) => claim.intent), ['abyss.action.load-slot-1']);
 });

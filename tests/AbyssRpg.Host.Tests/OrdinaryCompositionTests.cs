@@ -741,6 +741,24 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void The_menu_resumes_the_save_it_lists_by_position()
+    {
+        // The menu cannot name a key inside an intent, so it claims the position
+        // of the row it rendered and the product resolves that against the same
+        // ordering. This drives the whole chain: intent -> position -> key -> load.
+        using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        UseAt(product, spatial, 2, 4f, 12f);
+        Assert.Equal("quicksave/0", product.Quicksave());
+
+        product.Update(new ProductUpdate(Facts(20), [Intent("abyss.action.load-slot-1")]));
+        Assert.Contains("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+        var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Single(reloaded.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View().UniqueItems);
+    }
+
+    [Fact]
     public void A_looted_container_is_still_empty_after_a_save_and_load()
     {
         using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
@@ -1227,15 +1245,19 @@ public sealed class OrdinaryCompositionTests
     [Fact]
     public void Declared_intents_match_the_entry_and_are_all_handled()
     {
-        // The declaration itself, minus the owner behaviour covered above.
+        // The declaration itself, minus the owner behaviour covered above. The
+        // slot intents are one per key the scheme can hold, in menu order.
+        string[] declared =
+        [
+            "abyss.lifecycle.start", "abyss.lifecycle.pause", "abyss.lifecycle.resume", "abyss.lifecycle.stop",
+            "abyss.action.quicksave", "abyss.action.journey-onward",
+            .. AbyssRpg.Host.AbyssSaveSlots.Keys()
+                .Select((_, position) => AbyssRpg.Host.AbyssProductEntry.SlotIntent(position)),
+            "abyss.action.respawn",
+        ];
         Assert.Equal(
-            AbyssProductEntry.Default.DeclaredIntents.OrderBy(name => name, StringComparer.Ordinal),
-            new[]
-            {
-                "abyss.lifecycle.start", "abyss.lifecycle.pause", "abyss.lifecycle.resume", "abyss.lifecycle.stop",
-                "abyss.action.quicksave", "abyss.action.journey-onward", "abyss.action.load-slot:",
-                "abyss.action.respawn",
-            }.OrderBy(name => name, StringComparer.Ordinal));
+            declared.OrderBy(name => name, StringComparer.Ordinal),
+            AbyssProductEntry.Default.DeclaredIntents.OrderBy(name => name, StringComparer.Ordinal));
     }
 
     [Fact]

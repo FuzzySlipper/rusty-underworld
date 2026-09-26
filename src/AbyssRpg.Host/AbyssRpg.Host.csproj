@@ -48,7 +48,19 @@
     <RustyEngineProductInputIntent Include="abyss.lifecycle.stop" Value="digital" />
     <RustyEngineProductInputIntent Include="abyss.action.quicksave" Value="digital" />
     <RustyEngineProductInputIntent Include="abyss.action.journey-onward" Value="digital" />
-    <RustyEngineProductInputIntent Include="abyss.action.load-slot:" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-1" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-2" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-3" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-4" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-5" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-6" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-7" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-8" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-9" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-10" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-11" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-12" Value="digital" />
+    <RustyEngineProductInputIntent Include="abyss.action.load-slot-13" Value="digital" />
     <RustyEngineProductInputIntent Include="abyss.action.respawn" Value="digital" />
     <RustyEngineProductInputMapping Include="abyss.action.quicksave.chord" Intent="abyss.action.quicksave" Trigger="key:key-s:pressed:chord=alt-left" />
     <RustyEngineProductInputMapping Include="abyss.action.journey-onward.chord" Intent="abyss.action.journey-onward" Trigger="key:key-l:pressed:chord=alt-left" />

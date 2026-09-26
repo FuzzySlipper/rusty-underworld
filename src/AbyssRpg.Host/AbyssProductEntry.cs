@@ -38,7 +38,7 @@ public sealed record AbyssProductEntry(
         [
             "abyss.action.quicksave",
             "abyss.action.journey-onward",
-            "abyss.action.load-slot:",
+            .. AbyssSaveSlots.Keys().Select((_, position) => SlotIntent(position)),
             "abyss.action.respawn",
         ],
         UiProjectionStream: "abyss.hud",
@@ -47,4 +47,12 @@ public sealed record AbyssProductEntry(
 
     /// <summary>Every direct intent the DOM may claim, lifecycle and player actions together.</summary>
     public IReadOnlyList<string> DeclaredIntents => [.. LifecycleIntents, .. ActionIntents];
+
+    /// <summary>
+    /// One intent per slot the save scheme can hold, in the order the menu lists
+    /// them, because a declared intent is an identifier: the slot cannot ride
+    /// inside the name, so its position does. The menu names the row it shows and
+    /// the product resolves that position against the same ordering.
+    /// </summary>
+    public static string SlotIntent(int position) => $"abyss.action.load-slot-{position + 1}";
 }
