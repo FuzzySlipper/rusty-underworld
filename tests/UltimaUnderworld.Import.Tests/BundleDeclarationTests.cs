@@ -34,12 +34,13 @@ public sealed class BundleDeclarationTests
         foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
         {
             string id = pack.GetProperty("id").GetString()!;
-            // Level and object-table packs are operator-produced from the
-            // game's own data, so they are generated into the imports tree
+            // Level, object-table and item-catalog packs are operator-produced
+            // from the game's own data, so they are generated into the imports tree
             // rather than committed; the descriptor is found wherever the
             // resolver would find it under the content root.
             if (id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
-                || id == "abyssrpg.object-tables")
+                || id == "abyssrpg.object-tables"
+                || id == "abyssrpg.item-catalog")
             {
                 string generated = Directory
                     .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)

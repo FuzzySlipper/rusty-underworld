@@ -13,7 +13,11 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Dungeon;
 /// </summary>
 public static class UuEntityAdmission
 {
-    public sealed record Admission(IReadOnlyDictionary<int, EntityId> ByIndex, IReadOnlyDictionary<int, DurableIdentityReference> Identities);
+    public sealed record Admission(
+        IReadOnlyDictionary<int, EntityId> ByIndex,
+        IReadOnlyDictionary<int, DurableIdentityReference> Identities,
+        IReadOnlyDictionary<int, AdmittedObject> Objects,
+        IReadOnlyDictionary<int, (int X, int Y)> Tiles);
 
     public static Admission AdmitLevel(EntityDirectory directory, AdmittedLevel level, UuLevelState state)
     {
@@ -25,6 +29,8 @@ public static class UuEntityAdmission
 
         var byIndex = new Dictionary<int, EntityId>();
         var identities = new Dictionary<int, DurableIdentityReference>();
+        var live = new Dictionary<int, AdmittedObject>();
+        var tiles = new Dictionary<int, (int X, int Y)>();
         var objects = level.Objects.ToDictionary(o => o.Index);
         foreach (AdmittedTile tile in level.Tiles)
         {
@@ -46,13 +52,17 @@ public static class UuEntityAdmission
                         entity = directory.CreateItemEntity(identity, new EntityTypeId($"abyss.item.{obj.ItemId}"));
                     byIndex[index] = entity;
                     identities[index] = identity;
+                    live[index] = obj;
+                    // A tile can carry a chain of objects; the walk knows the
+                    // tile each link hangs on, which is where the object is.
+                    tiles.TryAdd(index, (tile.X, tile.Y));
                 }
 
                 index = obj.Next;
             }
         }
 
-        return new Admission(byIndex, identities);
+        return new Admission(byIndex, identities, live, tiles);
     }
 
     private static bool IsCritter(AdmittedObject obj) =>

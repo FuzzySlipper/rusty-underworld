@@ -33,6 +33,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// <summary>Melee reach in Engine units; a swing resolves against an opponent inside it.</summary>
     public const float MeleeReach = 6f;
 
+    /// <summary>A hand's reach: what the use channel can name from where the avatar stands.</summary>
+    public const float InteractionReach = 2.5f;
+
     private const float EyeHeight = 1.6f;
 
     private readonly GameSessionContext _context;
@@ -70,6 +73,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuLevelScene scene,
         UuLevelPlacements? placements,
         UuLevelCatalog? catalog,
+        UuItemCatalog? items,
         UuSession session,
         SpatialMovementSystem movement,
         PlayerControlState player,
@@ -84,6 +88,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _scene = scene;
         _placements = placements;
         _catalog = catalog;
+        _items = items;
         _session = session;
         _movement = movement;
         _player = player;
@@ -124,6 +129,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>The imported levels this session may travel between, when the entry built one.</summary>
     private readonly UuLevelCatalog? _catalog;
+
+    /// <summary>The imported item catalog, when the bundle carries one.</summary>
+    private readonly UuItemCatalog? _items;
 
     /// <summary>
     /// The actor each placed critter slot became, per level, so a defeat can be
@@ -208,6 +216,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         AdmittedLevel FirstLevel,
         UuLevelPlacements? Placements,
         UuObjectTables? Tables,
+        UuItemCatalog? Items,
         UuSessionSnapshot? Snapshot,
         int WorldSeed,
         string DefaultAvatarName);
@@ -260,12 +269,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuObjectTables? tables = tablesPack is null
             ? null
             : UuObjectTablesContent.Read(tablesPack.Payload, $"content pack '{tablesPack.Id.Value}'");
+        ContentPack? itemsPack = composition.ContentPacks
+            .SingleOrDefault(pack => pack.Id.Value == UuItemCatalogContent.PackId);
+        UuItemCatalog? items = itemsPack is null
+            ? null
+            : UuItemCatalogContent.Read(itemsPack.Payload, $"content pack '{itemsPack.Id.Value}'");
         AdmittedLevel firstLevel = placements is null
             ? new AdmittedLevel(level.Level, [], [])
             : new AdmittedLevel(level.Level, placements.Tiles, placements.Objects);
 
         return new Prepared(
-            tuning, level, choices, vitals, firstLevel, placements, tables, savedSnapshot, worldSeed,
+            tuning, level, choices, vitals, firstLevel, placements, tables, items, savedSnapshot, worldSeed,
             creation.Defaults.Name);
     }
 
@@ -328,6 +342,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             scene,
             prepared.Placements,
             new UuLevelCatalog(context.Composition),
+            prepared.Items,
             session,
             movement,
             player,
@@ -565,6 +580,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// tile opens and closes through the level state the save carries, so the
     /// change survives a load; anywhere else the outcome says so.
     /// </summary>
+    /// <summary>
+    /// The admitted use channel: what the avatar is standing at decides. A door
+    /// tile opens or closes, an object the level placed is named from the
+    /// imported item catalog, and anything else answers that there is nothing
+    /// here — one dispatch, not a verb per owner.
+    /// </summary>
     private void Interact()
     {
         if (_placements is null || _player.Position is not { } position)
@@ -573,16 +594,49 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
-        AdmittedTile? tile = _placements.TileAt(position);
-        if (tile is not { Door: true })
+        if (_placements.TileAt(position) is { Door: true } tile)
         {
-            _outcome = "There is nothing here to use.";
+            bool open = !_session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y));
+            _session.Dungeon.Current.SetDoor(tile.X, tile.Y, open);
+            _outcome = open ? "You open the door." : "You close the door.";
             return;
         }
 
-        bool open = !_session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y));
-        _session.Dungeon.Current.SetDoor(tile.X, tile.Y, open);
-        _outcome = open ? "You open the door." : "You close the door.";
+        if (PlacedObjectInReach(position) is { } placed)
+        {
+            _outcome = $"You see {Describe(placed.ItemId)} here.";
+            return;
+        }
+
+        _outcome = "There is nothing here to use.";
+    }
+
+    /// <summary>The nearest object the level placed, within a hand's reach.</summary>
+    private AdmittedObject? PlacedObjectInReach(WorldPoint position)
+    {
+        AdmittedObject? nearest = null;
+        float nearestDistance = InteractionReach;
+        foreach (int index in _session.PlacedObjectIndexes(_session.Dungeon.CurrentLevel))
+        {
+            if (_session.PlacedObjectAt(_session.Dungeon.CurrentLevel, index, out (int X, int Y) tile) is not { } obj)
+                continue;
+            AdmittedTile? on = _placements?.Tile(tile.X, tile.Y);
+            if (on is null) continue;
+            WorldPoint center = _placements!.TileCenter(on.X, on.Y, on.FloorHeight);
+            float distance = center.HorizontalDistanceTo(position);
+            if (distance > nearestDistance) continue;
+            nearest = obj;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>What the avatar calls an item it can see: its imported name, or its kind.</summary>
+    private string Describe(int itemId)
+    {
+        string name = _items?.Find(itemId)?.Name ?? "";
+        return name.Length > 0 ? name : "something";
     }
 
     /// <summary>
@@ -736,6 +790,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             .Take(take)
             .ToArray();
     }
+
+    /// <summary>The imported item catalog this session reads names and mass from, when the bundle carries one.</summary>
+    public UuItemCatalog? Items => _items;
 
     /// <summary>Where the avatar's capsule center stands, before any new proposal.</summary>
     public WorldPoint? AvatarPosition => _player.Position;

@@ -59,6 +59,25 @@ public sealed class UuSession : IDisposable
     /// <summary>Avatar flight. Set by spell/item systems; the product reads it per update.</summary>
     public bool Flying { get; set; }
 
+    /// <summary>
+    /// The live placed object at a level and object index, with the tile it
+    /// hangs on, or null when the level admits no such object.
+    /// </summary>
+    public AdmittedObject? PlacedObjectAt(int level, int objectIndex, out (int X, int Y) tile)
+    {
+        tile = default;
+        if (!_admissions.TryGetValue(level, out UuEntityAdmission.Admission? admission)) return null;
+        if (!admission.Objects.TryGetValue(objectIndex, out AdmittedObject? obj)) return null;
+        tile = admission.Tiles.TryGetValue(objectIndex, out (int X, int Y) found) ? found : default;
+        return obj;
+    }
+
+    /// <summary>The object indexes a level admits as live entities right now.</summary>
+    public IReadOnlyCollection<int> PlacedObjectIndexes(int level) =>
+        _admissions.TryGetValue(level, out UuEntityAdmission.Admission? admission)
+            ? admission.Objects.Keys.ToArray()
+            : [];
+
     private UuSession(
         ActorsState actors,
         EntityDirectory directory,

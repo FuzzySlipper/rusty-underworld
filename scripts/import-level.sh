@@ -31,6 +31,9 @@ mkdir -p "$packs"
 # beside the authored packs; the level's placements ride with the level.
 if [[ -f "$data_dir/OBJECTS.DAT" ]]; then
   tables_args=(--objects "$data_dir/OBJECTS.DAT" --packs "$packs")
+  # The item catalog needs the common object table and the name strings too.
+  [[ -f "$data_dir/COMOBJ.DAT" ]] && tables_args+=(--common "$data_dir/COMOBJ.DAT")
+  [[ -f "$data_dir/STRINGS.PAK" ]] && tables_args+=(--strings "$data_dir/STRINGS.PAK")
 else
   tables_args=()
   echo "OBJECTS.DAT missing in $data_dir: the level imports without critter and container tables." >&2
@@ -40,6 +43,22 @@ dotnet run --project "$repo_root/src/UltimaUnderworld.Import.Tool/UltimaUnderwor
   --configuration Release -- \
   emit-level --levark "$data_dir/LEV.ARK" --terrain "$data_dir/TERRAIN.DAT" --level "$level" --out "$out" \
   "${tables_args[@]}"
+
+admit_pack() {
+  python3 - "$repo_root" "$1" <<'PYEOF'
+import json, sys, pathlib
+root, pack_id = pathlib.Path(sys.argv[1]), sys.argv[2]
+bundle = root / "content/abyss/bundles/stygian-abyss.bundle.json"
+document = json.loads(bundle.read_text())
+packs = document["contentPacks"]
+if not any(pack["id"] == pack_id for pack in packs):
+    at = min((index for index, pack in enumerate(packs)
+              if pack["id"].startswith("abyssrpg.level-")), default=len(packs))
+    packs.insert(at, {"id": pack_id})
+    bundle.write_text(json.dumps(document, indent=2) + "\n")
+    print(f"Admitted {pack_id} in the shipped bundle.")
+PYEOF
+}
 
 admit_level() {
   python3 - "$repo_root" "$level" <<'PYEOF'
@@ -63,5 +82,8 @@ PYEOF
 # The shipped bundle is the product's default composition: an imported level is
 # admitted there, so the launcher can reach it and travel can enter it.
 admit_level
+if [[ -f "$packs/abyssrpg.item-catalog.pack.json" ]]; then
+  admit_pack abyssrpg.item-catalog
+fi
 
 echo "Imported level $level into $out (placements included). Rebuild the product to stage it."

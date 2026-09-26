@@ -30,6 +30,8 @@ try
     // The object tables are install-global, so they are written beside the
     // authored packs rather than into a per-level directory.
     string? packsDirectory = Array.IndexOf(args, "--packs") >= 0 ? Get("--packs") : null;
+    string? commonDatPath = Array.IndexOf(args, "--common") >= 0 ? Get("--common") : null;
+    string? stringsPakPath = Array.IndexOf(args, "--strings") >= 0 ? Get("--strings") : null;
 
     byte[] archive = File.ReadAllBytes(levArk);
     byte[] terrain = File.ReadAllBytes(terrainPath);
@@ -155,6 +157,41 @@ try
                 },
             }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"Emitted object tables: {tables.Critters.Count} critters, {tables.Containers.Count} containers.");
+
+        // The item catalog joins them: the common object table plus the string
+        // archive's item-name block, both install-global.
+        if (commonDatPath is not null && stringsPakPath is not null
+            && File.Exists(commonDatPath) && File.Exists(stringsPakPath))
+        {
+            byte[] commonBytes = File.ReadAllBytes(commonDatPath);
+            byte[] stringsBytes = File.ReadAllBytes(stringsPakPath);
+            ItemCatalogPack.Catalog catalog = ItemCatalogPack.Emit(
+                CommonObjDatReader.Read(commonBytes),
+                StringsPakReader.Decode(stringsBytes, "UW/DATA/STRINGS.PAK"),
+                UwTableProvenance.FromBytes("UW1", "UW/DATA/COMOBJ.DAT", commonBytes),
+                UwTableProvenance.FromBytes("UW1", "UW/DATA/STRINGS.PAK", stringsBytes));
+            string catalogJson = ItemCatalogPack.ToJson(catalog);
+            string catalogFile = $"{ItemCatalogPack.PackId}.json";
+            File.WriteAllText(Path.Combine(packsDirectory, catalogFile), catalogJson);
+            File.WriteAllText(
+                Path.Combine(packsDirectory, $"{ItemCatalogPack.PackId}.pack.json"),
+                JsonSerializer.Serialize(new
+                {
+                    kind = "abyssrpg.content-pack",
+                    id = ItemCatalogPack.PackId,
+                    ruleset = "abyssrpg.ultima-underworld",
+                    dependencies = Array.Empty<object>(),
+                    payload = $"{tablesPrefix}{catalogFile}",
+                    provenance = new
+                    {
+                        source = "UW1",
+                        origin = "UW/DATA/COMOBJ.DAT + UW/DATA/STRINGS.PAK",
+                        sha256 = Sha256(catalogJson),
+                    },
+                }, new JsonSerializerOptions { WriteIndented = true }));
+            int named = catalog.Items.Count(item => item.Name.Length > 0);
+            Console.WriteLine($"Emitted item catalog: {catalog.Items.Count} item ids, {named} named.");
+        }
     }
 
     Console.WriteLine(

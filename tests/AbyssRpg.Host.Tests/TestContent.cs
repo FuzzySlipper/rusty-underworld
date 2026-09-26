@@ -46,6 +46,7 @@ internal static class TestContent
                 { "id": "abyssrpg.classes" },
                 { "id": "abyssrpg.starting-kit" },
                 { "id": "abyssrpg.object-tables" },
+                { "id": "abyssrpg.item-catalog" },
                 { "id": "abyssrpg.level-__LEVEL__" }__SECOND_LEVEL__
               ],
               "tuning": { "id": "abyssrpg.stygian-default" }
@@ -54,6 +55,8 @@ internal static class TestContent
             File("abyss/packs/test.avatar-options.pack.json", Pack("abyssrpg.avatar-options", "abyss/content-packs/avatar-options.json")),
             File("abyss/packs/test.classes.pack.json", Pack("abyssrpg.classes", "abyss/content-packs/classes.json")),
             File("abyss/packs/test.starting-kit.pack.json", Pack("abyssrpg.starting-kit", "abyss/content-packs/starting-kit.json")),
+            File("abyss/packs/abyssrpg.item-catalog.pack.json", Pack("abyssrpg.item-catalog", "abyss/imports/object-tables/abyssrpg.item-catalog.json")),
+            File("abyss/imports/object-tables/abyssrpg.item-catalog.json", ItemCatalog()),
             File("abyss/tuning/test.tuning.json", """
             {
               "kind": "abyssrpg.tuning-profile",
@@ -145,6 +148,25 @@ internal static class TestContent
             "__PLACEMENTS__",
             withPlacements ? $"\n  \"placements\": {{ \"path\": \"{PlacementsPathFor(level)}\" }}," : "",
             StringComparison.Ordinal);
+
+    /// <summary>
+    /// The item catalog the shipped import produces, trimmed to the ids this
+    /// fixture places: the prop, the container and its content, and both levels'
+    /// critters.
+    /// </summary>
+    internal static string ItemCatalog() => """
+    {
+      "schemaVersion": 1,
+      "source": { "commonObjects": { "SourceGame": "UW1" }, "strings": { "SourceGame": "UW1" } },
+      "items": [
+        { "itemId": 64, "name": "giant rat", "massTenthStones": 12, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 0 },
+        { "itemId": 66, "name": "giant spider", "massTenthStones": 14, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 2 },
+        { "itemId": 128, "name": "sack", "massTenthStones": 2, "height": 4, "radius": 2, "canPickUp": true, "class": 2, "minorClass": 0, "classIndex": 0 },
+        { "itemId": 176, "name": "piece of meat", "massTenthStones": 7, "height": 3, "radius": 1, "canPickUp": true, "class": 2, "minorClass": 3, "classIndex": 0 },
+        { "itemId": 200, "name": "torch", "massTenthStones": 4, "height": 5, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 8 }
+      ]
+    }
+    """;
 
     /// <summary>
     /// The critter and container tables the shipped import produces, trimmed to

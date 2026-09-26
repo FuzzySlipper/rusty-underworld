@@ -44,7 +44,7 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(BuiltInRulesets.UltimaUnderworld, product.CompositionIdentity.Ruleset);
         Assert.Equal("abyssrpg.stygian-default", product.CompositionIdentity.Tuning.Value);
         Assert.Equal(
-            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.level-1", "abyssrpg.object-tables", "abyssrpg.starting-kit"],
+            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.item-catalog", "abyssrpg.level-1", "abyssrpg.object-tables", "abyssrpg.starting-kit"],
             product.CompositionIdentity.ContentPacks.Select(pack => pack.Value).OrderBy(value => value, StringComparer.Ordinal));
         Assert.NotNull(product.Session);
         Assert.True(product.Session is ISessionStatusSource);
@@ -395,6 +395,37 @@ public sealed class OrdinaryCompositionTests
         Assert.Throws<InvalidOperationException>(() => session.TravelToLevel(1, costTicks: 0));
         Assert.Equal(1, session.Status.Level);
         Assert.Equal(1, session.PresentActors);
+    }
+
+    [Fact]
+    public void The_use_channel_names_a_placed_object_from_the_imported_item_catalog()
+    {
+        // The fixture's prop (item 200, the catalog's "torch") hangs on tile
+        // (0,1), which the Engine's step stands the avatar on.
+        UiDouble ui = UiDouble.Create();
+        var spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 12f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.NotNull(session.Items);
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You see torch here.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // Away from anything the level placed, the answer is still honest.
+        spatial.StepTranslation = new System.Numerics.Vector3(60f, 1f, 60f);
+        product.Update(SixtyHzUpdate(3));
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("There is nothing here to use.", HudString(ui.LastProjection!.Value.Value, "outcome"));
     }
 
     [Fact]

@@ -148,4 +148,34 @@ public sealed class LevelPlacementsTests
         Assert.NotEmpty(placedCritters);
         Assert.All(placedCritters, critter => Assert.InRange(critter.HomeTileY, 0, 63));
     }
+
+    [Fact]
+    public void The_item_catalog_names_the_operators_own_items()
+    {
+        byte[] common = File.ReadAllBytes(TestData.Find("UW/DATA/COMOBJ.DAT"));
+        byte[] strings = File.ReadAllBytes(TestData.Find("UW/DATA/STRINGS.PAK"));
+        ItemCatalogPack.Catalog catalog = ItemCatalogPack.Emit(
+            CommonObjDatReader.Read(common),
+            StringsPakReader.Decode(strings, "UW/DATA/STRINGS.PAK"),
+            UwTableProvenance.FromBytes("UW1", "UW/DATA/COMOBJ.DAT", common),
+            UwTableProvenance.FromBytes("UW1", "UW/DATA/STRINGS.PAK", strings));
+
+        // One record per item id the common object table defines, and the names
+        // the string archive's name block gives them.
+        Assert.Equal((common.Length - CommonObjDatReader.RecordOffset) / CommonObjDatReader.RecordSize, catalog.Items.Count);
+        Assert.True(catalog.Items.Count(item => item.Name.Length > 0) > 300, "most item ids carry a name");
+
+        // A door is scenery, a sack is carried: the pickup flag comes from the
+        // table rather than from the item's class.
+        Assert.False(catalog.Items[320].CanBePickedUp);
+        Assert.True(catalog.Items[128].CanBePickedUp);
+        Assert.Contains("sack", catalog.Items[128].Name, StringComparison.OrdinalIgnoreCase);
+        Assert.True(catalog.Items[176].MassTenthStones > 0, "a piece of meat has mass");
+
+        // The class of an item id is the donor's own split of the id.
+        Assert.Equal(320 >> 6, catalog.Items[320].Class);
+        Assert.Equal(128 >> 6, catalog.Items[128].Class);
+        Assert.Equal((128 & 0x30) >> 4, catalog.Items[128].MinorClass);
+        Assert.Equal(128 & 0xF, catalog.Items[128].ClassIndex);
+    }
 }
