@@ -423,6 +423,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             try
             {
                 session.RestoreSnapshot(savedSnapshot);
+                // The world the Engine owns -- what each owner holds, and the
+                // state of the creatures standing on the level -- is restored
+                // after the level's own delta, because a placement the save says
+                // is gone has no actor or item to put anything back into.
+                gameSession.RestoreWorld(savedSnapshot);
                 player.Restore(
                     new WorldPoint(savedSnapshot.AvatarPose.X, savedSnapshot.AvatarPose.Y, savedSnapshot.AvatarPose.Z),
                     DetachedMotion(savedSnapshot.AvatarPose.Y));
@@ -1210,8 +1215,186 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         ObjectDisposedException.ThrowIf(_disposed, this);
         WorldPoint position = _player.Position ?? _level.Spawn.Position;
         UuSessionSnapshot snapshot = _session.CaptureSnapshot(
-            new AvatarPoseDto(position.X, position.Y, position.Z, _player.YawRadians));
+            new AvatarPoseDto(position.X, position.Y, position.Z, _player.YawRadians)) with
+        {
+            Holdings = CaptureHoldings(),
+            Creatures = CaptureCreatures(),
+        };
         return new RulesetSavePayload(UuGameRuleset.RulesetIdentity, UuSessionSnapshotCodec.Encode(snapshot));
+    }
+
+    /// <summary>
+    /// What the owners on the live level hold, plus the avatar's own pack. Play
+    /// can only reach what stands on the level it is on, so those are the owners
+    /// whose holdings can differ from the content; the avatar is captured
+    /// wherever it travelled.
+    /// </summary>
+    private UuHoldingDto[] CaptureHoldings()
+    {
+        if (_levelItems is not { } items) return [];
+        int level = _session.Dungeon.CurrentLevel;
+        if (!TryOwnerIndexes(level, out Dictionary<ulong, int> byEntity)) return [];
+        var rows = new List<UuHoldingDto>
+        {
+            // The avatar's pack is keyed by the level each item came from, which
+            // is this level for everything it can have picked up here.
+            Holding(level, UuHoldingDto.AvatarOwner, items.Read(_session.Avatar.Actor.Entity), byEntity),
+            Holding(level, UuHoldingDto.FloorOwner, items.Read(items.Floor(level)), byEntity),
+        };
+        foreach (int index in OwnerIndexes(level))
+        {
+            EntityId owner = OwnerEntity(level, index);
+            InventoryView held = items.Read(owner);
+            if (held.UniqueItems.Count > 0) rows.Add(new UuHoldingDto(level, index, ItemIndexes(held, byEntity)));
+        }
+
+        return rows.ToArray();
+    }
+
+    /// <summary>
+    /// Every admitted owner on a level: the records that hold something (the
+    /// level states that by linking, or by a creature carrying it) and the
+    /// creatures standing on it. A plain prop holds nothing and is not an owner,
+    /// so it never gets an inventory it has no use for.
+    /// </summary>
+    private IEnumerable<int> OwnerIndexes(int level)
+    {
+        if (_session.PlacedAdmission(level) is not { } admission) yield break;
+        var owners = new SortedSet<int>(admission.Holders.Values);
+        if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors))
+        {
+            foreach (int index in actors.Keys) owners.Add(index);
+        }
+
+        foreach (int index in owners)
+        {
+            if (admission.Objects.ContainsKey(index) || OwnerIsActor(level, index)) yield return index;
+        }
+    }
+
+    private bool OwnerIsActor(int level, int index) =>
+        _placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)
+        && actors.ContainsKey(index);
+
+    /// <summary>The entity that holds what a placed record holds.</summary>
+    private EntityId OwnerEntity(int level, int index)
+    {
+        if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)
+            && actors.TryGetValue(index, out ActorState? actor))
+        {
+            return actor.Actor.Entity;
+        }
+
+        return _session.PlacedAdmission(level)!.ByIndex[index];
+    }
+
+    private static UuHoldingDto Holding(int level, int ownerIndex, InventoryView held, Dictionary<ulong, int>? byEntity) =>
+        new(level, ownerIndex, ItemIndexes(held, byEntity));
+
+    private static int[] ItemIndexes(InventoryView held, Dictionary<ulong, int>? byEntity)
+    {
+        if (byEntity is null) return [];
+        var indexes = new List<int>();
+        foreach (Rusty.Engine.Mechanics.UniqueInventoryItem item in held.UniqueItems)
+        {
+            if (byEntity.TryGetValue(item.Entity.Value, out int index)) indexes.Add(index);
+        }
+
+        return indexes.ToArray();
+    }
+
+    /// <summary>Maps each admitted item entity back to the object index it came from.</summary>
+    private bool TryOwnerIndexes(int level, out Dictionary<ulong, int> byEntity)
+    {
+        byEntity = [];
+        if (_session.PlacedAdmission(level) is not { } admission) return false;
+        foreach (KeyValuePair<int, EntityId> entry in admission.ByIndex) byEntity[entry.Value.Value] = entry.Key;
+        return true;
+    }
+
+    /// <summary>Where the admitted creatures stand and how hurt they are.</summary>
+    private UuCreatureDto[] CaptureCreatures()
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        if (!_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)) return [];
+        return actors
+            .Select(placed =>
+            {
+                ActorState actor = placed.Value;
+                return new UuCreatureDto(
+                    level,
+                    placed.Key,
+                    actor.Position.X,
+                    actor.Position.Y,
+                    actor.Position.Z,
+                    actor.HeadingYawRadians,
+                    actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current);
+            })
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Puts the world back the way the save left it: each owner holds what it
+    /// held, and each creature stands where it stood with the wounds it had. An
+    /// item already held by the right owner is left alone, so a restore applied
+    /// twice changes nothing.
+    /// </summary>
+    private void RestoreWorld(UuSessionSnapshot snapshot)
+    {
+        if (_levelItems is not { } items) return;
+        foreach (UuHoldingDto holding in snapshot.Holdings ?? [])
+        {
+            if (holding.Level != _session.Dungeon.CurrentLevel) continue;
+            if (!TryOwnerIndexes(holding.Level, out Dictionary<ulong, int> byEntity)) continue;
+            Dictionary<int, ulong> byIndex = byEntity.ToDictionary(entry => entry.Value, entry => entry.Key);
+            EntityId destination = holding.OwnerIndex switch
+            {
+                UuHoldingDto.AvatarOwner => _session.Avatar.Actor.Entity,
+                UuHoldingDto.FloorOwner => items.Floor(holding.Level),
+                _ => OwnerEntity(holding.Level, holding.OwnerIndex),
+            };
+            foreach (int index in holding.ItemIndexes)
+            {
+                if (!byIndex.TryGetValue(index, out ulong identity)) continue;
+                var item = new EntityId(identity);
+                if (items.TryContainerOf(item, out EntityId holder) && holder.Value == destination.Value) continue;
+                MoveItem(items, item, destination);
+            }
+        }
+
+        foreach (UuCreatureDto creature in snapshot.Creatures ?? [])
+        {
+            if (creature.Level != _session.Dungeon.CurrentLevel) continue;
+            if (!_placedCrittersByLevel.TryGetValue(creature.Level, out IReadOnlyDictionary<int, ActorState>? actors))
+                continue;
+            if (!actors.TryGetValue(creature.Index, out ActorState? actor)) continue;
+            actor.ApplyPose(new ActorPose(
+                new WorldPoint(creature.X, creature.Y, creature.Z),
+                creature.HeadingYawRadians));
+            actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = creature.Health;
+        }
+    }
+
+    /// <summary>Moves one item to the owner the save named, wherever it lies now.</summary>
+    private void MoveItem(UuLevelItems items, EntityId item, EntityId destination)
+    {
+        AdmittedObject? record = RecordOf(item);
+        if (record is null) return;
+        bool held = items.TryHold(item, record.ItemId, destination);
+    }
+
+    /// <summary>The admitted record an item entity came from, when it has one.</summary>
+    private AdmittedObject? RecordOf(EntityId item)
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        if (_session.PlacedAdmission(level) is not { } admission) return null;
+        foreach (KeyValuePair<int, EntityId> entry in admission.ByIndex)
+        {
+            if (entry.Value.Value == item.Value && admission.Objects.TryGetValue(entry.Key, out AdmittedObject? obj))
+                return obj;
+        }
+
+        return null;
     }
 
     /// <summary>Returns the avatar to the level spawn and restores its vitals: the defeat outcome.</summary>

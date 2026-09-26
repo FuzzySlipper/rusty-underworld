@@ -308,10 +308,16 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             case "abyss.action.respawn":
                 Respawn();
                 break;
+            case var slot when slot.StartsWith(LoadSlotIntentPrefix, StringComparison.Ordinal):
+                LoadSlot(slot[LoadSlotIntentPrefix.Length..]);
+                break;
             default:
                 break;
         }
     }
+
+    /// <summary>The intent prefix a menu uses to name the slot it wants resumed.</summary>
+    public const string LoadSlotIntentPrefix = "abyss.action.load-slot:";
 
     private void ApplyMode()
     {
@@ -390,6 +396,23 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             return false;
         }
 
+        return LoadKey(key);
+    }
+
+    /// <summary>
+    /// Loads one save slot by key. Journey Onward resolves which slot that is for
+    /// the automatic path; the menu names a slot outright, so a save a player
+    /// made can be resumed rather than only written.
+    /// </summary>
+    public bool LoadSlot(string key)
+    {
+        ThrowIfShutdown();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return LoadKey(key);
+    }
+
+    private bool LoadKey(string key)
+    {
         ProductStateLoad<AbyssSaveEnvelope> loaded = _store.Load(key);
         if (!loaded.Present || loaded.State is null)
         {

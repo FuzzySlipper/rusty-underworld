@@ -38,6 +38,7 @@ public sealed record AbyssProductEntry(
         [
             "abyss.action.quicksave",
             "abyss.action.journey-onward",
+            "abyss.action.load-slot:",
             "abyss.action.respawn",
         ],
         UiProjectionStream: "abyss.hud",

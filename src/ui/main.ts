@@ -63,6 +63,9 @@ const INTENTS = {
   quicksave: 'abyss.action.quicksave',
   journeyOnward: 'abyss.action.journey-onward',
   respawn: 'abyss.action.respawn',
+  // A named slot rides in the intent: the menu lists real saves, so a player can
+  // resume the one they made rather than only write it.
+  loadSlotPrefix: 'abyss.action.load-slot:',
 } as const;
 
 interface SlotView {
@@ -478,7 +481,9 @@ export function mountProductUi(
     respawnButton.disabled = !view.canRespawn;
     slotList.replaceChildren(...view.slots.map((slot) => {
       const item = document.createElement('li');
-      item.textContent = `${slot.label} — ${slot.savedAtUtc}`;
+      const load = button(`${slot.label} — ${slot.savedAtUtc}`);
+      load.addEventListener('click', () => enterPlay(`${INTENTS.loadSlotPrefix}${slot.key}`));
+      item.append(load);
       return item;
     }));
   };

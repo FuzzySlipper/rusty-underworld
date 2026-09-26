@@ -129,6 +129,35 @@ public sealed class UuLevelItems
             _coordinator.Read(from).StoreRevision);
     }
 
+    /// <summary>
+    /// Ensures an admitted item is held by one owner: an item the store already
+    /// knows is transferred, and one it does not is materialized there. Answers
+    /// false only when the catalog has no definition for the item, which is the
+    /// same reason admission would not have placed it.
+    /// </summary>
+    public bool TryHold(EntityId item, int itemId, EntityId owner)
+    {
+        if (!_definitions.TryDefinition(itemId, out ItemDefinition definition)) return false;
+        _ = Owner(owner);
+        if (!_store.TryGetContainer(item, out EntityId holder))
+        {
+            Place(item, definition, owner);
+            return true;
+        }
+
+        if (holder.Value == owner.Value) return true;
+        UniqueInventoryItem match = _coordinator.Read(holder).UniqueItems
+            .FirstOrDefault(entry => entry.Entity.Value == item.Value);
+        if (match.Entity.Value != item.Value) return false;
+        _ = Owner(holder);
+        return _coordinator.Transfer(
+            holder,
+            owner,
+            new InventoryContainerSelection(
+                new InventoryItemId(match.Definition.Value), 1, UniqueEntityId: item.Value),
+            _coordinator.Read(holder).StoreRevision).UniqueItems.Count == 1;
+    }
+
     /// <summary>Where an item currently lies, when the store knows it.</summary>
     public bool TryContainerOf(EntityId item, out EntityId container) => _store.TryGetContainer(item, out container);
 

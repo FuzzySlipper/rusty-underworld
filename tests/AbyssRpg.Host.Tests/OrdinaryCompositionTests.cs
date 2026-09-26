@@ -685,6 +685,128 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains(TestContent.TradeLine, conversation.Transcript);
     }
 
+    /// <summary>A product whose saves survive a load, with the spatial double that drives movement.</summary>
+    private static AbyssProduct SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial)
+    {
+        ui = UiDouble.Create();
+        spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 4f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        return new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    /// <summary>Walks to a tile and presses the use key there.</summary>
+    private static void UseAt(AbyssProduct product, EngineSpatialDouble spatial, ulong step, float x, float z)
+    {
+        spatial.StepTranslation = new System.Numerics.Vector3(x, 1f, z);
+        product.Update(SixtyHzUpdate(step));
+        product.Update(new ProductUpdate(Facts(step + 1), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        product.Update(new ProductUpdate(Facts(step + 2), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+    }
+
+    [Fact]
+    public void A_taken_item_is_still_carried_after_a_save_and_load()
+    {
+        // Save and load replace the whole session, so the world the Engine owns
+        // is what carries the item across: this is the round trip that used to
+        // lose it.
+        using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        UseAt(product, spatial, 2, 4f, 12f);
+        Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        Assert.Equal("quicksave/0", product.Quicksave());
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        var carried = reloaded.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+        Assert.Single(carried.UniqueItems);
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
+            carried.UniqueItems[0].Definition.Value);
+        // The floor it came from does not hold it any more, and it exists once:
+        // the sack that was never taken is still lying there.
+        var floor = reloaded.LevelItems!.Read(reloaded.LevelItems.Floor(1));
+        Assert.DoesNotContain(
+            floor.UniqueItems,
+            item => item.Definition.Value == AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value);
+        Assert.Single(floor.UniqueItems);
+    }
+
+    [Fact]
+    public void A_looted_container_is_still_empty_after_a_save_and_load()
+    {
+        using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        UseAt(product, spatial, 2, 12f, 4f);
+        Assert.Equal("You loot 1 item from the sack.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        Assert.Equal("quicksave/0", product.Quicksave());
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        var carried = reloaded.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+        Assert.Single(carried.UniqueItems);
+        // Using the sack again reports it empty: the contents did not come back.
+        // The session's own line is what says so; the host line still reports the
+        // load it just performed.
+        UseAt(product, spatial, 20, 12f, 4f);
+        Assert.Equal("The sack is empty.", ((ISessionStatusSource)reloaded).Status.Outcome);
+    }
+
+    [Fact]
+    public void A_wounded_creature_is_still_wounded_and_a_restore_does_not_duplicate()
+    {
+        using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        AbyssRpg.Kit.Actors.ActorState target = session.NearestActors(1)[0].Actor;
+        double full = target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).MaximumValue;
+
+        // One swing lands or misses; keep swinging until it takes a wound.
+        ulong step = 10;
+        for (int attempt = 0; attempt < 60 && target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current >= full; attempt++)
+        {
+            product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Pressed)]));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Released)]));
+        }
+
+        double wounded = target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current;
+        Assert.True(wounded < full, "the creature takes a wound before the save");
+
+        Assert.Equal("quicksave/0", product.Quicksave());
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        AbyssRpg.Kit.Actors.ActorState restored = reloaded.NearestActors(1)[0].Actor;
+        Assert.Equal(
+            wounded,
+            restored.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
+
+        // Restoring the same payload again changes nothing: one creature, one wound.
+        Assert.Single(reloaded.NearestActors(1));
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var twice = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Single(twice.NearestActors(1));
+        Assert.Equal(
+            wounded,
+            twice.NearestActors(1)[0].Actor.Stats
+                .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
+    }
+
     [Fact]
     public void The_operator_tile_probe_refuses_a_tile_the_avatar_cannot_stand_on()
     {
@@ -1111,7 +1233,8 @@ public sealed class OrdinaryCompositionTests
             new[]
             {
                 "abyss.lifecycle.start", "abyss.lifecycle.pause", "abyss.lifecycle.resume", "abyss.lifecycle.stop",
-                "abyss.action.quicksave", "abyss.action.journey-onward", "abyss.action.respawn",
+                "abyss.action.quicksave", "abyss.action.journey-onward", "abyss.action.load-slot:",
+                "abyss.action.respawn",
             }.OrderBy(name => name, StringComparer.Ordinal));
     }
 

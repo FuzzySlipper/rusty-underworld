@@ -32,7 +32,38 @@ public sealed record UuSessionSnapshot(
     NoteDto[] Notes,
     AvatarPoseDto AvatarPose,
     AbyssRpg.Kit.World.KindAllocatorState[] ActorIdentities,
-    AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities);
+    AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities,
+    UuHoldingDto[]? Holdings = null,
+    UuCreatureDto[]? Creatures = null);
+
+/// <summary>
+/// What one owner holds, by the level and object index each item was admitted
+/// from: the durable identity the runtime assigns an admitted object is derived
+/// from exactly that pair, so the holding survives a rebuild and a later restore
+/// finds the same item rather than a copy.
+/// </summary>
+public sealed record UuHoldingDto(int Level, int OwnerIndex, int[] ItemIndexes)
+{
+    /// <summary>The owner index of the avatar's own pack.</summary>
+    public const int AvatarOwner = -1;
+
+    /// <summary>The owner index of a level's loose objects.</summary>
+    public const int FloorOwner = -2;
+}
+
+/// <summary>
+/// One admitted creature's own state: where it stands and how hurt it is. The
+/// level's delta already records whether it is gone; this records the state of
+/// the ones still standing, which the delta cannot express.
+/// </summary>
+public sealed record UuCreatureDto(
+    int Level,
+    int Index,
+    float X,
+    float Y,
+    float Z,
+    float HeadingYawRadians,
+    double Health);
 
 public sealed record UuLevelDeltaDto(
     int LevelNumber,

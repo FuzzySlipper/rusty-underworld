@@ -192,15 +192,20 @@ test('every control claims a declared intent', (t) => {
 
   const declared = new Set([
     'abyss.lifecycle.start', 'abyss.lifecycle.pause', 'abyss.lifecycle.resume', 'abyss.lifecycle.stop',
-    'abyss.action.quicksave', 'abyss.action.journey-onward', 'abyss.action.respawn',
+    'abyss.action.quicksave', 'abyss.action.journey-onward', 'abyss.action.load-slot:', 'abyss.action.respawn',
   ]);
   assert.deepEqual(
     ctx.claimed.map((claim) => claim.intent).sort(),
-    ['abyss.action.journey-onward', 'abyss.action.quicksave', 'abyss.action.respawn',
-      'abyss.lifecycle.resume', 'abyss.lifecycle.start', 'abyss.lifecycle.stop'].sort(),
+    ['abyss.action.journey-onward', 'abyss.action.load-slot:autosave/level-1', 'abyss.action.quicksave',
+      'abyss.action.respawn', 'abyss.lifecycle.resume', 'abyss.lifecycle.start', 'abyss.lifecycle.stop'].sort(),
   );
   for (const claim of ctx.claimed) {
-    assert.ok(declared.has(claim.intent), `${claim.intent} is not a declared intent`);
+    // A declared intent ending in ':' is a prefix carrying a named target, which
+    // is how a listed save is resumed by key.
+    const declaredIntent = [...declared].some(
+      (entry) => entry === claim.intent || (entry.endsWith(':') && claim.intent.startsWith(entry)),
+    );
+    assert.ok(declaredIntent, `${claim.intent} is not a declared intent`);
     assert.deepEqual(claim.value, { kind: 'digital', active: true });
   }
   // Every control that returns to play keeps the pointer-lock gesture alive by
@@ -420,4 +425,25 @@ test('a conversation of the wrong shape is not rendered as a contract', (t) => {
     value: snapshot({ conversation: { npc: 5, lines: 'not a list' } }),
   }));
   assert.equal(globalThis.document.querySelector('.abyss-talk').hidden, true);
+});
+
+test('a listed save can be resumed by name', (t) => {
+  const ctx = context();
+  mount(t, ctx);
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({
+      menu: {
+        ...baseMenu(),
+        visible: true,
+        slots: [{ key: 'quicksave/0', label: 'Quicksave', savedAtUtc: '2026-01-01T00:00:00.0000000Z' }],
+      },
+    }),
+  }));
+
+  const rows = globalThis.document.querySelectorAll('.abyss-menu .slots li button');
+  assert.equal(rows.length, 1);
+  assert.match(rows[0].textContent, /Quicksave/);
+  rows[0].dispatchEvent(new (globalThis.document.defaultView.MouseEvent)('click', { bubbles: true }));
+  assert.deepEqual(ctx.claimed.map((claim) => claim.intent), ['abyss.action.load-slot:quicksave/0']);
 });

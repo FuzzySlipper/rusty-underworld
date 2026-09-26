@@ -17,11 +17,13 @@ public sealed class HostEntryTests
         Assert.Equal("abyssrpg.product", AbyssProductEntry.Default.Id);
         Assert.Equal(["abyss.lifecycle.start", "abyss.lifecycle.pause", "abyss.lifecycle.resume", "abyss.lifecycle.stop"],
             AbyssProductEntry.Default.LifecycleIntents);
-        Assert.Equal(["abyss.action.quicksave", "abyss.action.journey-onward", "abyss.action.respawn"],
+        Assert.Equal(
+            ["abyss.action.quicksave", "abyss.action.journey-onward", "abyss.action.load-slot:",
+                "abyss.action.respawn"],
             AbyssProductEntry.Default.ActionIntents);
         Assert.Equal("abyss.hud", AbyssProductEntry.Default.UiProjectionStream);
         Assert.Equal("abyss.ui.snapshot.v1", AbyssProductEntry.Default.UiProjectionContract);
-        Assert.Equal(7, AbyssProductEntry.Default.DeclaredIntents.Count);
+        Assert.Equal(8, AbyssProductEntry.Default.DeclaredIntents.Count);
         Assert.Equal(
             AbyssProductEntry.Default.DeclaredIntents.Count,
             AbyssProductEntry.Default.DeclaredIntents.Distinct(StringComparer.Ordinal).Count());
