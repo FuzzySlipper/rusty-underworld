@@ -32,6 +32,19 @@ internal static class TestContent
     /// <summary>A burning light source (majorclass 1, classindex 4) the level places.</summary>
     public const int LitLightItemId = 80;
 
+    /// <summary>A pressure plate: a door trap (majorclass 6, minor 0, classindex 8).</summary>
+    public const int PlateItemId = 392;
+
+    /// <summary>The plate's object index, and the tile the avatar stands on to press it.</summary>
+    public const int PlateObjectIndex = 511;
+
+    public const int PlateTileX = 3;
+
+    public const int PlateTileY = 0;
+
+    /// <summary>The door object the plate is wired to, standing on the door tile.</summary>
+    public const int DoorObjectIndex = 512;
+
     /// <summary>The object index the burning light hangs on.</summary>
     public const int LitLightObjectIndex = 510;
 
@@ -322,6 +335,8 @@ internal static class TestContent
                     // The runestones hang on their own tile, chained together.
                     (0, 2) when withRunes => FirstRunestoneObjectIndex,
                     (2, 0) => LitLightObjectIndex,
+                    (1, 1) => DoorObjectIndex,
+                    (3, 0) => PlateObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -351,14 +366,16 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 5,
+          "liveObjects": 7,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
             {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1,5],
             [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
             [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
-            [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
+            [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
+            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

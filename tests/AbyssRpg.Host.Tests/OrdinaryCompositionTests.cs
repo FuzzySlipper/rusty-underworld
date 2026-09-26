@@ -86,7 +86,7 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
-        Assert.Equal(5, graphics.LastSnapshot.Count);
+        Assert.Equal(7, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -478,6 +478,50 @@ public sealed class OrdinaryCompositionTests
             // first-circle spell costs and this test arranges only the runes.
             TestContent.Build(withRunes: true, defaultClass: "druid"),
             BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void A_pressure_plate_opens_the_door_it_is_wired_to()
+    {
+        // The fixture places a door trap on tile (3,0) whose link names the door
+        // object standing on the door tile (1,1). Standing on the plate fires its
+        // chain, the door-trap action opens the door it names, and stepping off
+        // releases the plate so it can fire again -- all inside the admitted update.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        (int doorX, int doorY) = TestContent.FirstLevelDoorTile;
+        Assert.DoesNotContain((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
+        Assert.Empty(session.State.Dungeon.Current.FiredTriggers);
+
+        // Stand on the plate.
+        spatial.StepTranslation = new System.Numerics.Vector3(
+            (TestContent.PlateTileX + 0.5f) * 8f, 1f, (TestContent.PlateTileY + 0.5f) * 8f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+
+        AbyssRpg.Kit.Controls.WorldPoint? at = session.PlayerPosition;
+        Assert.True(
+            at is { } p && (int)(p.X / 8f) == TestContent.PlateTileX && (int)(p.Z / 8f) == TestContent.PlateTileY,
+            $"the avatar stands on the plate: {at}");
+        Assert.True(
+            session.State.PlacedObjectAt(1, TestContent.PlateObjectIndex, out (int X, int Y) plateTile) is not null,
+            $"the plate resolves to a tile: {plateTile}");
+        Assert.Contains((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
+        Assert.Contains(TestContent.PlateObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+        Assert.Equal("A mechanism opens the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // Stepping off releases it, so the same plate can fire again.
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(4));
+        product.Update(SixtyHzUpdate(5));
+        Assert.DoesNotContain(TestContent.PlateObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+
+        // And the door it opened is no longer standing in the doorway.
+        ulong door = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+            .LevelObjectIdentity(1, TestContent.DoorObjectIndex).Value;
+        Assert.False(Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == door).Visible);
     }
 
     [Fact]

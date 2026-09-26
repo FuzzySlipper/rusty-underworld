@@ -66,12 +66,28 @@ public sealed class UuLevelState
 
     public bool Lift(DroppedPlacement placement) => Dropped.Remove(placement);
 
+    /// <summary>
+    /// Trigger placements that have already fired, by object index. A trigger that
+    /// has fired does not fire again until it is released, and the level's own state
+    /// is where that lives, so it survives a save and a level's re-admission.
+    /// </summary>
+    public HashSet<int> FiredTriggers { get; } = [];
+
+    /// <summary>Records that a trigger has fired, and answers whether it was new.</summary>
+    public bool Fire(int objectIndex) => FiredTriggers.Add(objectIndex);
+
+    /// <summary>Releases a trigger, so an occupying one can fire again.</summary>
+    public bool Release(int objectIndex) => FiredTriggers.Remove(objectIndex);
+
     public UuLevelDelta CaptureDelta() => new(
         LevelNumber,
         RemovedObjects.ToArray(),
         MovedObjects.ToDictionary(e => e.Key, e => e.Value),
         OpenedDoors.ToArray(),
-        Dropped.ToArray());
+        Dropped.ToArray())
+    {
+        FiredTriggers = FiredTriggers.ToArray(),
+    };
 
     public void ApplyDelta(UuLevelDelta delta)
     {
@@ -82,6 +98,7 @@ public sealed class UuLevelState
         foreach (var move in delta.MovedObjects) MovedObjects[move.Key] = move.Value;
         foreach (var door in delta.OpenedDoors) OpenedDoors.Add(door);
         Dropped.AddRange(delta.Dropped);
+        FiredTriggers.UnionWith(delta.FiredTriggers);
     }
 }
 
@@ -103,6 +120,9 @@ public sealed record UuLevelDelta(
     /// with the level into a save.
     /// </summary>
     public UuLevelActor[] Actors { get; init; } = [];
+
+    /// <summary>Trigger placements that had fired when this level was captured.</summary>
+    public int[] FiredTriggers { get; init; } = [];
 }
 
 /// <summary>One admitted creature's own state, by the placement index it was admitted from.</summary>

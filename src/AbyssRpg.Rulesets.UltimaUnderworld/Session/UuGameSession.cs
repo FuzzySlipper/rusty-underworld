@@ -709,6 +709,82 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         ? ((int)Math.Floor(position.X / TileUnits), (int)Math.Floor(position.Z / TileUnits))
         : (0, 0);
 
+    /// <summary>
+    /// Evaluates the level's triggers inside the admitted update: what the avatar is
+    /// standing on decides. A trigger that has fired stays fired until it is
+    /// released, and both live in the level's own state, so a plate that opened a
+    /// door is still down after a save and a load.
+    /// </summary>
+    private void TickTriggers()
+    {
+        if (_placements is null || _player.Position is not { } position) return;
+        AdmittedTile? here = _placements.TileAt(position);
+        if (here is null) return;
+        int level = _session.Dungeon.CurrentLevel;
+        UuLevelState state = _session.Dungeon.Current;
+
+        foreach (int index in _session.PlacedObjectIndexes(level))
+        {
+            if (_session.PlacedObjectAt(level, index, out (int X, int Y) tile) is not { } obj) continue;
+            if (!Traps.UuTrapDispatch.IsTrap(obj.ItemId)) continue;
+            bool occupied = tile.X == here.X && tile.Y == here.Y;
+            if (!occupied)
+            {
+                // Stepping off releases it, so the same plate can fire again.
+                state.Release(index);
+                continue;
+            }
+
+            if (!state.IsLive(index) || !state.Fire(index)) continue;
+            FireTrigger(obj);
+        }
+    }
+
+    /// <summary>
+    /// Fires one trigger's chain of linked effects. The chain walk is the trap
+    /// owner's; what each fired kind does is applied through the owner that already
+    /// does it, so there is no second implementation of opening a door.
+    /// </summary>
+    private void FireTrigger(AdmittedObject trigger)
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        IReadOnlyList<Traps.UuTrapDispatch.TrapKind> fired = Traps.UuTrapDispatch.FireChain(
+            index => _session.PlacedObjectAt(level, index, out (int X, int Y) tile) is { } linked
+                ? new Traps.UuTrapDispatch.ChainNode(
+                    Traps.UuTrapDispatch.ClassifyItem(linked.ItemId), linked.Link, linked.Next)
+                : new Traps.UuTrapDispatch.ChainNode(Traps.UuTrapDispatch.TrapKind.Unknown, 0, 0),
+            // The trigger's own record is the first node of its chain; its link names
+            // what the effect applies to.
+            trigger.Index);
+        foreach (Traps.UuTrapDispatch.TrapKind kind in fired)
+        {
+            if (kind == Traps.UuTrapDispatch.TrapKind.Door)
+            {
+                ApplyDoorTrap(trigger);
+            }
+        }
+    }
+
+    /// <summary>A door trap opens, closes or toggles the door its own link names.</summary>
+    private void ApplyDoorTrap(AdmittedObject trigger)
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        Traps.UuTrapDispatch.DoorTrapAction action = Traps.UuTrapDispatch.DoorAction(trigger.Quality);
+        if (action == Traps.UuTrapDispatch.DoorTrapAction.None) return;
+        if (_session.PlacedObjectAt(level, trigger.Link, out (int X, int Y) doorTile) is not { } door) return;
+
+        if (doorTile.X < 0) return;
+        UuLevelState state = _session.Dungeon.Current;
+        bool open = action switch
+        {
+            Traps.UuTrapDispatch.DoorTrapAction.Open => true,
+            Traps.UuTrapDispatch.DoorTrapAction.Close => false,
+            _ => !state.OpenedDoors.Contains((doorTile.X, doorTile.Y)),
+        };
+        state.SetDoor(doorTile.X, doorTile.Y, open);
+        _outcome = open ? "A mechanism opens the door." : "A mechanism closes the door.";
+    }
+
     /// <summary>Records what the avatar's light reaches on this level's map.</summary>
     private void RevealAroundAvatar()
     {
@@ -886,6 +962,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             PublishScene(_appearance);
         }
 
+        TickTriggers();
         RevealAroundAvatar();
         double seconds = update.Facts.FixedDeltaSeconds;
         if (!double.IsFinite(seconds) || seconds <= 0d)
@@ -1283,9 +1360,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             nearest = distance;
         }
 
-        // A door tile is underfoot where an object on it is at the tile's centre, so
-        // the doorway is the closer of the two and the object is what stands in it.
-        if (nearestObject is not null)
+        // The doorway the avatar stands in wins over anything standing in it: the use
+        // channel has always opened the door rather than taken the leaf.
+        if (found.Kind == UuReachKind.None && nearestObject is not null)
         {
             bool container = Content.UuObjectTablesContent.IsContainerItem(nearestObject.ItemId);
             found = UuReachTarget.AtObject(nearestObject, nearest, container);

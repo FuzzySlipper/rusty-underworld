@@ -36,6 +36,13 @@ public static class UuTrapDispatch
         TriggerLeg,    // 6-2-x, 6-3-x (trigger continuations)
     }
 
+    /// <summary>Whether an item id is a trap or trigger record at all (majorclass 6).</summary>
+    public static bool IsTrap(int itemId) => itemId >> 6 == TrapMajorClass;
+
+    /// <summary>Classifies an item id the way the donor's records split it.</summary>
+    public static TrapKind ClassifyItem(int itemId) =>
+        Classify(itemId >> 6, (itemId & 0x30) >> 4, itemId & 0xF);
+
     public static TrapKind Classify(int major, int minor, int classIndex)
     {
         if (major != TrapMajorClass) return TrapKind.Unknown;
