@@ -319,7 +319,13 @@ internal sealed class GraphicsDouble : IGraphicsService
     public Appearance CreateStaticMeshFromContentReference(StaticMeshContentReferenceRequest arg0) => throw new NotSupportedException("CreateStaticMeshFromContentReference");
     public void UpdateMaterial(MaterialUpdateRequest arg0) => throw new NotSupportedException("UpdateMaterial");
     public Material ReplaceMaterial(MaterialUpdateRequest arg0) => throw new NotSupportedException("ReplaceMaterial");
-    public Appearance CreatePrimitive(PrimitiveAppearanceRequest arg0) => throw new NotSupportedException("CreatePrimitive");
+    internal List<PrimitiveAppearanceRequest> PrimitiveRequests { get; } = [];
+
+    public Appearance CreatePrimitive(PrimitiveAppearanceRequest arg0)
+    {
+        PrimitiveRequests.Add(arg0);
+        return new Appearance(new AppearanceHandle(1), static () => { });
+    }
     public Appearance ReplacePrimitive(PrimitiveAppearanceReplaceRequest arg0) => throw new NotSupportedException("ReplacePrimitive");
     public MeshPartition PartitionMesh(MeshPartitionRequest arg0) => throw new NotSupportedException("PartitionMesh");
     public MeshPartitionReadout ReadMeshPartition(MeshPartition arg0) => throw new NotSupportedException("ReadMeshPartition");

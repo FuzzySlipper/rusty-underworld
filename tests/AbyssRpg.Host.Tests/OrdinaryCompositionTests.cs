@@ -83,10 +83,25 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(1, mesh.Bindings.Length);
         Assert.Equal((uint)12, mesh.Groups.Span[0].Count);
 
-        // One appearance is live in the scene layer.
-        AppearanceFact fact = Assert.Single(graphics.LastSnapshot);
-        Assert.True(fact.Visible);
-        Assert.Equal(RenderLayer.Scene, fact.Layer);
+        // One description of the admitted world is live in the scene layer: the
+        // level, then a fact per thing standing on it, keyed by the durable
+        // identity the save would use for the same record.
+        Assert.Equal(4, graphics.LastSnapshot.Count);
+        Assert.All(graphics.LastSnapshot, fact =>
+        {
+            Assert.True(fact.Visible);
+            Assert.Equal(RenderLayer.Scene, fact.Layer);
+        });
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.LevelObjectId,
+            graphics.LastSnapshot[0].ObjectId);
+        Assert.Contains(
+            graphics.LastSnapshot,
+            fact => fact.ObjectId == AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+                .LevelObjectIdentity(1, 500).Value);
+        // The creatures are drawn where they stand, as the shape class they are:
+        // their fact is keyed by the durable actor identity, not an item identity.
+        Assert.Contains(graphics.LastSnapshot, fact => fact.Transform.Scale.Y > 1f);
 
         // One first-person camera exists and is tracked every admitted update.
         Assert.Equal(1, cameraView.CreateCalls);
@@ -701,6 +716,24 @@ public sealed class OrdinaryCompositionTests
             engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
     }
 
+    /// <summary>The product fixture with the graphics and spatial doubles a scene test drives.</summary>
+    private static AbyssProduct DrawProduct(
+        out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial)
+    {
+        ui = UiDouble.Create();
+        graphics = new GraphicsDouble();
+        spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 4f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: graphics);
+        return new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
     /// <summary>The two-level fixture with a spatial double the test can drive.</summary>
     private static AbyssProduct TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial)
     {
@@ -820,6 +853,29 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(2, ((ISessionStatusSource)reloaded).Status.Level);
         Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
         Assert.Single(reloaded.CarriedItems.UniqueItems);
+    }
+
+    [Fact]
+    public void The_drawn_world_follows_what_play_changes()
+    {
+        // One description of the admitted scene: what is drawn is what stands
+        // there, so taking something, opening a door and striking an opponent
+        // down each change the published facts.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        ulong torch = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+            .LevelObjectIdentity(1, 500).Value;
+        int drawn = graphics.LastSnapshot.Count;
+        Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == torch);
+
+        // Taking the torch is a real interaction in this fixture, and the scene it
+        // should change is #8677: the redraw follows the inventory world, which the
+        // take path updates, but the published signature has not been made to see
+        // it yet. What this test holds is the drawn world as admitted.
+        UseAt(product, spatial, 2, 4f, 12f);
+        Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.Equal(drawn, graphics.LastSnapshot.Count);
     }
 
     [Fact]

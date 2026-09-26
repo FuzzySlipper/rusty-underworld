@@ -3,6 +3,7 @@ using AbyssRpg.Kit;
 using AbyssRpg.Kit.Actors;
 using AbyssRpg.Kit.Controls;
 using AbyssRpg.Kit.Inventory;
+using System.Runtime.InteropServices;
 using AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 using AbyssRpg.Rulesets.UltimaUnderworld.Content;
 using AbyssRpg.Rulesets.UltimaUnderworld.Creation;
@@ -526,18 +527,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 new MeshGroup[] { new(0, 0, (uint)scene.Indices.Length) },
                 new MeshMaterialBinding[] { new(0, material) }));
             appearance = _context.Engine.Graphics.CreateMeshAppearance(mesh);
-            _context.Engine.Graphics.PublishSnapshot(
-            new AppearanceFact[]
-            {
-                new AppearanceFact(
-                    LevelObjectId,
-                    HasParentObject: false,
-                    ParentObjectId: 0,
-                    new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One),
-                    appearance,
-                    Visible: true,
-                    RenderLayer.Scene),
-            });
+            PublishScene(appearance);
             RetireLevelResources();
             _material = material;
             _mesh = mesh;
@@ -560,6 +550,140 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _camera.Update(_player);
     }
 
+    /// <summary>
+    /// Publishes one description of the admitted scene: the level's own geometry
+    /// and one fact per thing standing on it, each keyed by the durable identity
+    /// the runtime assigns that record, so what is drawn and what is saved are the
+    /// same world. Called when the level changes and whenever play changes what
+    /// stands on it -- a thing taken, a door opened, an opponent struck down.
+    /// </summary>
+    private void PublishScene(Appearance? levelAppearance)
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        var facts = new List<AppearanceFact>
+        {
+            new(
+                LevelObjectId,
+                HasParentObject: false,
+                ParentObjectId: 0,
+                new Transform(Vector3.Zero, Quaternion.Identity, Vector3.One),
+                levelAppearance ?? _appearance!,
+                Visible: true,
+                RenderLayer.Scene),
+        };
+        if (_session.PlacedAdmission(level) is { } admission)
+        {
+            HashSet<(int X, int Y)> open = [.. _session.Dungeon.Current.OpenedDoors];
+            foreach ((int index, EntityId _) in admission.ByIndex.OrderBy(entry => entry.Key))
+            {
+                if (!admission.Objects.TryGetValue(index, out AdmittedObject? obj)) continue;
+                // What a record holds is inside it, and what an owner carries is on
+                // them: only what stands loose on the level is drawn here.
+                if (admission.Holders.ContainsKey(index) && obj.Owner != 0) continue;
+                if (admission.Holders.Values.Contains(index) && !obj.Mobile && !IsContainerItem(obj.ItemId))
+                {
+                    // A held item: inside a container or on a creature, not drawn.
+                    continue;
+                }
+
+                // A mobile's tile lives on its own record when the level's tile list
+                // does not carry it.
+                if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile))
+                {
+                    if (obj.HomeTileX < 0 || obj.HomeTileY < 0) continue;
+                    tile = (obj.HomeTileX, obj.HomeTileY);
+                }
+                AdmittedTile? placed = _placements?.Tile(tile.X, tile.Y);
+                bool door = placed?.Door == true;
+                bool openDoor = door && open.Contains((tile.X, tile.Y));
+                UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, door);
+                Appearance appearance = ObjectAppearance(shape);
+                WorldPoint center = _placements?.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0)
+                    ?? new WorldPoint((tile.X + 0.5f) * 8f, 0.92f, (tile.Y + 0.5f) * 8f);
+                facts.Add(new AppearanceFact(
+                    Identity.UuIdentityPolicy.LevelObjectIdentity(level, index).Value,
+                    HasParentObject: false,
+                    ParentObjectId: 0,
+                    new Transform(
+                        new Vector3(center.X, center.Y + (shape.Height / 2f), center.Z),
+                        Quaternion.Identity,
+                        new Vector3(shape.Width, shape.Height, shape.Depth)),
+                    appearance,
+                    // An open door stands aside: nothing is drawn in the doorway.
+                    Visible: !openDoor,
+                    RenderLayer.Scene));
+            }
+        }
+
+        // Creatures are admitted as actors, not as level records, and they are drawn
+        // where they stand now rather than where content placed them.
+        if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures))
+        {
+            UuObjectShape shape = UuObjectShape.Of(0, mobile: true, door: false);
+            Appearance appearance = ObjectAppearance(shape);
+            foreach (ActorState creature in creatures.Values)
+            {
+                if (creature.IsDefeated) continue;
+                facts.Add(new AppearanceFact(
+                    checked((ulong)creature.DurableId),
+                    HasParentObject: false,
+                    ParentObjectId: 0,
+                    new Transform(
+                        new Vector3(
+                            creature.Position.X,
+                            creature.Position.Y + (shape.Height / 2f),
+                            creature.Position.Z),
+                        Quaternion.Identity,
+                        new Vector3(shape.Width, shape.Height, shape.Depth)),
+                    appearance,
+                    Visible: true,
+                    RenderLayer.Scene));
+            }
+        }
+
+        _context.Engine.Graphics.PublishSnapshot(CollectionsMarshal.AsSpan(facts));
+        // Removals are what play does to the level, so the drawn set is signed by
+        // how many records are still live rather than by the admission-time count.
+        _publishedScene = (
+            level,
+            LiveObjectCount(level),
+            _session.Dungeon.Current.OpenedDoors.Count,
+            CarriedItems.UniqueItems.Count);
+    }
+
+
+    /// <summary>Whether an owner belongs to the level: its floor, its records, its creatures.</summary>
+    private bool LevelOwns(UuEntityAdmission.Admission admission, int level, EntityId owner) =>
+        owner.Value == _levelItems?.Floor(level).Value
+        || admission.ByIndex.Values.Any(candidate => candidate.Value == owner.Value)
+        || (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)
+            && actors.Values.Any(actor => actor.Actor.Entity.Value == owner.Value));
+
+    /// <summary>How many of a level's admitted records are still standing.</summary>
+    private int LiveObjectCount(int level) =>
+        _session.PlacedAdmission(level) is { } admission
+            ? admission.Objects.Keys.Count(_session.Dungeon.Current.IsLive)
+            : 0;
+
+    /// <summary>The appearance of one shape class, created once and shared.</summary>
+    private Appearance ObjectAppearance(UuObjectShape shape)
+    {
+        if (_objectAppearances.TryGetValue(shape.Class, out Appearance? existing)) return existing;
+        Appearance created = _context.Engine.Graphics.CreatePrimitive(new PrimitiveAppearanceRequest(
+            shape.Class is UuObjectShapeKind.Rune ? PrimitiveGeometry.Sphere : PrimitiveGeometry.Cube,
+            Wireframe: false,
+            shape.Color));
+        _objectAppearances[shape.Class] = created;
+        return created;
+    }
+
+    private bool IsContainerItem(int itemId) => Content.UuObjectTablesContent.IsContainerItem(itemId);
+
+    private readonly Dictionary<UuObjectShapeKind, Appearance> _objectAppearances = [];
+
+    /// <summary>What the published scene was drawn from, so it is redrawn only when it changes.</summary>
+    private (int Level, int Objects, int Doors, int Carried) _publishedScene = (-1, -1, -1, -1);
+
     /// <summary>Keeps the generation being replaced until the session releases it.</summary>
     private void RetireLevelResources()
     {
@@ -576,6 +700,19 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public ProductUpdateResult Update(ProductUpdate update)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        // What stands on the level changes when play takes, opens or strikes: the
+        // scene is one description, so it is republished when its inputs differ.
+        if (_scenePublished && _appearance is not null
+            && _session.PlacedAdmission(_session.Dungeon.CurrentLevel) is { } live
+            && _publishedScene != (
+                _session.Dungeon.CurrentLevel,
+                LiveObjectCount(_session.Dungeon.CurrentLevel),
+                _session.Dungeon.Current.OpenedDoors.Count,
+                CarriedItems.UniqueItems.Count))
+        {
+            PublishScene(_appearance);
+        }
+
         double seconds = update.Facts.FixedDeltaSeconds;
         if (!double.IsFinite(seconds) || seconds <= 0d)
             throw new ArgumentOutOfRangeException(nameof(update));
