@@ -870,7 +870,7 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == torch);
 
         // Taking the torch is a real interaction in this fixture, and the scene it
-        // should change is #8677: the redraw follows the inventory world, which the
+        // should change is #8664: the redraw follows the inventory world, which the
         // take path updates, but the published signature has not been made to see
         // it yet. What this test holds is the drawn world as admitted.
         UseAt(product, spatial, 2, 4f, 12f);
