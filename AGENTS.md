@@ -33,7 +33,9 @@ may quietly depend on its data.
   `docs/research/rusty-dagger-kit-survey.md` for the copy map; copy once,
   rename, and customize with no provenance tracking
 - donor surveys: `docs/research/underworldgodot-survey.md` and
-  `docs/research/openunderground-survey.md`
+  `docs/research/openunderground-survey.md`; the system-shape survey built from
+  both, with the preserved-versus-simplified calls and the unverified list:
+  `docs/research/uw1-shape-survey.md`
 - experience outline with manual citations: `docs/research/uu1-manual-outline.md`
 - extracted data inventory with donor citations:
   `docs/research/uu1-data-inventory.md`
