@@ -59,13 +59,13 @@ public sealed class UuHudProjectionTests
     public void Ui_mapping_carries_the_eight_named_fields()
     {
         UuHudValues values = UuHudProjection.Read(
-            AvatarStats(), TrackId.Parse("abyss.defeat"), TrackId.Parse("abyss.mana"), 0.5f, 0f, "Hi.");
+            AvatarStats(), TrackId.Parse("abyss.defeat"), TrackId.Parse("abyss.mana"), 0.5f, 0f, "Hi.", 6);
         var builder = new UiValueBuilder();
         Rusty.Engine.UiValue built = builder.Build(UuHudProjection.WriteUi(builder, values));
 
         Rusty.Engine.StructuredValueNode root = built.Nodes.Span[(int)built.Root];
         Assert.Equal(Rusty.Engine.StructuredValueKind.Object, root.Kind);
-        Assert.Equal(8u, root.ChildCount);
+        Assert.Equal(9u, root.ChildCount);
         var names = new List<string>();
         for (uint i = 0; i < root.ChildCount; i++)
         {
@@ -75,7 +75,7 @@ public sealed class UuHudProjectionTests
         }
 
         Assert.Equal(
-            ["hp", "maxHp", "mana", "maxMana", "charge", "yawRadians", "wind", "outcome"],
+            ["hp", "maxHp", "mana", "maxMana", "charge", "yawRadians", "wind", "outcome", "lightRadius"],
             names);
     }
 }

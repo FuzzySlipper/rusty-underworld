@@ -135,7 +135,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             StatsComponent stats = _session.Avatar.Stats;
             UuHudValues hud = UuHudProjection.Read(
                 stats, UuAvatarFactory.DefeatTrack, UuAvatarFactory.ManaTrack,
-                _combat.ChargeFraction, _player.YawRadians, _outcome);
+                _combat.ChargeFraction, _player.YawRadians, _outcome, LightRadius);
             return new SessionStatus(
                 _session.Dungeon.CurrentLevel,
                 _session.Clock.ElapsedTicks,
@@ -601,11 +601,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 bool door = placed?.Door == true;
                 bool openDoor = door && open.Contains((tile.X, tile.Y));
                 UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, door);
-                bool lit = _placements is not { } grid
-                    || InLight(
+                int band = _placements is not { } grid
+                    ? 0
+                    : BandAt(
                         grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).X,
                         grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).Z);
-                Appearance appearance = ObjectAppearance(shape);
+                if (band >= Presentation.UuLightBands.Hidden) continue;
+                Appearance appearance = ObjectAppearance(shape, band);
                 WorldPoint center = _placements?.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0)
                     ?? new WorldPoint((tile.X + 0.5f) * 8f, 0.92f, (tile.Y + 0.5f) * 8f);
                 facts.Add(new AppearanceFact(
@@ -617,9 +619,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                         Quaternion.Identity,
                         new Vector3(shape.Width, shape.Height, shape.Depth)),
                     appearance,
-                    // An open door stands aside, and what the avatar's light does not
-                    // reach is not drawn: the light is what decides, not the record.
-                    Visible: !openDoor && lit,
+                    // An open door stands aside; what stands in the light is drawn.
+                    Visible: !openDoor,
                     RenderLayer.Scene));
             }
         }
@@ -629,10 +630,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures))
         {
             UuObjectShape shape = UuObjectShape.Of(0, mobile: true, door: false);
-            Appearance appearance = ObjectAppearance(shape);
             foreach (ActorState creature in creatures.Values)
             {
                 if (creature.IsDefeated) continue;
+                int creatureBand = BandAt(creature.Position.X, creature.Position.Z);
+                if (creatureBand >= Presentation.UuLightBands.Hidden) continue;
                 facts.Add(new AppearanceFact(
                     checked((ulong)creature.DurableId),
                     HasParentObject: false,
@@ -644,7 +646,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                             creature.Position.Z),
                         Quaternion.Identity,
                         new Vector3(shape.Width, shape.Height, shape.Depth)),
-                    appearance,
+                    ObjectAppearance(shape, creatureBand),
                     Visible: true,
                     RenderLayer.Scene));
             }
@@ -707,14 +709,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         page.RevealDisc(tileX, tileY, LightRadius);
     }
 
-    /// <summary>Whether the avatar's light reaches a world position.</summary>
-    private bool InLight(float x, float z)
+    /// <summary>Which light band a world position falls in; the outer band is darkness.</summary>
+    private int BandAt(float x, float z)
     {
-        if (_player.Position is not { } position) return true;
+        if (_player.Position is not { } position) return 0;
         float dx = x - position.X;
         float dz = z - position.Z;
-        float reach = LightRadius * TileUnits;
-        return (dx * dx) + (dz * dz) <= reach * reach;
+        return Presentation.UuLightBands.Band(
+            MathF.Sqrt((dx * dx) + (dz * dz)), LightRadius * TileUnits);
     }
 
     /// <summary>Whether the avatar carries an admitted object away from its level.</summary>
@@ -743,20 +745,21 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             : 0;
 
     /// <summary>The appearance of one shape class, created once and shared.</summary>
-    private Appearance ObjectAppearance(UuObjectShape shape)
+    private Appearance ObjectAppearance(UuObjectShape shape, int band)
     {
-        if (_objectAppearances.TryGetValue(shape.Class, out Appearance? existing)) return existing;
+        var key = (shape.Class, band);
+        if (_objectAppearances.TryGetValue(key, out Appearance? existing)) return existing;
         Appearance created = _context.Engine.Graphics.CreatePrimitive(new PrimitiveAppearanceRequest(
             shape.Class is UuObjectShapeKind.Rune ? PrimitiveGeometry.Sphere : PrimitiveGeometry.Cube,
             Wireframe: false,
-            shape.Color));
-        _objectAppearances[shape.Class] = created;
+            Presentation.UuLightBands.Shade(shape.Color, band)));
+        _objectAppearances[key] = created;
         return created;
     }
 
     private bool IsContainerItem(int itemId) => Content.UuObjectTablesContent.IsContainerItem(itemId);
 
-    private readonly Dictionary<UuObjectShapeKind, Appearance> _objectAppearances = [];
+    private readonly Dictionary<(UuObjectShapeKind Class, int Band), Appearance> _objectAppearances = [];
 
     /// <summary>What the published scene was drawn from, so it is redrawn only when it changes.</summary>
     private (int Level, int Objects, int Doors, int Carried, int Creatures) _publishedScene = (-1, -1, -1, -1, -1);

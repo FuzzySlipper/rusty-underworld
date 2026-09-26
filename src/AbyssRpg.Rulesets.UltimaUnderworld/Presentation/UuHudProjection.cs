@@ -18,7 +18,8 @@ public sealed record UuHudValues(
     float ChargeFraction,
     float YawRadians,
     int WindIndex,
-    string Outcome);
+    string Outcome,
+    int LightRadius);
 
 public static class UuHudProjection
 {
@@ -28,7 +29,8 @@ public static class UuHudProjection
         TrackId manaTrack,
         float chargeFraction,
         float yawRadians,
-        string outcome)
+        string outcome,
+        int lightRadius = 0)
     {
         ArgumentNullException.ThrowIfNull(stats);
         ArgumentNullException.ThrowIfNull(hpTrack);
@@ -42,7 +44,8 @@ public static class UuHudProjection
             Math.Clamp(chargeFraction, 0f, 1f),
             yawRadians,
             WindIndex(yawRadians),
-            outcome);
+            outcome,
+            lightRadius);
     }
 
     /// <summary>
@@ -71,6 +74,9 @@ public static class UuHudProjection
             ("charge", builder.Number(values.ChargeFraction)),
             ("yawRadians", builder.Number(values.YawRadians)),
             ("wind", builder.Number(values.WindIndex)),
-            ("outcome", builder.String(values.Outcome)));
+            ("outcome", builder.String(values.Outcome)),
+            // How far the avatar's light reaches: the player reads the darkness
+            // rather than discovering it by walking into it.
+            ("lightRadius", builder.Number(values.LightRadius)));
     }
 }

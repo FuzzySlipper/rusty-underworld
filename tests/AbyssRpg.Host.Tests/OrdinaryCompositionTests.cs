@@ -876,6 +876,13 @@ public sealed class OrdinaryCompositionTests
         int drawn = graphics.LastSnapshot.Count;
         Assert.True(drawn > 1, "the light reaches the placements around the spawn");
 
+        // Light falls off rather than switching off: the shapes nearest the avatar
+        // and those farther out are drawn as different appearances, so the world
+        // shades with distance instead of only disappearing at the edge.
+        Assert.True(
+            graphics.PrimitiveRequests.Count >= 3,
+            $"the light shades the world in bands: {graphics.PrimitiveRequests.Count} appearances");
+
         // Walking reveals more of the map than standing still did.
         int mappedAtStart = session.MappedTiles;
         Assert.True(mappedAtStart > 0, "the spawn is on the map");
