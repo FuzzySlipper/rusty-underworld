@@ -126,8 +126,7 @@ and `m` (renderer metrics). The renderer reports `GPU timer: unavailable` on
 this host, and the metrics readout is the only frame-pacing evidence available
 from the product side.
 
-A connected Wolf session is still not by itself gameplay acceptance: the
-captures and the state reads in
-[the slice evidence](playtest-evidence/8587-8588/README.md) are what establish
-the visible result, and the earlier failed run remains recorded in
-[task 8576's evidence](playtest-evidence/8576/README.md).
+A connected Wolf session is still not by itself gameplay acceptance: the captures
+and the state reads recorded in the Den document `playtest-evidence-log` are what
+establish the visible result, and the earlier failed run remains recorded in that
+document's task 8576 section.
