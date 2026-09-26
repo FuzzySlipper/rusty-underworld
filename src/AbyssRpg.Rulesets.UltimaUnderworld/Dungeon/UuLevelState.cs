@@ -94,4 +94,22 @@ public sealed record UuLevelDelta(
     int[] RemovedObjects,
     Dictionary<int, (int TileX, int TileY)> MovedObjects,
     (int X, int Y)[] OpenedDoors,
-    DroppedPlacement[] Dropped);
+    DroppedPlacement[] Dropped)
+{
+    /// <summary>
+    /// Where this level's admitted creatures stand and how hurt they are. Part of
+    /// the level's own state, beside what was removed, moved or opened: a creature
+    /// the player wounded waits wounded when they come back, and the state travels
+    /// with the level into a save.
+    /// </summary>
+    public UuLevelActor[] Actors { get; init; } = [];
+}
+
+/// <summary>One admitted creature's own state, by the placement index it was admitted from.</summary>
+public sealed record UuLevelActor(
+    int Index,
+    float X,
+    float Y,
+    float Z,
+    float HeadingYawRadians,
+    double Health);

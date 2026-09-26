@@ -160,7 +160,9 @@ public sealed class UuSession : IDisposable
         ArgumentNullException.ThrowIfNull(target);
 
         int from = Dungeon.CurrentLevel;
-        _storedDeltas[from] = Dungeon.Unload(from);
+        // The level's creatures are still standing here: what they became is part
+        // of the level's state, captured before they leave with it.
+        _storedDeltas[from] = Dungeon.Unload(from) with { Actors = CaptureActors(from) };
         if (_admissions.Remove(from, out var admission))
             UuEntityAdmission.AbandonLevel(Directory, admission, HeldItems);
 
@@ -182,6 +184,7 @@ public sealed class UuSession : IDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(pose);
+        UuLevelDelta captured = Dungeon.Unload(Dungeon.CurrentLevel) with { Actors = CaptureActors(Dungeon.CurrentLevel) };
         return new UuSessionSnapshot(
             Clock.ElapsedTicks,
             Dungeon.CurrentLevel,
@@ -193,7 +196,7 @@ public sealed class UuSession : IDisposable
             Survival.Drunkenness,
             WorldSeed,
             Anchor,
-            _storedDeltas.Values.Append(Dungeon.Unload(Dungeon.CurrentLevel)).Select(ToDeltaDto).ToArray(),
+            _storedDeltas.Values.Append(captured).Select(ToDeltaDto).ToArray(),
             Automap.Select(kv => new AutomapPageDto(kv.Key, kv.Value.EncodePage())).ToArray(),
             Enumerable.Range(0, Kit.Knowledge.QuestVariables.SlotCount)
                 .Select(slot => new QuestVarDto(slot, Quests.Get(slot)))
@@ -267,14 +270,18 @@ public sealed class UuSession : IDisposable
         dto.RemovedObjects.ToArray(),
         dto.MovedObjects.ToDictionary(m => m.Index, m => (m.TileX, m.TileY)),
         dto.OpenedDoors.Select(door => (door.X, door.Y)).ToArray(),
-        dto.Dropped.Select(d => new DroppedPlacement(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray());
+        dto.Dropped.Select(d => new DroppedPlacement(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray())
+    {
+        Actors = [.. (dto.Actors ?? []).Select(a => new UuLevelActor(a.Index, a.X, a.Y, a.Z, a.HeadingYawRadians, a.Health))],
+    };
 
     private static UuLevelDeltaDto ToDeltaDto(UuLevelDelta delta) => new(
         delta.LevelNumber,
         delta.RemovedObjects.ToArray(),
         delta.MovedObjects.Select(kv => new MovedObjectDto(kv.Key, kv.Value.TileX, kv.Value.TileY)).ToArray(),
         delta.OpenedDoors.Select(door => new DoorDto(door.X, door.Y)).ToArray(),
-        delta.Dropped.Select(d => new DroppedDto(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray());
+        delta.Dropped.Select(d => new DroppedDto(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray(),
+        [.. delta.Actors.Select(a => new LevelActorDto(a.Index, a.X, a.Y, a.Z, a.HeadingYawRadians, a.Health))]);
 
     /// <summary>
     /// Remembers which actor a placed object index became, so a save that says
@@ -288,6 +295,47 @@ public sealed class UuSession : IDisposable
             throw new ArgumentOutOfRangeException(nameof(placementIndex), "A placement index is 1-1023.");
         _placedActors[placementIndex] = ActorsState.Identity(actor.DurableId);
     }
+
+    /// <summary>Where a level's admitted creatures stand and how hurt they are.</summary>
+    public UuLevelActor[] CaptureActors(int level)
+    {
+        if (!_admissions.ContainsKey(level)) return [];
+        var actors = new List<UuLevelActor>();
+        foreach (int index in _placedActors.Keys.OrderBy(index => index))
+        {
+            if (!TryGetPlacedActor(index, out ActorState actor)) continue;
+            actors.Add(new UuLevelActor(
+                index,
+                actor.Position.X,
+                actor.Position.Y,
+                actor.Position.Z,
+                actor.HeadingYawRadians,
+                actor.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current));
+        }
+
+        return actors.ToArray();
+    }
+
+    /// <summary>Puts a level's creatures back the way it left them, once they are admitted.</summary>
+    public void ApplyActors(IReadOnlyList<UuLevelActor> actors)
+    {
+        ArgumentNullException.ThrowIfNull(actors);
+        foreach (UuLevelActor state in actors)
+        {
+            if (!TryGetPlacedActor(state.Index, out ActorState actor)) continue;
+            actor.ApplyPose(new AbyssRpg.Kit.Actors.ActorPose(
+                new AbyssRpg.Kit.Controls.WorldPoint(state.X, state.Y, state.Z),
+                state.HeadingYawRadians));
+            actor.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current = state.Health;
+        }
+    }
+
+    /// <summary>How many placements became actors, for diagnostics and tests.</summary>
+    public int PlacedActorCount => _placedActors.Count;
+
+    /// <summary>What a level's stored delta says, when the session has one.</summary>
+    public UuLevelDelta? StoredDelta(int level) =>
+        _storedDeltas.TryGetValue(level, out UuLevelDelta? delta) ? delta : null;
 
     /// <summary>The actor a placement index became, if it is still standing.</summary>
     public bool TryGetPlacedActor(int placementIndex, out ActorState actor)

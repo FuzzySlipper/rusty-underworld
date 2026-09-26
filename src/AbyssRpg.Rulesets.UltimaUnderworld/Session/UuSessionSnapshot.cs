@@ -33,8 +33,7 @@ public sealed record UuSessionSnapshot(
     AvatarPoseDto AvatarPose,
     AbyssRpg.Kit.World.KindAllocatorState[] ActorIdentities,
     AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities,
-    UuHoldingDto[]? Holdings = null,
-    UuCreatureDto[]? Creatures = null);
+    UuHoldingDto[]? Holdings = null);
 
 /// <summary>
 /// What one owner holds. The level and owner index locate the owner, which a
@@ -54,26 +53,23 @@ public sealed record UuHoldingDto(int Level, int OwnerIndex, UuHeldItemDto[] Ite
 /// <summary>One held item: the identity it keeps across a save, and what it is.</summary>
 public sealed record UuHeldItemDto(ulong Identity, string Definition);
 
-/// <summary>
-/// One admitted creature's own state: where it stands and how hurt it is. The
-/// level's delta already records whether it is gone; this records the state of
-/// the ones still standing, which the delta cannot express.
-/// </summary>
-public sealed record UuCreatureDto(
-    int Level,
-    int Index,
-    float X,
-    float Y,
-    float Z,
-    float HeadingYawRadians,
-    double Health);
 
 public sealed record UuLevelDeltaDto(
     int LevelNumber,
     int[] RemovedObjects,
     MovedObjectDto[] MovedObjects,
     DoorDto[] OpenedDoors,
-    DroppedDto[] Dropped);
+    DroppedDto[] Dropped,
+    LevelActorDto[]? Actors = null);
+
+/// <summary>One admitted creature's state inside a level's own delta.</summary>
+public sealed record LevelActorDto(
+    int Index,
+    float X,
+    float Y,
+    float Z,
+    float HeadingYawRadians,
+    double Health);
 
 public sealed record MovedObjectDto(int Index, int TileX, int TileY);
 public sealed record DoorDto(int X, int Y);

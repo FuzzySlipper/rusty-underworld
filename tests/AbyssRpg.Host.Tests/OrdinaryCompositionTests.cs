@@ -823,6 +823,53 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_levels_own_world_survives_leaving_and_re_entering_it()
+    {
+        // A level's creatures and looted containers are the level's own state: they
+        // are captured when it is left and put back when it is admitted again, not
+        // rebuilt from content as if nothing had happened there.
+        using AbyssProduct product = TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        AbyssRpg.Kit.Actors.ActorState target = session.NearestActors(1)[0].Actor;
+        ulong step = 10;
+        double full = target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).MaximumValue;
+        for (int attempt = 0; attempt < 60 && target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current >= full; attempt++)
+        {
+            product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Pressed)]));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Released)]));
+        }
+
+        double wounded = target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current;
+        Assert.True(wounded < full, "the creature takes a wound before the trip");
+
+        // Then loot the sack, so the trip has to carry both a wound and a loot.
+        UseAt(product, spatial, step++, 12f, 4f);
+        Assert.Equal("You loot 1 item from the sack.", ((ISessionStatusSource)session).Status.Outcome);
+
+        session.TravelToLevel(2, 0);
+        product.Update(SixtyHzUpdate(step + 1));
+        session.TravelToLevel(1, 0);
+        product.Update(SixtyHzUpdate(step + 2));
+
+        AbyssRpg.Kit.Actors.ActorState returned = session.NearestActors(1)[0].Actor;
+        Assert.Equal(
+            wounded,
+            returned.Stats.GetTrack(
+                AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
+        UseAt(product, spatial, step + 10, 12f, 4f);
+        Assert.Equal("The sack is empty.", ((ISessionStatusSource)session).Status.Outcome);
+        Assert.Single(session.CarriedItems.UniqueItems);
+    }
+
+    [Fact]
     public void Play_after_a_load_is_not_undone_by_travel()
     {
         // A loaded snapshot is input to the level it restores, not a standing

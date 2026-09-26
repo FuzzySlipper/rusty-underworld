@@ -1083,6 +1083,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_levelItems is { } levelItems && _session.PlacedAdmission(level) is { } admittedLevel)
             levelItems.AdoptLevel(level, admittedLevel);
         ApplySavedWorld(level);
+        _session.ApplyActors(_session.StoredDelta(level)?.Actors ?? []);
 
         WorldPoint anchor = AnchorPositionOf(definition);
         _player.Restore(anchor, DetachedMotion(anchor.Y));
@@ -1231,7 +1232,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             new AvatarPoseDto(position.X, position.Y, position.Z, _player.YawRadians)) with
         {
             Holdings = CaptureHoldings(),
-            Creatures = CaptureCreatures(),
         };
         return new RulesetSavePayload(UuGameRuleset.RulesetIdentity, UuSessionSnapshotCodec.Encode(snapshot));
     }
@@ -1313,26 +1313,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                         item.Definition.Value)),
             ]);
 
-    /// <summary>Where the admitted creatures stand and how hurt they are.</summary>
-    private UuCreatureDto[] CaptureCreatures()
-    {
-        int level = _session.Dungeon.CurrentLevel;
-        if (!_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)) return [];
-        return actors
-            .Select(placed =>
-            {
-                ActorState actor = placed.Value;
-                return new UuCreatureDto(
-                    level,
-                    placed.Key,
-                    actor.Position.X,
-                    actor.Position.Y,
-                    actor.Position.Z,
-                    actor.HeadingYawRadians,
-                    actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current);
-            })
-            .ToArray();
-    }
 
     /// <summary>
     /// Puts the world back the way the save left it: each owner holds what it
@@ -1347,8 +1327,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         // restored session has not stood in yet, and their contents are applied
         // when admission rebuilds them rather than all at once here.
         _savedHoldings = snapshot.Holdings ?? [];
-        _savedCreatures = snapshot.Creatures ?? [];
         ApplySavedWorld(_session.Dungeon.CurrentLevel);
+        // The level's creatures are admitted from content at full strength; what
+        // the save says they became rides in the level's own delta.
+        _session.ApplyActors(_session.StoredDelta(_session.Dungeon.CurrentLevel)?.Actors ?? []);
     }
 
     /// <summary>
@@ -1401,15 +1383,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             }
         }
 
-        if (!_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)) return;
-        foreach (UuCreatureDto creature in _savedCreatures)
-        {
-            if (creature.Level != level || !actors.TryGetValue(creature.Index, out ActorState? actor)) continue;
-            actor.ApplyPose(new ActorPose(
-                new WorldPoint(creature.X, creature.Y, creature.Z),
-                creature.HeadingYawRadians));
-            actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = creature.Health;
-        }
     }
 
     /// <summary>Every item this level holds right now, by durable identity.</summary>
@@ -1438,8 +1411,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>The saved world, kept until every level it names has been admitted.</summary>
     private UuHoldingDto[] _savedHoldings = [];
-
-    private UuCreatureDto[] _savedCreatures = [];
 
     /// <summary>The levels whose saved world has already been put back.</summary>
     private readonly HashSet<int> _appliedSavedWorld = [];
