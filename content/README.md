@@ -5,12 +5,14 @@ require a product rebuild, and content never carries code. The four content kind
 and the rule that regeneration never overwrites authored work are fixed in
 [`../docs/code-organization.md`](../docs/code-organization.md).
 
-Planned layout:
+Layout:
 
 | Path | Holds |
 | --- | --- |
 | `abyss/bundles/` | Game-bundle declarations: which ruleset, content packs, and tuning profiles a launchable product selects. |
-| `abyss/content-packs/` | Authored **definitions** (attributes, skills, classes, runes, spells, objects, critters, conversations, traps, levels), **tuning** profiles, and **scenario** state. |
+| `abyss/packs/` | Generated content-pack descriptors, one per pack, naming the payload and its provenance. |
+| `abyss/content-packs/` | Authored **definitions** (attributes, skills, classes, runes, spells, objects, critters, conversations, traps, levels) and **scenario** state. |
+| `abyss/tuning/` | Typed tuning profiles: the adjustable values a launch selects. |
 | `abyss/imports/<level>/` | Imported dungeon content produced offline from an operator-supplied installation: tile maps, object lists, texture maps, automap blocks, media, normalized tables, and the provenance that records game, build, source file, and transformation. Imports are generated; their sources stay outside the repository. |
 
 Boundary rules:
@@ -26,4 +28,5 @@ Boundary rules:
 - Definitions are data, not code: if content seems to need behavior, the
   behavior belongs in the ruleset and the content should carry the values.
 
-Only this README exists so far; no content is checked in.
+Generated imports and authored content stay separate; regeneration never
+overwrites authored work.

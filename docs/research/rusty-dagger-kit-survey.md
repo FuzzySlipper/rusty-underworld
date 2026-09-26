@@ -8,10 +8,8 @@ AbyssRpg copy is the owner from then on. Donor-license posture does not apply
 (the same author/house owns both repositories); UW donor rules
 (UnderworldGodot/OpenUnderground: read, never copy) are unaffected.
 
-Den note: the `rusty-underworld` Den project exists and its task list is
-currently empty (`list_tasks` returns `[]`). No tasks were created by this
-survey; the derived task records live in Den (project `rusty-underworld`)
-are the task source when tracking starts.
+Den note: task records live in Den (project `rusty-underworld`); this survey
+creates none.
 
 ## 1. What was surveyed (sizes verified by listing)
 
@@ -139,8 +137,10 @@ reshape for UW) · **SKIP** (do not copy; reason given).
 ### AI — ADAPT (no retreat, flat-world steering)
 
 - `Ai/PursuitCoordinator.cs` (157): ADAPT, don't copy blindly.
-  `PursuitState` is `{Idle, Chase, Attack, Dead}` — there is no Retreat, so
-  UW morale/flee needs a Kit enum edit (a fork, stated upfront) or an
+  `PursuitState` includes `Retreat` (assigned by the ruleset's critter policy),
+  so morale and flee need no Kit enum change; the chase steering still flattens
+  the target to actor height, which remains the open vertical-policy decision
+  (a fork, stated upfront) or an
   explicit retreat==Idle mapping. The Chase steering also flattens its
   target to actor height while the Attack/Chase decision uses 3D distance —
   mixed frames that misbehave across pits, ledges, and bridges. UW must set
@@ -244,17 +244,3 @@ already met without donor-engine notions.
 | Donor GameManager/state-stack orchestration | Host lifecycle + one admitted update; session modes, not scene stacks |
 | Unity `Resources`/Godot `BasePath` asset discovery | `GameComposition` bundle/pack/tuning resolution with provenance |
 | Donor input singletons | `PlayerInputSystem` held-input + ruleset-owned bindings |
-
-## 7. Suggested copy order (matches UW-T waves)
-
-1. Architecture tests + Kit project shell (namespace rename) — UW-T01/T02.
-2. World + Facts + GameComposition/GameplayServices — UW-T02…T05.
-3. Controls (movement/camera/input) + Targeting — UW-T08/T10.
-4. Inventory + Loot + Actors + AI — UW-T11/T12/T15.
-5. Combat execution + Effects + Progression — UW-T13/T19.
-6. Presentation builders — UW-T17 as panels land.
-7. Canary-imitating smoke suite alongside wave 0.
-
-After each batch: run the architecture suite; reconcile Dagger naming that
-survived the rename (`grep -rni daggerfall|worldrpg` must be empty outside
-this survey).

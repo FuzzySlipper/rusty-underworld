@@ -1,8 +1,8 @@
 # Code organization: how the repository expresses the game
 
-Status: **design intent. No project exists yet.** This document fixes where
-things belong so that the first implementation tasks do not have to invent the
-seams. It describes owners and boundaries, not APIs.
+Status: **design intent.** The projects exist; this document fixes where new
+code belongs so that seams are not reinvented. It describes owners and
+boundaries, not APIs.
 
 Read it with [`gameplay-design.md`](gameplay-design.md), which defines the shape
 being expressed, and [`../AGENTS.md`](../AGENTS.md), which owns the vocabulary,
@@ -22,8 +22,8 @@ AbyssRpg.Host  (one product entry; selects ruleset, bundle, defaults)
 TypeScript UI  (DOM presentation of projections; semantic actions back)
 ```
 
-The rules are one-directional and enforced by an architecture suite once the
-projects exist:
+The rules are one-directional and enforced by the architecture suite
+(`tests/AbyssRpg.Architecture.Tests`):
 
 - **Kit never names the game.** No `UltimaUnderworld`, no game or place names,
   no attribute/skill/rune/spell/object/critter names, no donor names, no
@@ -57,16 +57,16 @@ Working names; the responsibilities are the contract, the names are not.
 | Session | The one live session: its clock, avatar, dungeon, and saved state; composed from a compiled ruleset + bundle + content packs | Rules, formulas, content meaning |
 | Ruleset contract | The typed seam a ruleset implements: catalogs it supplies, policy it answers, session services it composes | Any concrete rule |
 | Avatar | Attributes, resources (health/mana/hunger/fatigue), conditions, skills and progression flags, encumbrance | What an attribute means; how a skill grows |
-| Creation | The character-creation flow and its validation, driven by ruleset-supplied choices and budgets | The ruleset's class tables |
+| Creation | The character-creation flow's shape and validation, driven by ruleset-supplied choices and budgets | The class tables and the flow's rules (ruleset) |
 | Skills | Skill catalog shape, per-avatar skill entries, use-driven advancement bookkeeping, shrine/training sources as world entities | Which class may learn what, and thresholds |
-| Magic | Rune catalog shape, collected runes and shelf state, casting workflow (validate → cost → target → apply), effect instances with game-time duration, item-borne casting | Rune lists, costs, circles, and per-spell effect policy |
+| Magic | Casting-workflow shape (validate → cost → target → apply), effect instances with game-time duration, item-borne casting mechanics | The rune and spell tables, costs, circles, gates and per-spell effect policy (ruleset) |
 | Combat | One real-time attack state over the live dungeon: charge buildup and release, per-actor recovery, attack execution, effect and condition application, NPC AI coordination, corpses and loot | Damage formulas, critter definitions, condition meanings |
 | World | The level graph, entry points, transitions with cost, entity population, spatial stepping, per-level runtime state, persistence of unloaded levels | What a level contains (content), how it looks (Engine + media) |
 | Knowledge | Discovery state: automap coverage, notes, compass state, quest variables and flags, read flags | Conversation definitions; world state |
-| Interaction | Interaction targets (doors, containers, levers, switches, objects, people) and the look/get/use/use-on workflow | Trap and lock policy |
-| Dialogue | Conversation state, option lists, topic availability, barter offers, attitude memory | Who says what (content) |
+| Interaction | Interaction target shape (doors, containers, levers, switches, objects, people) and the look/get/use/use-on workflow | Door, lock and trap policy (ruleset) |
+| Dialogue | Conversation state, option lists, topic availability, barter trays, attitude memory | Dialogue content, and the interpretation that runs it (ruleset) |
 | Objects | Object definitions and instances, inventory, equipment/paperdoll, currency, food, lights, containers and loot, identify and repair state | Object values, combination rules, treasure placement |
-| Survival | Hunger, fatigue, light, rest/sleep advancement, poison/disease/condition ticking over game time | Rates and thresholds (ruleset + tuning) |
+| Survival | Hunger, fatigue, light and rest mechanics over game time, with condition ticking | Rates, thresholds and effect policy (ruleset + tuning) |
 | Time | The one dungeon clock; discrete advancement; schedule and respawn queries; duration deadlines | Schedules and constants (content and ruleset) |
 | Content | Pack loading and validation: definitions, tuning, scenario, imported level data, provenance; bundle resolution | Any meaning of the data |
 | Presentation | Projections (HUD and screens) and semantic actions; live-debug diagnostics | DOM, layout, styling, or state |
@@ -92,9 +92,11 @@ Two Kit rules that prevent most later refactoring:
 | Presentation meaning | Which projection fields exist and what the panels and screens show |
 | Provenance rules | What an imported pack must record about the source it came from |
 
-Attributes, skills, runes, spells, objects, critters, conversations, traps, and
-levels are **data**. Their numbers live in content packs and tuning profiles;
-their interpretation lives here; their names never appear in Kit.
+Attributes, skills, objects, critters, conversations, traps, and levels are
+**data**: their numbers live in content packs and tuning profiles, their
+interpretation lives here, and their names never appear in Kit. The rune and spell
+tables are the exception today — they are compiled ruleset identities — and a
+named task carries moving their values into a pack.
 
 ## 5. Host and product composition
 

@@ -1,11 +1,8 @@
 # tests
 
-Suites mirroring the product graph. `AbyssRpg.Architecture.Tests`,
-`AbyssRpg.Kit.Tests`, `AbyssRpg.Rulesets.UltimaUnderworld.Tests`, and
-`UltimaUnderworld.Import.Tests` are checked in and executed by
-`scripts/verify.sh`; the remaining suites are planned.
+Suites mirroring the product graph, each executed by `scripts/verify.sh`.
 
-| Directory | Planned suite | Answers |
+| Directory | Suite | Answers |
 | --- | --- | --- |
 | `AbyssRpg.Kit.Tests/` | `AbyssRpg.Kit.Tests` | Do the reusable mechanisms behave as specified, independently of any ruleset? |
 | `AbyssRpg.Rulesets.UltimaUnderworld.Tests/` | `AbyssRpg.Rulesets.UltimaUnderworld.Tests` | Do the formulas, gates, advancement rules, and per-system fidelity verdicts match what `docs/gameplay-design.md` and the cited evidence say? |

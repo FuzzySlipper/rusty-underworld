@@ -211,11 +211,3 @@ UW2 timer triggers (`src/World/timers.cs`) and the `src/scd/` engine.
 - Enchanted-item/potion overlay: cross-cuts all families; Kit
   casting-workflow + condition machinery with ruleset item-effect tables;
   Lore gate stays ruleset policy.
-
-## 7. Remaining gaps
-
-Numeric success formula and backfire rate; recast-delay table; per-spell
-duration/stability classes; per-spell (major, minor) minors beyond the survey
-shape; enchanted-equipment allowlist; potion brewing vs fixed effects;
-targeting correspondence (red/blue cursors vs raycast/position entry points);
-Freeze Time / Roaming Sight engine hooks (UW2 timer paths stay out of scope).

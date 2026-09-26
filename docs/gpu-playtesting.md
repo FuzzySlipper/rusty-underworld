@@ -94,31 +94,10 @@ failures the browser would otherwise swallow.
 ## Current product limitations
 
 The slice imports a level's collision, visible geometry, spawn, object
-placements and the object tables. Placed props become durable entities and
-placed critters become actors on their own tiles, so melee damages and can drop a
-real opponent (the kill is recorded in the saved level state) and the use channel
-opens a placed door through that state. The level's objects are held by owners:
-a container yields what its own record links to it, an object on the floor is
-taken into the avatar, a fallen opponent's carried things are looted from it, and
-a runestone (the donor's item range 232-255) lays itself on the casting shelf, so
-spells cast from stones picked up in play. A creature is talked to through the
-same use channel: the script its own record names runs on the conversation VM, the
-panel carries the transcript, the speaker's name from the string block and the
-options the script offers, and a vendor's own script trades against the imported
-values of what each side carries. Named remainders, each carried by its own task:
-placed objects and actors are simulated but not drawn and the door stays solid
-until its tile's collision is replaced (#8592); a conversation cannot be answered
-yet, so it runs one pass (#8623); carried, equipped and container items are not in
-the save yet (#8621); nothing in play walks a level transition yet (#8620).
-`abyss.goto`, `abyss.actors` and `abyss.travel` are operator probes for placing
-the avatar on a tile, reading nearby actors, and entering another imported level;
-they are not a gameplay path. The tile probe refuses a tile the level does not
-admit as open, because a capsule inside solid geometry makes the Engine refuse the
-next step and taints the runtime, and `abyss.travel` moves without a clock cost
-because the gameplay caller that owns a transition decides what it costs (#8620).
-Importing a level admits it in the shipped bundle: `scripts/import-level.sh <level>`
-writes the level, its placements and the object tables, and adds the pack, so a
-second imported level is reachable by travel without editing the bundle by hand.
+placements and the object tables. The tile probe refuses a tile the level does not admit as open, because a
+capsule inside solid geometry makes the Engine refuse the next step and taints
+the runtime. `abyss.travel` moves without a clock cost: the gameplay caller that
+owns a transition decides what it costs, and nothing in play walks one yet.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly
 the middle of the 1280×720 stream, so the menu also answers `c` (Engine console)

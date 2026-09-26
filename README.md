@@ -17,50 +17,33 @@ remains donor context for formats and divergences; it is not a target.
 The working formula is: **Engine guarantees. Kit shapes. Ruleset decides.
 Bundle assembles. Host launches.**
 
-> **Current state: a playable, imported first slice of the dungeon.**
-> The ordinary entry resolves the shipped game bundle, creates the compiled
-> ruleset session over an operator-imported level, publishes the visible level
-> and a first-person camera, and routes admitted updates into the combat,
-> casting, survival, menu, and save/load owners. The companion renders the
-> product's one projection and mounts the Engine's own live-debug panel.
-> What is imported is the level's collision, visible geometry, a spawn, its
-> object placements and the object tables: the placed props become durable
-> entities, the placed critters become actors standing on their own tiles, a
-> swing damages and can drop one (the kill is recorded in the saved level
-> state), and the use channel opens a placed door through that state. Every
-> imported level is admitted on arrival when the avatar travels, with its own
-> collision, geometry and inhabitants, while the level left behind keeps its
-> state. The level's objects are held by owners: a container yields what its own
-> record links to it, an object on the floor is taken into the avatar, a fallen
-> opponent's carried things are looted from it, and a runestone lands on the
-> casting shelf so spells can be cast from stones picked up in play. Placed things
-> are simulated but not drawn yet, carried items do not survive a save yet, and a
-> conversation is one pass: the imported conversations and the talk and barter
-> owners are live — using a creature runs its own script, the panel carries the
-> transcript, its speaker's name and the options it offers, and a vendor's script
-> trades against the imported values of what each side carries — but the avatar
-> cannot yet answer an option, which #8623 carries. Start with
-> `scripts/import-level.sh`; the operator step, the Crew profile, and the
-> observed limits are in [GPU playtesting](docs/gpu-playtesting.md). GPU runs and
-> their captures are evidence rather than repository state: each run's sessions,
-> capture artifact ids and frame digests live in Den under
-> `playtest-evidence-log` (project `rusty-underworld`), which is where they are
-> retrieved from.
+> **The ordinary entry composes a playable slice of the imported game.** It
+> resolves the shipped bundle, creates the compiled ruleset session over an
+> operator-imported level, admits the level's geometry, collision, placements and
+> inhabitants, and runs one admitted update: movement and look, charge-based melee,
+> the use channel (doors, conversation and barter, looting, taking), runic casting
+> from collected runes, survival, and save and load, projected to the companion
+> UI. An imported level is admitted on arrival when the avatar travels, which is
+> the operator probe `abyss.travel` until walkable transitions land.
+> What that slice reaches, and what it does not, is measured in the Den
+> document `coverage-audit`; Den also holds task state and GPU evidence
+> (`playtest-evidence-log`), and `docs/gpu-playtesting.md` is the operator setup.
+> Start with `scripts/import-level.sh` before launching.
 
 ## Ownership
 
 - Rusty Engine guarantees reusable infrastructure and admitted update services.
-- `AbyssRpg.Kit` will define the reusable dungeon-RPG composition grammar and the
+- `AbyssRpg.Kit` defines the reusable dungeon-RPG composition grammar and the
   ordinary mechanisms needed to construct one.
-- `AbyssRpg.Host` will own the product lifecycle, built-in ruleset registry,
-  shipped bundles, launcher, defaults, and session selection.
-- `AbyssRpg.Rulesets.UltimaUnderworld` will own all Ultima Underworld semantics,
+- `AbyssRpg.Host` owns the product lifecycle, built-in ruleset registry, shipped
+  bundles, launcher, defaults, and session selection.
+- `AbyssRpg.Rulesets.UltimaUnderworld` owns all Ultima Underworld semantics,
   formulas, identities, runic-magic policy, conversation meaning, presentation
   meaning, and content interpretation.
-- Content packs will own authored definitions, assets, levels, placements,
+- Content packs own authored definitions, assets, levels, placements,
   conversations, and scenario state.
-- `UltimaUnderworld.Import` will own source-format knowledge for the original
-  game's data files and for the donors that document them.
+- `UltimaUnderworld.Import` owns source-format knowledge for the original game's
+  data files and for the donors that document them.
 - `AbyssRpg.Host` is the ordinary product entry. The packaged SDK generates
   CoreCLR and NativeAOT composition beneath ignored `obj` output.
 
@@ -142,8 +125,8 @@ Two documents fix the shape before implementation starts:
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | The working contract: direction, ownership, boundary rules, donor posture, git and documentation conventions. |
 | [`docs/`](docs/README.md) | Durable documents: the [gameplay design](docs/gameplay-design.md), the [code organization](docs/code-organization.md), the [research notes](docs/research/), and the [review lane model](docs/agent-review/README.md). |
-| [`src/`](src/README.md) | The planned product graph: kit, ruleset, host, importer and its tool, and the product DOM companion. |
-| [`tests/`](tests/README.md) | The planned suites, including the architecture suite that will enforce the ownership laws. |
+| [`src/`](src/README.md) | The product graph: kit, ruleset, host, importer and its tool, and the product DOM companion. |
+| [`tests/`](tests/README.md) | The suites, including the architecture suite that enforces the ownership laws. |
 | [`content/`](content/README.md) | Loaded content: bundles, authored content packs, and per-level imports produced offline. |
 | [`data/`](data/README.md) | Small checked-in reference tables a person maintains. |
 | `scripts/` | Engine pair installation and pin movement, the operator level import, and `verify.sh`. |
@@ -192,9 +175,9 @@ Routine verification:
 Today that verifies the installed pair identity, installs the product UI
 dependencies, builds the TypeScript companion and runs its DOM suite, then
 builds every product project and runs each semantic suite plus the architecture
-laws. NativeAOT is a separate fidelity target and stays opt-in with `--aot`. When the
-first project lands, add it to `product_projects` and its suite to
-`test_projects` in the script — the lists are explicit on purpose, because a
+laws. NativeAOT is a separate fidelity target and stays opt-in with `--aot`.
+Every landed project is listed in `product_projects` and every suite in
+`test_projects`; keep those lists explicit when adding one, because a
 discovery-based loop silently stops covering a project that moved.
 
 Import a level before launching; the product's default bundle selects it and the

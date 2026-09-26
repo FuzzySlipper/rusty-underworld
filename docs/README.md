@@ -10,7 +10,9 @@ Durable repository documents for Rusty Underworld. Start here.
 | [`code-organization.md`](code-organization.md) | How the repository expresses that shape: layering, where new code goes, the Kit and ruleset owner maps, content and import shapes, the UI contract, session modes, and persistence. |
 | [`research/`](research/) | Donor surveys, the manual-cited experience outline, and the sibling-kit bootstrap map: what the reference recreations, the shipped manual, the ISO data, and `WorldRpg.Kit` say about and for the game. |
 | [`coverage/feature-ledger.md`](coverage/feature-ledger.md) | Scope: stable feature IDs with disposition and the behavior required, including the binding exclusions. |
-| [`coverage/`](coverage/content-scope.md) | The transcribed magic and trap inventories and the content scope of the shipped data: what the game's data contains, not what this repository imports. |
+| [`coverage/content-scope.md`](coverage/content-scope.md) | Which source families the shipped data holds and what each is for. |
+| [`coverage/magic-inventory.md`](coverage/magic-inventory.md) | The transcribed grimoire, runes, casting gates and skills, from the printed manual and the donors. |
+| [`coverage/trap-inventory.md`](coverage/trap-inventory.md) | The donor trap dispatch tables, trigger codes and their UW2 exclusions. |
 | [`agent-review/`](agent-review/) | The review lane model and the packets handed to reviewers. |
 
 Documentation posture: a repository document states what is true of the code and

@@ -96,8 +96,8 @@ cover.
 
 | Owner | Responsibility |
 | --- | --- |
-| `AbyssRpg.Kit` | Reusable and reasonably uncertain dungeon-RPG mechanisms: typed IDs, compiled ruleset/session contracts, bundle/content-pack/tuning resolution, avatar state, attributes, skills, runic-magic casting workflows, conditions and recovery, progression bookkeeping, attack execution with charge timing, targeting, NPC presence and AI coordination, corpse and loot machinery, containers and doors, object physics coordination, conversation state, barter, traps and triggers, automap and quest-variable state, world and spatial session stepping, structured UI values. It is not a universal RPG framework. |
-| `AbyssRpg.Rulesets.UltimaUnderworld` | Ultima Underworld identities, attributes, skills, rune and spell definitions, object and critter definitions, combat and charge formulas, spell-effect and cost policy, time and schedule policy, conversation and barter policy, trap and lock policy, content interpretation, presentation meaning, save meaning, and session composition. |
+| `AbyssRpg.Kit` | Reusable and reasonably uncertain dungeon-RPG mechanisms: typed IDs, compiled ruleset/session contracts, bundle/content-pack/tuning resolution, avatar state, attributes, skill entries and advancement bookkeeping, condition and recovery mechanisms, attack execution with charge timing, targeting, NPC presence and pursuit coordination, corpse and loot machinery, containers and containment, object physics coordination, conversation state, barter trays, trap and trigger machinery, automap and quest-variable state, world and spatial session stepping, structured UI values. It is not a universal RPG framework, and it holds mechanisms rather than one game's policy. |
+| `AbyssRpg.Rulesets.UltimaUnderworld` | Ultima Underworld identities, attributes, skills, rune and spell definitions, object and critter definitions, class tables and the creation flow's rules, combat and charge formulas, spell-effect and cost policy, casting workflow, time and schedule policy, conversation interpretation and barter policy, trap, trigger, door and lock policy, survival rates, content interpretation, presentation meaning, save meaning, and session composition. |
 | `AbyssRpg.Host` | Product lifecycle, explicit built-in ruleset/bundle selection, product defaults, and the one ordinary product entry. It may select Ultima Underworld; it never interprets Ultima Underworld rules or reads original game data. |
 | `UltimaUnderworld.Import` | Offline knowledge of the original game's data files and of the donors that document them: source formats, conversion quirks, provenance, normalization into packs, and differential validation against the donor recreations. Not a runtime dependency. |
 | `UltimaUnderworld.Import.Tool` | The operator-facing command line that drives the importer and writes normalized packs. |
@@ -113,9 +113,9 @@ gameplay DSL, or a universal plug-in ABI. Named, explicitly composed Kit service
 and typed RuleEvents are encouraged where they make gameplay ownership and
 contribution discoverable.
 
-The concrete project graph, and the seam between kit and ruleset, are planning
-decisions. `src/README.md` and the per-project READMEs record the current
-intention.
+The project graph and the kit/ruleset seam are enforced by the architecture
+suite; `src/README.md` and the per-project READMEs record each project's
+ownership.
 
 ## Kit, Ultima Underworld, and tuning rules
 
@@ -131,8 +131,8 @@ game, its attribute/skill/rune/spell/object/critter names, donor project names
 (`UnderworldGodot`, `OpenUnderground`, `UnityUnderground`), and source file
 names (`.ARK`, `.GR`, `.BYT`, `.TR`, `.PAK`, `.DAT` basenames such as `LEV`,
 `CNV`, `OBJECTS`, `STRINGS`, `XFER`, `TERRAIN`, `COMOBJ`, `WEAPONS`, `CRIT`,
-`CUTS`, `.VOC`, `.N00`). An architecture suite enforces this list once the
-projects exist; until then the rule is a review obligation, not a checked one.
+`CUTS`, `.VOC`, `.N00`). The architecture suite enforces the forbidden names and
+the donor project names; the source-file basenames remain a review obligation.
 
 Ultima Underworld assumptions are legal only in the ruleset, Ultima Underworld
 content packs, Ultima Underworld presentation, and `UltimaUnderworld.Import`. The
@@ -150,8 +150,10 @@ guessing. The `UW2/` tree inside the ISO is never an extraction source.
 Give each value one honest home:
 
 - Adjustable ruleset values use discoverable, validated, typed tuning handles.
-- Avatar, skill, rune, spell, object, critter, conversation, trap, and level
-  values belong in content packs.
+- Avatar, skill, object, critter, conversation, trap, and level values belong in
+  content packs. The rune and spell tables are currently compiled ruleset
+  identities rather than pack data; moving their values into a pack is carried by
+  a named task, and this document is not the owner of that until it lands.
 - Algorithmic invariants stay beside the owning algorithm.
 - Source-format quirks stay in `UltimaUnderworld.Import`.
 - Product default selection stays in the Host.

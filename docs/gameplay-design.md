@@ -1,7 +1,7 @@
 # Gameplay design: the shape of the game
 
-Status: **design intent for a product that does not exist yet.** This document
-fixes the *shape* of the game — what the player does, what systems must therefore
+Status: **design intent for the product.** This document fixes the *shape* of
+the game the implemented slice must keep expressing — what the player does, what systems must therefore
 exist, and how faithful each one is meant to be. It deliberately does not fix
 tuning, formulas, or interfaces; those belong to the ruleset, the content, and
 later tasks.
@@ -334,23 +334,6 @@ their own evidence, not assumptions smuggled into the importer.
    confrontation and ascent.
 
 One session, one clock, one admitted update. No mode gets its own loop.
-
-## 5. The first coherent slice
-
-The original ships multiple dungeon levels, hundreds of objects per level, 40
-spells in 8 circles from 24 runes (manual pp. 28-29, 32), 20 skills (manual
-p. 30), scores of NPCs, and a full conversation corpus. Hand-authoring that is
-not the plan; the importer carries tile maps, object tables, conversations, and
-media, and content authoring fills what it cannot.
-
-A **first coherent slice** is therefore: creation → level 1 walkable with
-collisions and light → real-time movement with jump and swim → charged melee
-with one weapon family and one critter kind → take, drop, and container loot →
-one rune spell cast from found runes → one NPC conversation with a barter or
-quest hook → automap with notes → save and load. Missile combat, traps, survival
-depth, and the remaining levels follow before breadth. Breadth (more levels,
-more objects, more spells, more conversations), then depth (factions, dreams,
-endgame).
 
 ## 6. Non-goals
 
