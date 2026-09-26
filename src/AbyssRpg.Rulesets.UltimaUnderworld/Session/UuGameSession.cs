@@ -681,8 +681,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             int radius = BaseLightRadius;
             // A light spell widens it while it holds; the maintained-spell owner
             // answers that, not a second timer here.
-            // A light spell widens the radius while it holds; that rides with the
-            // maintained-spell owner and is not wired yet (#8666).
+            if (_casting.MaintainsFamily(Magic.UuSpellCatalog.Family.Light)) radius += SpellLightBonus;
 
             return radius;
         }

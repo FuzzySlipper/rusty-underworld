@@ -456,7 +456,12 @@ public sealed class OrdinaryCompositionTests
     }
 
     /// <summary>A product whose fixture level also places the two runestones a first-circle spell needs.</summary>
-    private static AbyssProduct RuneProduct(out UiDouble ui, out EngineSpatialDouble spatial)
+    private static AbyssProduct RuneProduct(out UiDouble ui, out EngineSpatialDouble spatial) =>
+        RuneProduct(out ui, out spatial, out _);
+
+    /// <summary>The rune fixture, also handing back its graphics double for scene checks.</summary>
+    private static AbyssProduct RuneProduct(
+        out UiDouble ui, out EngineSpatialDouble spatial, out GraphicsDouble graphics)
     {
         ui = UiDouble.Create();
         spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 20f));
@@ -466,7 +471,7 @@ public sealed class OrdinaryCompositionTests
             content: SpatialContentDouble.Create().Service,
             ui: ui.Service,
             cameraView: CameraViewDouble.Create().Service,
-            graphics: new GraphicsDouble());
+            graphics: graphics = new GraphicsDouble());
         return new AbyssProduct(
             engine,
             // A druid's starting skills train Mana, so it begins with the mana a
@@ -514,6 +519,53 @@ public sealed class OrdinaryCompositionTests
         product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
         product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
         Assert.Equal("The sack is empty.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
+    [Fact]
+    public void Casting_light_widens_what_the_avatar_can_see()
+    {
+        // The light spell is the one thing in A2 that makes the radius grow: it is
+        // maintained by the casting owner, and the session reads that rather than
+        // keeping a light timer of its own.
+        using AbyssProduct product = RuneProduct(out UiDouble ui, out _, out GraphicsDouble graphics);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius,
+            session.LightRadius);
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.GrantManaForTest(session.State.Avatar, 12d);
+        AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastingHosting.CastOutcome outcome =
+            session.AttemptCast(TestContent.LightSpellId);
+        for (int tries = 0; tries < 50
+            && outcome.Gate != AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.Cast; tries++)
+        {
+            outcome = session.AttemptCast(TestContent.LightSpellId);
+        }
+
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.Cast, outcome.Gate);
+        Assert.True(
+            session.Casting.MaintainsFamily(
+                AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuSpellCatalog.Family.Light),
+            "the caster is maintaining a light spell");
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius
+                + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus,
+            session.LightRadius);
+
+        // The wider radius never draws less than the narrower one did.
+        int bandsDrawn = graphics.PrimitiveRequests.Count;
+
+        // And the wider radius is what the player is told about.
+        product.Update(SixtyHzUpdate(6));
+        Assert.Equal(
+            session.LightRadius,
+            (int)Field(ui.LastProjection!.Value.Value, "lightRadius").NumberValue);
+        Assert.True(graphics.PrimitiveRequests.Count >= bandsDrawn);
     }
 
     [Fact]

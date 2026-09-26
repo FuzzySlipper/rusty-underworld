@@ -40,6 +40,15 @@ public sealed class UuCastingHosting
 
     public MagicPanel Panel() => new(_shelf.Shelf.ToArray(), _maintained.Spells.ToArray(), _effects.ToArray());
 
+    /// <summary>
+    /// Whether a spell of a family is being maintained right now. What the session
+    /// is holding is the maintained owner's answer, so a caller asking "is the
+    /// avatar lit" reads it here rather than keeping a light timer of its own.
+    /// </summary>
+    public bool MaintainsFamily(UuSpellCatalog.Family family) =>
+        _maintained.Spells.Any(maintained =>
+            UuSpellCatalog.FindByRunes(maintained.Runes) is { } spell && spell.SpellFamily == family);
+
     public void Upkeep(ulong nowTicks)
     {
         var expired = _effects.Where(e => UuCastingWorkflow.IsExpired(e, nowTicks)).ToList();
