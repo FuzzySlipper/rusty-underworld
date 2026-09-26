@@ -290,7 +290,8 @@ public sealed record SessionStatus(
     bool Swimming,
     bool Flying,
     int PresentActors,
-    ConversationView? Conversation = null);
+    ConversationView? Conversation = null,
+    int LightRadius = 0);
 
 /// <summary>
 /// The conversation a session is in, as a product projects it: who is speaking,

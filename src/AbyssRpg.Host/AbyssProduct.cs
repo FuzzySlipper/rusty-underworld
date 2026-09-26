@@ -596,7 +596,8 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             Flying: status?.Flying ?? false,
             PresentActors: status?.PresentActors ?? 0,
             Slots: slots.Count,
-            Conversation: Conversation(status)));
+            Conversation: Conversation(status),
+            LightRadius: status?.LightRadius ?? 0));
     }
 
     /// <summary>

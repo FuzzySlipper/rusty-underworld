@@ -87,7 +87,8 @@ public sealed record AbyssUiSnapshot(
     bool Flying,
     int PresentActors,
     int Slots,
-    AbyssConversationView? Conversation)
+    AbyssConversationView? Conversation,
+    int LightRadius = 0)
 {
     public static uint Write(UiValueBuilder builder, AbyssUiSnapshot snapshot)
     {
@@ -138,6 +139,9 @@ public sealed record AbyssUiSnapshot(
             ("swimming", builder.Boolean(snapshot.Swimming)),
             ("flying", builder.Boolean(snapshot.Flying)),
             ("presentActors", builder.Number(snapshot.PresentActors)),
+            // How far the avatar's light reaches, in tiles: the DOM reads it, so the
+            // player can see the darkness rather than walk into it.
+            ("lightRadius", builder.Number(snapshot.LightRadius)),
             ("slots", builder.Number(snapshot.Slots)),
             ("conversation", conversation));
     }

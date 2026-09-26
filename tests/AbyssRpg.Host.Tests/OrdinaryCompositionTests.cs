@@ -876,6 +876,12 @@ public sealed class OrdinaryCompositionTests
         int drawn = graphics.LastSnapshot.Count;
         Assert.True(drawn > 1, "the light reaches the placements around the spawn");
 
+        // The light the session carries reaches the companion UI: the HUD reads it,
+        // so a player can see how far they can see.
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius,
+            (int)Field(ui.LastProjection!.Value.Value, "lightRadius").NumberValue);
+
         // Light falls off rather than switching off: the shapes nearest the avatar
         // and those farther out are drawn as different appearances, so the world
         // shades with distance instead of only disappearing at the edge.

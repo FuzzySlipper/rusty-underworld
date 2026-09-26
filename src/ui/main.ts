@@ -95,6 +95,7 @@ interface SnapshotView {
   readonly mana: number;
   readonly maxMana: number;
   readonly charge: number;
+  readonly lightRadius: number;
   readonly outcome: string;
   readonly level: number;
   readonly avatar: string;
@@ -216,13 +217,13 @@ function readConversation(value: unknown): ConversationView | null | undefined {
 function readSnapshot(value: unknown): SnapshotView | null {
   if (!isRecord(value)) return null;
   const {
-    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu, conversation,
+    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, outcome, level, avatar, defeated, menu, conversation,
   } = value;
   if (
     typeof ready !== 'boolean' || typeof mode !== 'string' ||
     typeof hp !== 'number' || typeof maxHp !== 'number' ||
     typeof mana !== 'number' || typeof maxMana !== 'number' ||
-    typeof charge !== 'number' || typeof outcome !== 'string' ||
+    typeof charge !== 'number' || typeof lightRadius !== 'number' || typeof outcome !== 'string' ||
     typeof level !== 'number' || typeof avatar !== 'string' ||
     typeof defeated !== 'boolean'
   ) {
@@ -233,7 +234,7 @@ function readSnapshot(value: unknown): SnapshotView | null {
   const talk = readConversation(conversation);
   if (talk === undefined) return null;
   return {
-    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu: view,
+    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, outcome, level, avatar, defeated, menu: view,
     conversation: talk,
   };
 }
@@ -276,12 +277,16 @@ export function mountProductUi(
   const hpBar = bar('hp', 'health');
   const manaBar = bar('mana', 'mana');
   const chargeBar = bar('charge', 'charge');
+  // How far the avatar's light carries, in tiles. Light is what decides how much of
+  // the world is drawn, so the player needs to read it rather than infer it.
+  const light = document.createElement('p');
+  light.className = 'light';
   const status = document.createElement('p');
   status.className = 'status';
   // Before the first projection there is nothing to show. Say so instead of
   // rendering full bars, which is what an unset width looks like.
   status.textContent = 'Waiting for the first session snapshot…';
-  hud.append(hpBar.root, manaBar.root, chargeBar.root, status);
+  hud.append(hpBar.root, manaBar.root, chargeBar.root, light, status);
 
   // The conversation panel: hidden until a session says the avatar is talking
   // to someone, and it is not interactive, so the world keeps the pointer.
@@ -517,6 +522,7 @@ export function mountProductUi(
     hpBar.fill.style.width = percent(view.hp, view.maxHp);
     manaBar.fill.style.width = percent(view.mana, view.maxMana);
     chargeBar.fill.style.width = `${100 * Math.max(0, Math.min(1, view.charge))}%`;
+    light.textContent = view.lightRadius > 0 ? `light ${Math.round(view.lightRadius)} tiles` : '';
     applyInteractionMode(view.menu.visible ? 'interface' : 'gameplay');
     const vitals = `${Math.round(view.hp)}/${Math.round(view.maxHp)} hp · ${Math.round(view.mana)}/${Math.round(view.maxMana)} mana`;
     status.textContent = view.outcome === ''

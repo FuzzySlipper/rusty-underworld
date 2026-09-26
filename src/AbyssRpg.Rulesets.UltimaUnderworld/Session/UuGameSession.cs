@@ -142,7 +142,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 _avatarName,
                 hud.Hp, hud.MaxHp, hud.Mana, hud.MaxMana, hud.ChargeFraction, hud.YawRadians, hud.WindIndex,
                 _outcome, _session.Avatar.IsDefeated, _session.Swimming, _session.Flying,
-                PresentActors, ConversationView);
+                PresentActors, ConversationView, LightRadius);
         }
     }
 

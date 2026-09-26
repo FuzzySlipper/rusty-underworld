@@ -81,6 +81,7 @@ const snapshot = (overrides = {}) => ({
   mana: 6,
   maxMana: 12,
   charge: 0.5,
+  lightRadius: 6,
   yawRadians: 0,
   wind: 0,
   outcome: '',
@@ -101,6 +102,20 @@ function mount(t, ctx = context(), deps = {}) {
   t.after(() => ui.dispose());
   return { dom, ctx, ui, document: dom.window.document };
 }
+
+test('the HUD reads how far the light reaches', async (t) => {
+  const { ctx, document } = mount(t);
+  ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
+  assert.equal(document.querySelector('.abyss-hud .light').textContent, 'light 6 tiles');
+
+  // Light decides how much of the world is drawn, so a projection that does not
+  // say how far it reaches is not one this HUD will show: it keeps the last
+  // projection it could read instead of half-rendering the new one.
+  ctx.listeners.forEach((fn) =>
+    fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot({ lightRadius: undefined }) }));
+  assert.equal(document.querySelector('.abyss-hud').dataset.ready, 'true');
+  assert.equal(document.querySelector('.abyss-hud .light').textContent, 'light 6 tiles');
+});
 
 test('HUD waits for a snapshot instead of showing full bars', (t) => {
   const { document } = mount(t);
