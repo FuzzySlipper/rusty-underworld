@@ -51,6 +51,15 @@ public sealed record UuLevelPlacements(
             ? Tiles[(tileY * TileDimension) + tileX]
             : null;
 
+    /// <summary>The placement record for an object slot, or null when it has none.</summary>
+    public AdmittedObject? Object(int objectIndex)
+    {
+        _objectsByIndex ??= Objects.ToDictionary(obj => obj.Index);
+        return _objectsByIndex.TryGetValue(objectIndex, out AdmittedObject? found) ? found : null;
+    }
+
+    private Dictionary<int, AdmittedObject>? _objectsByIndex;
+
     public const int TileDimension = 64;
 }
 

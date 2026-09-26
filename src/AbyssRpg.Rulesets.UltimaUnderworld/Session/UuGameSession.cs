@@ -618,6 +618,18 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
+        // A fallen opponent is looted where it lies: what it carried is held by
+        // its own record, so the same transfer serves a corpse and a container.
+        if (_levelItems is { } carried && FallenOpponentInReach(position) is { } fallen)
+        {
+            InventoryContainerTransferReceipt looted = carried.Loot(fallen.Actor.Entity, _session.Avatar.Actor.Entity);
+            int count = looted.UniqueItems.Count;
+            _outcome = count == 0
+                ? $"The {Describe(FallenItemId(fallen))} carries nothing."
+                : $"You loot {count} item{(count == 1 ? "" : "s")} from the {Describe(FallenItemId(fallen))}.";
+            return;
+        }
+
         if (_placements.TileAt(position) is { Door: true } tile)
         {
             bool open = !_session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y));
@@ -699,6 +711,37 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         }
 
         _outcome = $"You take the {Describe(placed.ItemId)}.";
+    }
+
+    /// <summary>The nearest fallen opponent within a hand's reach, if any.</summary>
+    private ActorState? FallenOpponentInReach(WorldPoint position)
+    {
+        ActorState? nearest = null;
+        float nearestDistance = InteractionReach;
+        foreach (ActorState actor in PlacedCritters.Values)
+        {
+            if (!actor.IsDefeated) continue;
+            float distance = actor.Position.HorizontalDistanceTo(position);
+            if (distance > nearestDistance) continue;
+            nearest = actor;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>The item id a placed opponent was admitted from, for naming it.</summary>
+    private int FallenItemId(ActorState actor)
+    {
+        foreach (KeyValuePair<int, ActorState> placed in PlacedCritters)
+        {
+            if (placed.Value.DurableId != actor.DurableId) continue;
+            // A critter slot is an actor, not an item entity, so its item id
+            // comes from the level's own placement record.
+            return _placements?.Object(placed.Key)?.ItemId ?? 0;
+        }
+
+        return 0;
     }
 
     /// <summary>The nearest object the level placed, within a hand's reach.</summary>

@@ -62,12 +62,13 @@ public static class UuEntityAdmission
             }
         }
 
-        // A container's contents hang off its own link, not off a tile, so they
-        // are admitted here and recorded without a tile: they are inside the
-        // container, not lying on the floor.
+        // What a container holds, and what a critter carries, hangs off that
+        // record's own link rather than off a tile, so it is admitted here and
+        // recorded without a tile: it is inside the container or on the
+        // creature, not lying on the floor.
         foreach (AdmittedObject container in objects.Values)
         {
-            if (!IsContainer(container) || !state.IsLive(container.Index)) continue;
+            if (!HoldsContents(container) || !state.IsLive(container.Index)) continue;
             int index = container.Link;
             var visited = new HashSet<int>();
             while (index != 0)
@@ -98,6 +99,10 @@ public static class UuEntityAdmission
 
     private static bool IsContainer(AdmittedObject obj) =>
         !obj.Mobile && Content.UuObjectTablesContent.IsContainerItem(obj.ItemId);
+
+    /// <summary>A record whose link chain is what it holds: a container, or a creature.</summary>
+    private static bool HoldsContents(AdmittedObject obj) =>
+        IsContainer(obj) || obj.Mobile;
 
     public static void AbandonLevel(EntityDirectory directory, Admission admission)
     {

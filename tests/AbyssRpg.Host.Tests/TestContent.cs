@@ -164,6 +164,9 @@ internal static class TestContent
     /// fixture places: the prop, the container and its content, and both levels'
     /// critters.
     /// </summary>
+    /// <summary>The object the fixture's critter carries, linked from its own record.</summary>
+    public const int CarriedObjectIndex = 506;
+
     /// <summary>The runestone slots, item ids and shelf indices the fixture places.</summary>
     public const int FirstRunestoneObjectIndex = 504;
     public const int SecondRunestoneObjectIndex = 505;
@@ -248,8 +251,9 @@ internal static class TestContent
               + $",\n            [{SecondRunestoneObjectIndex},0,{LorStoneItemId},0,0,0,0,0,-1,-1,-1]"
             : "";
         int critterItem = level == SecondLevel ? SecondLevelCritterItemId : CritterItemId;
+        // The critter's own record links what it carries.
         string critterRow = withCritter
-            ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,0,0,0,0],\n            "
+            ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,{CarriedObjectIndex},0,0,0],\n            "
             : "";
         return $$"""
         {
@@ -263,11 +267,17 @@ internal static class TestContent
           "objects": [
             {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1,5],
             [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
-            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1,-1]__RUNE_ROWS__
+            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """
-        .Replace("__RUNE_ROWS__", runeRows, StringComparison.Ordinal);
+        .Replace("__RUNE_ROWS__", runeRows, StringComparison.Ordinal)
+        .Replace(
+            "__CARRIED_ROW__",
+            withCritter
+                ? $",\n            [{CarriedObjectIndex},0,200,0,0,0,{CritterObjectIndex},0,-1,-1,-1]"
+                : "",
+            StringComparison.Ordinal);
     }
 
     /// <summary>

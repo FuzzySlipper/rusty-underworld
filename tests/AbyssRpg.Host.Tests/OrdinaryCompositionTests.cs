@@ -554,6 +554,53 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void Looting_a_fallen_opponent_takes_what_its_record_carried()
+    {
+        // The fixture's critter carries one object, linked from its own mobile
+        // record. Kill it standing next to it, then loot where it fell.
+        UiDouble ui = UiDouble.Create();
+        var spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 4f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        AbyssRpg.Kit.Actors.ActorState target = session.NearestActors(1)[0].Actor;
+
+        // What it carries is held by the critter's own record, not lying about.
+        Assert.Single(session.LevelItems!.Read(target.Actor.Entity).UniqueItems);
+
+        ulong step = 10;
+        void Swing()
+        {
+            product.Update(SixtyHzUpdate(step++, Attack(InputEdge.Pressed)));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Released)]));
+        }
+
+        for (int attempt = 0; attempt < 200 && !target.IsDefeated; attempt++) Swing();
+        Assert.True(target.IsDefeated, "the critter can be defeated where it stands");
+
+        product.Update(new ProductUpdate(Facts(step++), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You loot 1 item from the giant rat.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // The corpse is empty and the avatar carries what the critter did.
+        Assert.Empty(session.LevelItems!.Read(target.Actor.Entity).UniqueItems);
+        var carried = session.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+        Assert.Single(carried.UniqueItems);
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
+            carried.UniqueItems[0].Definition.Value);
+    }
+
+    [Fact]
     public void The_operator_tile_probe_refuses_a_tile_the_avatar_cannot_stand_on()
     {
         // A capsule placed inside solid geometry makes the Engine refuse the
