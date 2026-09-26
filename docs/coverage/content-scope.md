@@ -2,8 +2,9 @@
 
 Status: source-family inventory and authored-content target. Counts are ISO
 facts from [`uu1-data-inventory.md`](../research/uu1-data-inventory.md); donor behavior
-claims cite the surveys. This is not a claim of imported coverage — nothing
-is imported yet.
+claims cite the surveys. It states what the game's data contains, not what this
+repository imports; imported coverage is measured in the Den document
+`coverage-audit`.
 
 ## Source families (all under `UW/` in the operator ISO)
 

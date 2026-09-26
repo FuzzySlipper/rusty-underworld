@@ -3,8 +3,8 @@
 Product graph for Rusty Underworld. `AbyssRpg.Kit` is a working one-time
 bootstrap copy of `WorldRpg.Kit` mechanics (see `AbyssRpg.Kit/README.md` and
 [`../docs/research/rusty-dagger-kit-survey.md`](../docs/research/rusty-dagger-kit-survey.md));
-ruleset, Host, Importer, and Tool are owned project shells with the final
-dependency graph and no behavior yet. The owner-level contract is in
+ruleset, Host, importer and Tool are owned projects with the final
+dependency graph, each carrying its own behavior and tests. The owner-level contract is in
 [`../docs/code-organization.md`](../docs/code-organization.md).
 
 | Directory | Planned project | Owns |

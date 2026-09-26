@@ -1,7 +1,7 @@
 # Trap inventory
 
-Status: inventory baseline, not tasks. Factual donor survey only; nothing is
-implemented here. Primary donor: UnderworldGodot (`src/traps/trap.cs`,
+A factual inventory transcribed from the donor; reference material, not a
+statement of what this repository implements. Primary donor: UnderworldGodot (`src/traps/trap.cs`,
 `src/traps/hack_trap.cs`, `src/objectdata/triggerobjectdat.cs`), via
 [`underworldgodot-survey.md`](../research/underworldgodot-survey.md) §§8, 10, 15.
 Manual trap material is thin (no dedicated section in the guide); behavior

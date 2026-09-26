@@ -74,17 +74,21 @@ documents decide, and the difference is recorded rather than silently rounded.
 
 ## Current state
 
-**This repository has component implementations and an Engine-served UI shell,
-but the ordinary product entry does not yet compose a playable dungeon.**
-Kit, ruleset, Host, importer, and UI projects build and have tests. The entry
-currently starts without attaching a session or spatial scene; component-level
-combat, conversation, casting, and menu helpers are not proof of live integration.
+**The ordinary product entry composes a playable slice of the imported game.**
+Launch resolves the bundle, admits an imported level with its geometry, collision,
+placements and inhabitants, and runs one admitted update: first-person movement,
+charge-based melee against admitted creatures, the use channel (doors,
+conversation and barter, looting, taking), runic casting from collected runes,
+survival, save and load, and the projection the companion UI renders.
 
-Use `docs/gpu-playtesting.md` for the Crew GPU setup and evidence. Read current
-source and Den records before claiming a system runs: older directory READMEs
-and design documents may still describe planned ownership. `scripts/verify.sh`
-checks the Engine pair, UI, projects, semantic suites, architecture, and CoreCLR
-staging; this is separate from visible playable-slice acceptance.
+Status is not repository prose. What each system reaches, and what it does not, is
+measured in the Den document `coverage-audit` (project `rusty-underworld`), which
+also lists the behaviors that exist as policy without a caller. Den owns live
+status, tasks and evidence; read it before claiming a system runs.
+`scripts/verify.sh` checks the Engine pair, the UI build and DOM suite, every
+project's semantic suites, the architecture laws, and CoreCLR staging; it does not
+prove GPU output, which `docs/gpu-playtesting.md` and the Den evidence record
+cover.
 
 ## Current product graph
 
@@ -164,9 +168,9 @@ expressed — the loop, each system's shape with a fidelity verdict, and the
 decisions that are expensive to reverse — and
 [`docs/code-organization.md`](docs/code-organization.md) for the owner map: which
 Kit owner holds which state, what the ruleset supplies, where content and imports
-land, and what modes the session has. Both are design intent for an unimplemented
-product. They bind new work, and changing a decision they pin is a deliberate
-re-plan, not an implementation detail.
+land, and what modes the session has. Both are design intent: what the product is
+for and who owns which behavior. They bind new work, and changing a decision they
+pin is a deliberate re-plan, not an implementation detail.
 
 Compose Engine `Actor` in Kit/ruleset facades with named properties over the
 actual attached components. Explicit factories construct entities; wrapping an
@@ -253,10 +257,11 @@ with the claim, as the donor surveys do. Where donors disagree or a divergence i
 unverified, say so rather than picking the convenient answer.
 
 Coverage planning — what behavior is in scope for the emulated game, in what
-order, and which donor artifact documents it — lives in
-`docs/underworld-coverage-plan.md`, `docs/underworld-feature-map.md`, and
-`docs/underworld-task-preparation.md`, with the point-in-time donor inventory
-in `docs/research/` kept separate from live status.
+order, and which donor artifact documents it — lives in Den (project
+`rusty-underworld`: the `coverage-audit` document and the campaign epics built
+from it). The repository keeps durable reference only: the donor surveys and data
+inventories under `docs/research/` and `docs/coverage/`, which state what the
+donors and the shipped data do, never what this repository has finished.
 
 ## Coverage execution and drift
 

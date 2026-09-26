@@ -1,6 +1,7 @@
 # Magic inventory
 
-Status: inventory baseline, not tasks. Spell names, formulas, and behavior
+A factual inventory; reference material, not a statement of what this
+repository implements. Spell names, formulas, and behavior
 statements were transcribed verbatim from the printed Player's Guide
 (`Ultima_Underworld-Manual.pdf` pp. 28–29, extracted with `pdftotext -layout`;
 printed page numbers cited). Skill entries (§4) are condensed from the p. 30
