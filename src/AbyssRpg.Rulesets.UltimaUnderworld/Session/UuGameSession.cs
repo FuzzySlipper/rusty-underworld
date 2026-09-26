@@ -706,7 +706,18 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         int tileY = (int)Math.Floor(position.Z / TileUnits);
         if (!_session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page))
             _session.Automap[_session.Dungeon.CurrentLevel] = page = new Kit.Knowledge.AutomapPage();
-        page.RevealDisc(tileX, tileY, LightRadius);
+        // Only what the avatar can see goes on the map: a disc would draw the far
+        // side of a wall the player has never looked at.
+        for (int y = tileY - LightRadius; y <= tileY + LightRadius; y++)
+        {
+            for (int x = tileX - LightRadius; x <= tileX + LightRadius; x++)
+            {
+                if (x < 0 || y < 0 || x >= Kit.Knowledge.AutomapPage.Dimension || y >= Kit.Knowledge.AutomapPage.Dimension)
+                    continue;
+                if (SeesTile(x, y)) page.Reveal(x, y);
+            }
+        }
+
     }
 
     /// <summary>Which light band a world position falls in; the outer band is darkness.</summary>
@@ -715,8 +726,32 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_player.Position is not { } position) return 0;
         float dx = x - position.X;
         float dz = z - position.Z;
-        return Presentation.UuLightBands.Band(
+        int band = Presentation.UuLightBands.Band(
             MathF.Sqrt((dx * dx) + (dz * dz)), LightRadius * TileUnits);
+        if (band >= Presentation.UuLightBands.Hidden) return band;
+
+        // Light does not pass through walls: what is behind one is not drawn, however
+        // close the lamp is to it.
+        return SeesTile((int)Math.Floor(x / TileUnits), (int)Math.Floor(z / TileUnits))
+            ? band
+            : Presentation.UuLightBands.Hidden;
+    }
+
+    /// <summary>Whether the avatar has an unobstructed line to a tile.</summary>
+    private bool SeesTile(int tileX, int tileY)
+    {
+        if (_placements is null || _player.Position is not { } position) return true;
+        int fromX = (int)Math.Floor(position.X / TileUnits);
+        int fromY = (int)Math.Floor(position.Z / TileUnits);
+        HashSet<(int X, int Y)> open = [.. _session.Dungeon.Current.OpenedDoors];
+        return Dungeon.UuSight.HasLineOfSight(fromX, fromY, tileX, tileY, (x, y) =>
+        {
+            AdmittedTile? tile = _placements.Tile(x, y);
+            // Outside the level, solid, or a shut door: sight stops there. An open
+            // door is a doorway.
+            if (tile is null || !Dungeon.UuTileKind.IsOpen(tile)) return true;
+            return tile.Door && !open.Contains((x, y));
+        });
     }
 
     /// <summary>Whether the avatar carries an admitted object away from its level.</summary>

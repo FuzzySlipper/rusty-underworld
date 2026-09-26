@@ -926,17 +926,23 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
         product.Update(SixtyHzUpdate(6));
         Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == torch);
-        Assert.Equal(drawn - 1, graphics.LastSnapshot.Count);
+        // The set shrinks by at least the taken torch: walking to its tile can also
+        // put something else out of sight, since sight stops at a shut door's corner.
+        Assert.True(graphics.LastSnapshot.Count < drawn, "the taken torch is no longer drawn");
 
         // A wounded opponent is still drawn; one that is struck down is not. It
         // takes as many charged swings as it takes.
-        int withCreature = graphics.LastSnapshot.Count;
         // Stand on the opponent's tile without using it: using a creature talks to
-        // it, and a conversation is not where swings land.
+        // it, and a conversation is not where swings land. What is drawn is counted
+        // after the move, so the fighting position's own sight line is the baseline.
         spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         ulong step = 12;
         product.Update(SixtyHzUpdate(step++));
+        // The creature's own fact, by the durable actor identity it is keyed by:
+        // counting facts would also count what the new position brought into sight.
+        ulong creatureId = checked((ulong)session.NearestActors(1)[0].Actor.DurableId);
+        Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == creatureId);
         for (int swing = 0; swing < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; swing++)
         {
             product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Pressed)]));
@@ -946,7 +952,7 @@ public sealed class OrdinaryCompositionTests
         }
 
         Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "the opponent can be struck down");
-        Assert.Equal(withCreature - 1, graphics.LastSnapshot.Count);
+        Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == creatureId);
     }
 
     [Fact]
