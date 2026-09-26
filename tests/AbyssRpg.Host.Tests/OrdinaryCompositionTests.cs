@@ -818,17 +818,11 @@ public sealed class OrdinaryCompositionTests
             HudString(ui.LastProjection!.Value.Value, "outcome"));
         var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         Assert.Equal(2, ((ISessionStatusSource)reloaded).Status.Level);
-        // What the avatar carried across that restore is #8643: the pack's items
-        // are issued by a directory the capture does not yet ask, so a deeper-level
-        // save resumes at the right place without them until that task lands.
         Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.Single(reloaded.CarriedItems.UniqueItems);
     }
 
-    [Fact(Skip = "Verification blocked by #8643: leaving a level destroys its entities, "
-        + "so a re-admitted level is rebuilt from content and the looted state this "
-        + "asserts cannot survive the trip until one authority owns containment. The "
-        + "fix it would cover -- a level's saved world is applied once, not on every "
-        + "admission -- is in place; unskip with that task.")]
+    [Fact]
     public void Play_after_a_load_is_not_undone_by_travel()
     {
         // A loaded snapshot is input to the level it restores, not a standing
@@ -855,9 +849,7 @@ public sealed class OrdinaryCompositionTests
         Assert.Single(session.CarriedItems.UniqueItems);
     }
 
-    [Fact(Skip = "Carried by #8643: after a container transfer the Engine inventory "
-        + "component view and the store read model disagree, so the save cannot say "
-        + "truthfully where a looted item lies. Unskip with that task.")]
+    [Fact]
     public void A_looted_container_stays_empty_across_travel_and_a_save()
     {
         // The save names owners by durable identity, so a level's contents are put

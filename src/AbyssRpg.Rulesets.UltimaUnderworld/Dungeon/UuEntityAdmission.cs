@@ -109,13 +109,50 @@ public static class UuEntityAdmission
     private static bool HoldsContents(AdmittedObject obj) =>
         IsContainer(obj) || obj.Mobile;
 
-    public static void AbandonLevel(EntityDirectory directory, Admission admission)
+    /// <summary>
+    /// Releases a level's entities. Abandonment is idempotent: play may already
+    /// have consumed or destroyed admitted entities.
+    /// </summary>
+    /// <param name="heldItems">
+    /// The inventory world, when the caller has one. An item the avatar carried
+    /// off this level, or that another level's owner holds, is not this level's to
+    /// destroy: it leaves with its holder, and the level re-issues its own records
+    /// from content if it is ever admitted again.
+    /// </param>
+    public static void AbandonLevel(
+        EntityDirectory directory,
+        Admission admission,
+        Rusty.Engine.Mechanics.InventoryStore? heldItems = null)
     {
         ArgumentNullException.ThrowIfNull(directory);
         ArgumentNullException.ThrowIfNull(admission);
-        // Abandonment is idempotent: play may already have consumed or
-        // destroyed admitted entities.
+        var own = new HashSet<ulong>(admission.ByIndex.Values.Select(entity => entity.Value));
+        if (heldItems is not null && admission.ByIndex.Count > 0)
+        {
+            // The level's floor is not an admitted object; an item left lying on
+            // it belongs to the level and goes with it.
+            own.Add(FloorIdentity(admission).Value);
+        }
+
         foreach (DurableIdentityReference identity in admission.Identities.Values)
+        {
+            if (identity.Kind == DurableIdentityKind.Item
+                && heldItems is not null
+                && directory.TryResolve(identity, out EntityId entity)
+                && heldItems.TryGetContainer(entity, out EntityId holder)
+                && !own.Contains(holder.Value))
+            {
+                continue;
+            }
+
             directory.Destroy(identity);
+        }
+    }
+
+    /// <summary>The level's floor storage identity, derived from any admitted object identity.</summary>
+    private static DurableIdentityReference FloorIdentity(Admission admission)
+    {
+        int level = checked((int)(admission.Identities.Values.First().Value / 1024));
+        return UuIdentityPolicy.LevelStorageIdentity(level);
     }
 }

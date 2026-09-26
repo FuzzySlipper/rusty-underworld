@@ -27,6 +27,14 @@ public sealed class UuSession : IDisposable
 
     public ActorsState Actors { get; }
     public EntityDirectory Directory { get; }
+
+    /// <summary>
+    /// The Engine inventory world the session's owners hold their items in, when
+    /// the composition has an item catalog. Abandonment consults it so an item the
+    /// avatar carried off a level leaves with the avatar rather than dying with
+    /// the level that issued it.
+    /// </summary>
+    public Rusty.Engine.Mechanics.InventoryStore? HeldItems { get; set; }
     public GameClock Clock { get; }
     public DurableIdentityAllocator ActorIdentities { get; private set; }
     public DurableIdentityAllocator ItemIdentities { get; private set; }
@@ -154,7 +162,7 @@ public sealed class UuSession : IDisposable
         int from = Dungeon.CurrentLevel;
         _storedDeltas[from] = Dungeon.Unload(from);
         if (_admissions.Remove(from, out var admission))
-            UuEntityAdmission.AbandonLevel(Directory, admission);
+            UuEntityAdmission.AbandonLevel(Directory, admission, HeldItems);
 
         var state = new UuLevelState(target);
         if (_storedDeltas.TryGetValue(target.LevelNumber, out var stored))

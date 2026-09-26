@@ -110,6 +110,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             // The avatar is an owner from the start: an item it carries is not
             // re-placed by a level admitted later.
             _levelItems.Owner(session.Avatar.Actor.Entity);
+            session.HeldItems = store;
         }
         _movement = movement;
         _player = player;

@@ -61,7 +61,6 @@ public sealed class UuLevelItems
     private readonly MechanicsInventoryContainerCoordinator _coordinator;
     private readonly UuItemDefinitions _definitions;
     private readonly Func<int, EntityId?> _ownerEntity;
-    private readonly HashSet<ulong> _owners = [];
 
     public UuLevelItems(
         InventoryStore store,
@@ -190,7 +189,6 @@ public sealed class UuLevelItems
     public EntityId Owner(EntityId owner)
     {
         if (!_store.TryGetInventory(owner, out _)) _coordinator.RegisterOwner(owner);
-        _owners.Add(owner.Value);
         return owner;
     }
 
@@ -202,24 +200,11 @@ public sealed class UuLevelItems
         // somebody's inventory is not placed again: a level admitted twice -- after
         // travel, or after a load -- would otherwise hand the same item to the
         // owner content names and to the owner play moved it to.
-        if (HeldSomewhere(item)) return;
+        // The store's containment map is the authority: an item already held
+        // anywhere -- by content admission, or by play that moved it -- is not
+        // placed a second time.
+        if (_store.TryGetContainer(item, out _)) return;
         _coordinator.Entities.Store.Get<InventoryComponent>(holder).MaterializeUnique(new ItemState(item, definition));
     }
 
-    /// <summary>Whether any registered owner already holds this item.</summary>
-    private bool HeldSomewhere(EntityId item)
-    {
-        if (_store.TryGetContainer(item, out _)) return true;
-        foreach (ulong owner in _owners)
-        {
-            if (!_coordinator.Entities.Store.IsAlive(new EntityId(owner))) continue;
-            foreach (Rusty.Engine.Mechanics.UniqueInventoryItem entry in
-                _coordinator.Read(new EntityId(owner)).UniqueItems)
-            {
-                if (entry.Entity.Value == item.Value) return true;
-            }
-        }
-
-        return false;
-    }
 }
