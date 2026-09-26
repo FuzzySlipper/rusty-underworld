@@ -6,7 +6,8 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Time;
 /// The donor's pocket-watch derivations use slightly different divisors
 /// (0x3C00, 0xE1000); this policy uses the single gameplay divisor until a
 /// pocket-watch task verifies the original.
-/// UW1 clock state only — UW2 timer triggers are excluded (coverage plan).
+/// UW1 clock state only; UW2 timer triggers are out of scope (see
+/// docs/gameplay-design.md, donor-area dispositions).
 /// </summary>
 public static class UuClockPolicy
 {

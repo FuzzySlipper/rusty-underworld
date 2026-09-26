@@ -10,7 +10,7 @@ AbyssRpg copy is the owner from then on. Donor-license posture does not apply
 
 Den note: the `rusty-underworld` Den project exists and its task list is
 currently empty (`list_tasks` returns `[]`). No tasks were created by this
-survey; UW-T01…T38 in [`coverage/task-index.md`](../coverage/task-index.md)
+survey; the derived task records live in Den (project `rusty-underworld`)
 are the task source when tracking starts.
 
 ## 1. What was surveyed (sizes verified by listing)

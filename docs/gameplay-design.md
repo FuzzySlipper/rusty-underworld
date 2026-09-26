@@ -57,6 +57,25 @@ recreation. **Out of scope everywhere:** reading or writing original save games,
 loading the original executable, byte-exact tile geometry, exact table values,
 and any promise that original mods or editors keep working.
 
+What that means for each donor area, so a survey row never becomes a requirement
+by itself:
+
+| Donor area | Disposition |
+| --- | --- |
+| Godot scene/node/shader/palette topology, `godotscale` builders, audio backends, font filling, the coroutine VM driver, collision meshes | Exclude the runtime topology. Decode offline into normalized packs; consume them at runtime; interpret conversation with a ruleset-owned VM rather than a ported coroutine engine. |
+| Unity MonoBehaviour/prefab/scene wiring, `Resources` loading, directory-picking and loose-data caches, cursor and prompt art | Exclude the runtime topology and the distribution workflow. Decode offline; consume admitted packs at runtime. |
+| Top-level bootstrap scenes, front-end, logos and credits flow | Exclude the scene wiring. Extend the Host/ruleset composition and the Engine-admitted update. |
+| Original executable model data (`UW.EXE`) | Mine geometry knowledge through the donor loaders; never load the executable at runtime. |
+| Donor serialization and original save-file read/write | Exclude. Persist product meaning through the existing save ownership; classic save compatibility is not a requirement. |
+| UI | Adapt information, choices, workflows and semantic actions (panels, runebag, automap, conversation and barter, HUD) to the thin DOM companion. Do not emulate pixel geometry or widget hierarchies; gameplay authority stays in C#. |
+| XMI realtime synthesis (synth engines, ROM-gated) | Excluded. Contextual music and long-running loop playback from an ordinary imported audio file stay in scope. |
+| UW2-only systems (scheduled-event archives, timer triggers, spell branches, projectile tables, its automap block layout) | Not targets. They appear only as divergence notes that keep UW1 imports honest. |
+| Other donor infrastructure: achievements, debug showcases, physics sims, editor helpers | Not required by a survey row. Classify explicitly before scheduling; do not rebuild it to turn every row into "covered". |
+
+Excluding donor import or rendering code does not exclude tile maps, objects,
+conversations, textures or sounds. Excluding donor orchestration does not exclude
+game behavior such as charge timing or conversation consequences.
+
 ## 3. System shapes
 
 Each system states the **shape** (what the player experiences), the **model**

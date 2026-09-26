@@ -1,13 +1,16 @@
 # Feature ledger
 
-Stable IDs for every feature-map row, with disposition and remaining behavior.
-`implement` = future task material (nothing exists yet); `adapt` = keep the
-role, ours the shape; `exclude` = explicitly out with rationale; `engine` =
-upstream capability consumed, not built. Coverage-plan areas in brackets.
+Stable IDs for the behavior this product is in scope for, with disposition and
+the behavior required: `implement` = in scope and ours to build; `adapt` = keep
+the role, ours the shape; `exclude` = explicitly out, with the rationale that
+keeps it out; `engine` = upstream capability consumed rather than built. This is
+scope, not status: what is finished is measured in the Den document
+`coverage-audit`, and Den task records carry live state. Coverage areas are in
+brackets.
 
 ## F001–F011 · avatar and movement [A2, A5, A6]
 
-| ID | Feature (map §) | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F001 | Attribute container (§1) | implement | ST/DX/INT + derived maxima; Kit Avatar owner |
 | F002 | Skill container (§1) | implement | 20 skills, use-driven gains, mantra sources |
@@ -23,7 +26,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F012–F019 · combat [A6]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F012 | Charge execution | implement | Readiness/charge/release/impact/cooldown state |
 | F013 | Swing kinds | implement | Press-position mapping, per-weapon variance |
@@ -36,7 +39,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F020–F025 · magic foundations [A7]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F020 | Spell dispatch | implement | UW1 major/minor policy (UW2 branches excluded) |
 | F021 | Rune table | implement | 24 runes, shelf state, sequence mapping |
@@ -47,7 +50,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F026–F033 · objects [A5]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F026 | Object master table | implement | Import normalization into packs |
 | F027 | Object behaviors | implement | Per-family interpretation over content |
@@ -60,7 +63,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F034–F039 · dungeon [A4]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F034 | Tile map admission | implement | LEV.ARK blocks, per-level runtime state |
 | F035 | Tile geometry | implement | Import geometry; Engine-owned presentation |
@@ -71,7 +74,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F040–F044 · conversation [A9]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F040 | Conversation VM | implement | Ruleset-owned 42-opcode interpretation |
 | F041 | Imported functions | implement | Ask/menus, inventory, quest-var, world effects |
@@ -81,7 +84,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F045–F050 · traps [A4, A11]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F045 | Vanilla dispatch | implement | UW1-reachable 6-0 set + 6-1-0 text |
 | F046 | Do/hack family | implement | UW1 qualities; UW2-only as documentation |
@@ -92,7 +95,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F051–F055 · UI [A5, A7–A9]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F051 | HUD | adapt | Projection + charge/compass/flask semantics |
 | F052 | Panels | adapt | Screen values + semantic actions |
@@ -102,7 +105,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F056–F059 · audio [A12]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F056 | XMI music | exclude synth / implement playback | No synth port; ordinary files over Engine Audio |
 | F057 | VOC speech | implement | Admitted speech files |
@@ -111,7 +114,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F060–F065 · saves [A2]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F060 | Write path | implement | Current-schema snapshot/restore |
 | F061 | PLAYER.DAT layout | implement as orientation | Informs schema; no format code in runtime |
@@ -122,7 +125,7 @@ upstream capability consumed, not built. Coverage-plan areas in brackets.
 
 ## F066–F071 · bootstrap and options [A12]
 
-| ID | Feature | Disposition | Remaining behavior |
+| ID | Feature | Disposition | Required behavior |
 | --- | --- | --- | --- |
 | F066 | Bootstrap | exclude | Host/ruleset composition instead |
 | F067 | Corruption guards | exclude | Import-time validation instead |
