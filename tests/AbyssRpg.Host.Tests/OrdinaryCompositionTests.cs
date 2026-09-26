@@ -86,7 +86,7 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
-        Assert.Equal(7, graphics.LastSnapshot.Count);
+        Assert.Equal(8, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -478,6 +478,36 @@ public sealed class OrdinaryCompositionTests
             // first-circle spell costs and this test arranges only the runes.
             TestContent.Build(withRunes: true, defaultClass: "druid"),
             BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void A_pit_drops_the_avatar_a_level_and_the_clock_pays_for_it()
+    {
+        // The fixture places a pit trap on tile (4,0) and admits a second level, so
+        // the fall has somewhere to land. It rides the travel path the session
+        // already uses -- one level change, one clock cost, no second transition.
+        using AbyssProduct product = TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(1, session.Status.Level);
+        ulong before = session.Status.ClockTicks;
+
+        spatial.StepTranslation = new System.Numerics.Vector3(
+            (TestContent.PitTileX + 0.5f) * 8f, 1f, (TestContent.PitTileY + 0.5f) * 8f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+
+        Assert.Equal(2, session.Status.Level);
+        Assert.Equal("You fall through the pit to level 2.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        // The fall costs the clock a game minute, and the clock advanced by at least
+        // that: the update's own tick is included.
+        Assert.True(
+            session.Status.ClockTicks >= before + AbyssRpg.Rulesets.UltimaUnderworld.Time.UuClockPolicy.FallCostTicks,
+            $"the fall is paid for: {session.Status.ClockTicks} against {before}");
+        // The level left behind keeps the firing: the pit is recorded as fired on
+        // level 1, in that level's own stored delta.
+        Assert.Contains(TestContent.PitObjectIndex, session.State.StoredDelta(1)?.FiredTriggers ?? []);
     }
 
     [Fact]

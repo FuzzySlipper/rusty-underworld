@@ -736,7 +736,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             }
 
             if (!state.IsLive(index) || !state.Fire(index)) continue;
-            FireTrigger(obj);
+            FireTrigger(obj, tile.X, tile.Y);
         }
     }
 
@@ -745,7 +745,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// owner's; what each fired kind does is applied through the owner that already
     /// does it, so there is no second implementation of opening a door.
     /// </summary>
-    private void FireTrigger(AdmittedObject trigger)
+    private void FireTrigger(AdmittedObject trigger, int tileX, int tileY)
     {
         int level = _session.Dungeon.CurrentLevel;
         IReadOnlyList<Traps.UuTrapDispatch.TrapKind> fired = Traps.UuTrapDispatch.FireChain(
@@ -758,11 +758,67 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             trigger.Index);
         foreach (Traps.UuTrapDispatch.TrapKind kind in fired)
         {
-            if (kind == Traps.UuTrapDispatch.TrapKind.Door)
+            switch (kind)
             {
-                ApplyDoorTrap(trigger);
+                case Traps.UuTrapDispatch.TrapKind.Door:
+                    ApplyDoorTrap(trigger);
+                    break;
+                case Traps.UuTrapDispatch.TrapKind.Pit:
+                    FallThroughPit(tileX, tileY);
+                    break;
             }
         }
+    }
+
+    /// <summary>
+    /// A pit drops the avatar a level, through the travel path the session already
+    /// has, and the dungeon clock pays for the fall. The avatar lands on the tile it
+    /// fell from when that tile is open below, and on the nearest open tile when it
+    /// is not -- a pit whose mouth is walled in below must not drop the avatar into
+    /// geometry.
+    /// </summary>
+    private void FallThroughPit(int tileX, int tileY)
+    {
+        int below = _session.Dungeon.CurrentLevel + 1;
+        try
+        {
+            _catalog?.Definition(below);
+        }
+        catch (InvalidOperationException)
+        {
+            // Nothing imported below: the pit is a hole the bundle cannot follow the
+            // avatar through, and the refusal says which level is missing.
+            _outcome = $"The pit drops away into level {below}, which this bundle does not carry.";
+            return;
+        }
+
+        TravelToLevel(below, Time.UuClockPolicy.FallCostTicks);
+        (int X, int Y) landing = NearestOpenTile(below, tileX, tileY);
+        PlaceOnTile(landing.X, landing.Y);
+        _outcome = $"You fall through the pit to level {below}.";
+    }
+
+    /// <summary>The tile fallen from when it is open, or the nearest open one to it.</summary>
+    private (int X, int Y) NearestOpenTile(int level, int tileX, int tileY)
+    {
+        UuLevelPlacements? placements = _catalog?.Placements(level) ?? _placements;
+        if (placements is null) return (tileX, tileY);
+        const int Search = 8;
+        for (int ring = 0; ring <= Search; ring++)
+        {
+            for (int y = tileY - ring; y <= tileY + ring; y++)
+            {
+                for (int x = tileX - ring; x <= tileX + ring; x++)
+                {
+                    // Only the ring's edge is new at each step.
+                    if (ring > 0 && Math.Abs(x - tileX) != ring && Math.Abs(y - tileY) != ring) continue;
+                    if (placements.Tile(x, y) is not { } tile || !Dungeon.UuTileKind.IsOpen(tile)) continue;
+                    return (x, y);
+                }
+            }
+        }
+
+        return (tileX, tileY);
     }
 
     /// <summary>A door trap opens, closes or toggles the door its own link names.</summary>

@@ -14,6 +14,13 @@ public static class UuClockPolicy
     public const ulong TicksPerGameMinute = 15300;
     public const ulong GameMinutesPerDay = 1440;
 
+    /// <summary>
+    /// What falling a level costs the dungeon clock: a game minute. The donor's own
+    /// number for a fall was not established, so this is our tuning rather than a
+    /// faithful value, and it lives here because the clock is what it spends.
+    /// </summary>
+    public static ulong FallCostTicks => TicksPerGameMinute;
+
     public static ulong GameMinutes(ulong ticks) => ticks / TicksPerGameMinute;
 
     public static ulong DayCount(ulong ticks) => GameMinutes(ticks) / GameMinutesPerDay;

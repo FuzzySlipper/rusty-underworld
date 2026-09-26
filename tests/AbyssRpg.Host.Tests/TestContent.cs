@@ -42,6 +42,15 @@ internal static class TestContent
 
     public const int PlateTileY = 0;
 
+    /// <summary>A pit trap: majorclass 6, minor 0, classindex 4, with no link.</summary>
+    public const int PitItemId = 388;
+
+    public const int PitObjectIndex = 513;
+
+    public const int PitTileX = 4;
+
+    public const int PitTileY = 0;
+
     /// <summary>The door object the plate is wired to, standing on the door tile.</summary>
     public const int DoorObjectIndex = 512;
 
@@ -337,6 +346,7 @@ internal static class TestContent
                     (2, 0) => LitLightObjectIndex,
                     (1, 1) => DoorObjectIndex,
                     (3, 0) => PlateObjectIndex,
+                    (4, 0) => PitObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -366,7 +376,7 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 7,
+          "liveObjects": 8,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
@@ -375,7 +385,8 @@ internal static class TestContent
             [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
             [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
-            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1],
+            [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """
