@@ -268,23 +268,20 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             composition.Tuning.Payload, $"tuning '{composition.Tuning.Id.Value}'");
         ContentPack avatarPack = composition.RequireContentPack(new ContentPackId("abyssrpg.avatar-options"));
         ContentPack classPack = composition.RequireContentPack(new ContentPackId("abyssrpg.classes"));
-        (ContentPack levelPack, int levelNumber) = RequireLevelPack(composition);
+
+        // Decode before anything Engine-owned exists: a corrupt or foreign-level
+        // save must fail without leaving a half-built world behind. The saved level
+        // is the session's level, not the bundle's lowest: an autosave written deep
+        // in the dungeon is a place to continue from, and the bundle's first level
+        // is only where a new game starts.
+        UuSessionSnapshot? savedSnapshot = saved is null
+            ? null
+            : UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
+        (ContentPack levelPack, int levelNumber) = RequireLevelPack(composition, savedSnapshot?.Level);
 
         UuLevelDefinition level = UuLevelContent.Read(levelPack.Payload, $"content pack '{levelPack.Id.Value}'");
         if (level.Level != levelNumber)
             throw new InvalidOperationException($"Level pack '{levelPack.Id.Value}' declares level {level.Level}.");
-
-        // Decode before anything Engine-owned exists: a corrupt or foreign-level
-        // save must fail without leaving a half-built world behind.
-        UuSessionSnapshot? savedSnapshot = saved is null
-            ? null
-            : UuSessionSnapshotCodec.Decode(saved.Bytes.ToArray());
-        if (savedSnapshot is not null && savedSnapshot.Level != level.Level)
-        {
-            throw new InvalidOperationException(
-                $"Save is on level {savedSnapshot.Level}; the bundle admits level {level.Level}. "
-                + "Import that level before loading this save.");
-        }
 
         UuCreationCatalog.Catalog creation = UuCreationCatalog.Read(
             avatarPack.Payload, classPack.Payload,
@@ -453,7 +450,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     // The vitals policy reads the mana skill index; UW1 skill 8 governs casting.
     private const int SkillIndexForVitals = 8;
 
-    private static (ContentPack Pack, int Level) RequireLevelPack(ResolvedGameComposition composition)
+    private static (ContentPack Pack, int Level) RequireLevelPack(
+        ResolvedGameComposition composition, int? requiredLevel = null)
     {
         ContentPack? best = null;
         int bestLevel = 0;
@@ -462,6 +460,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             const string prefix = "abyssrpg.level-";
             if (!pack.Id.Value.StartsWith(prefix, StringComparison.Ordinal)) continue;
             if (!int.TryParse(pack.Id.Value[prefix.Length..], out int number) || number < 1) continue;
+            if (requiredLevel is { } wanted && number != wanted) continue;
             if (best is null || number < bestLevel)
             {
                 best = pack;
@@ -469,11 +468,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             }
         }
 
-        return best is null || bestLevel < 1
-            ? throw new InvalidOperationException(
-                "The default bundle carries no imported level pack. Run the operator import "
-                + "(scripts/import-level.sh) before launching, then rebuild.")
-            : (best, bestLevel);
+        if (best is null || bestLevel < 1)
+        {
+            throw new InvalidOperationException(requiredLevel is { } level
+                ? $"Save is on level {level}; the bundle admits no level {level}. "
+                    + "Import that level before loading this save."
+                : "The default bundle carries no imported level pack. Run the operator import "
+                    + "(scripts/import-level.sh) before launching, then rebuild.");
+        }
+
+        return (best, bestLevel);
     }
 
     /// <summary>

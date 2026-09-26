@@ -796,6 +796,34 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal("The sack is empty.", ((ISessionStatusSource)reloaded).Status.Outcome);
     }
 
+    [Fact]
+    public void A_save_written_on_a_deeper_level_resumes_there()
+    {
+        // The bundle's first level is where a new game starts; a save names the
+        // level to continue on, and an autosave written deep in the dungeon is a
+        // place to resume from rather than a save nothing can load.
+        using AbyssProduct product = TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        UseAt(product, spatial, 2, 4f, 12f);
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Single(session.CarriedItems.UniqueItems);
+
+        session.TravelToLevel(2, 0);
+        product.Update(SixtyHzUpdate(10));
+        Assert.Equal("quicksave/0", product.Quicksave());
+
+        Assert.True(
+            product.LoadSlot("quicksave/0"),
+            HudString(ui.LastProjection!.Value.Value, "outcome"));
+        var reloaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(2, ((ISessionStatusSource)reloaded).Status.Level);
+        // What the avatar carried across that restore is #8643: the pack's items
+        // are issued by a directory the capture does not yet ask, so a deeper-level
+        // save resumes at the right place without them until that task lands.
+        Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
     [Fact(Skip = "Carried by #8643: after a container transfer the Engine inventory "
         + "component view and the store read model disagree, so the save cannot say "
         + "truthfully where a looted item lies. Unskip with that task.")]
