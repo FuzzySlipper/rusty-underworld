@@ -96,6 +96,9 @@ interface SnapshotView {
   readonly maxMana: number;
   readonly charge: number;
   readonly lightRadius: number;
+  readonly automap: string;
+  readonly avatarTileX: number;
+  readonly avatarTileY: number;
   readonly outcome: string;
   readonly level: number;
   readonly avatar: string;
@@ -217,13 +220,15 @@ function readConversation(value: unknown): ConversationView | null | undefined {
 function readSnapshot(value: unknown): SnapshotView | null {
   if (!isRecord(value)) return null;
   const {
-    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, outcome, level, avatar, defeated, menu, conversation,
+    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, automap, avatarTileX, avatarTileY, outcome, level, avatar, defeated, menu, conversation,
   } = value;
   if (
     typeof ready !== 'boolean' || typeof mode !== 'string' ||
     typeof hp !== 'number' || typeof maxHp !== 'number' ||
     typeof mana !== 'number' || typeof maxMana !== 'number' ||
-    typeof charge !== 'number' || typeof lightRadius !== 'number' || typeof outcome !== 'string' ||
+    typeof charge !== 'number' || typeof lightRadius !== 'number' ||
+    typeof automap !== 'string' || typeof avatarTileX !== 'number' || typeof avatarTileY !== 'number' ||
+    typeof outcome !== 'string' ||
     typeof level !== 'number' || typeof avatar !== 'string' ||
     typeof defeated !== 'boolean'
   ) {
@@ -234,9 +239,48 @@ function readSnapshot(value: unknown): SnapshotView | null {
   const talk = readConversation(conversation);
   if (talk === undefined) return null;
   return {
-    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, outcome, level, avatar, defeated, menu: view,
+    ready, mode, hp, maxHp, mana, maxMana, charge, lightRadius, automap, avatarTileX, avatarTileY, outcome, level, avatar, defeated, menu: view,
     conversation: talk,
   };
+}
+
+const MAP_WINDOW = 15;
+
+/** Whether a tile is on the map, from the product's run-length encoding. */
+function automapTile(encoded: string, x: number, y: number): boolean {
+  if (encoded === '') return false;
+  const separator = encoded.indexOf(':');
+  if (separator < 0) return false;
+  let mapped = encoded[0] === '1';
+  let index = 0;
+  const target = y * 64 + x;
+  for (const run of encoded.slice(separator + 1).split(',')) {
+    const length = Number.parseInt(run, 10);
+    if (!Number.isFinite(length) || length <= 0) return false;
+    if (target < index + length) return mapped;
+    index += length;
+    mapped = !mapped;
+  }
+
+  return false;
+}
+
+/** The map around the avatar, one line per row, so a player can read where they are. */
+function automapWindow(view: SnapshotView): string {
+  if (view.automap === '') return '';
+  const lines: string[] = [];
+  for (let y = view.avatarTileY - MAP_WINDOW; y <= view.avatarTileY + MAP_WINDOW; y++) {
+    let line = '';
+    for (let x = view.avatarTileX - MAP_WINDOW; x <= view.avatarTileX + MAP_WINDOW; x++) {
+      if (x < 0 || y < 0 || x >= 64 || y >= 64) line += ' ';
+      else if (x === view.avatarTileX && y === view.avatarTileY) line += '@';
+      else line += automapTile(view.automap, x, y) ? '#' : '.';
+    }
+
+    lines.push(line);
+  }
+
+  return lines.join('\n');
 }
 
 function bar(className: string, label: string): { root: HTMLElement; fill: HTMLElement } {
@@ -281,12 +325,18 @@ export function mountProductUi(
   // the world is drawn, so the player needs to read it rather than infer it.
   const light = document.createElement('p');
   light.className = 'light';
+  // The map the avatar has built, as the tiles they have seen. It is a picture of
+  // state the engine already saves, so it is drawn from the projection and never
+  // from the DOM's own memory.
+  const map = document.createElement('pre');
+  map.className = 'abyss-map';
+  map.hidden = true;
   const status = document.createElement('p');
   status.className = 'status';
   // Before the first projection there is nothing to show. Say so instead of
   // rendering full bars, which is what an unset width looks like.
   status.textContent = 'Waiting for the first session snapshot…';
-  hud.append(hpBar.root, manaBar.root, chargeBar.root, light, status);
+  hud.append(hpBar.root, manaBar.root, chargeBar.root, light, map, status);
 
   // The conversation panel: hidden until a session says the avatar is talking
   // to someone, and it is not interactive, so the world keeps the pointer.
@@ -523,6 +573,8 @@ export function mountProductUi(
     manaBar.fill.style.width = percent(view.mana, view.maxMana);
     chargeBar.fill.style.width = `${100 * Math.max(0, Math.min(1, view.charge))}%`;
     light.textContent = view.lightRadius > 0 ? `light ${Math.round(view.lightRadius)} tiles` : '';
+    map.textContent = automapWindow(view);
+    map.hidden = map.textContent === '';
     applyInteractionMode(view.menu.visible ? 'interface' : 'gameplay');
     const vitals = `${Math.round(view.hp)}/${Math.round(view.maxHp)} hp · ${Math.round(view.mana)}/${Math.round(view.maxMana)} mana`;
     status.textContent = view.outcome === ''

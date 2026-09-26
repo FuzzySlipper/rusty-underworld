@@ -88,7 +88,10 @@ public sealed record AbyssUiSnapshot(
     int PresentActors,
     int Slots,
     AbyssConversationView? Conversation,
-    int LightRadius = 0)
+    int LightRadius = 0,
+    string Automap = "",
+    int AvatarTileX = 0,
+    int AvatarTileY = 0)
 {
     public static uint Write(UiValueBuilder builder, AbyssUiSnapshot snapshot)
     {
@@ -142,6 +145,11 @@ public sealed record AbyssUiSnapshot(
             // How far the avatar's light reaches, in tiles: the DOM reads it, so the
             // player can see the darkness rather than walk into it.
             ("lightRadius", builder.Number(snapshot.LightRadius)),
+            // What the avatar has seen on this level, run-length encoded, with the
+            // tile it stands on so the panel can show the map around it.
+            ("automap", builder.String(snapshot.Automap)),
+            ("avatarTileX", builder.Number(snapshot.AvatarTileX)),
+            ("avatarTileY", builder.Number(snapshot.AvatarTileY)),
             ("slots", builder.Number(snapshot.Slots)),
             ("conversation", conversation));
     }

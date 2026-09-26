@@ -82,6 +82,9 @@ const snapshot = (overrides = {}) => ({
   maxMana: 12,
   charge: 0.5,
   lightRadius: 6,
+  automap: '0:3,1,4092',
+  avatarTileX: 1,
+  avatarTileY: 0,
   yawRadians: 0,
   wind: 0,
   outcome: '',
@@ -102,6 +105,26 @@ function mount(t, ctx = context(), deps = {}) {
   t.after(() => ui.dispose());
   return { dom, ctx, ui, document: dom.window.document };
 }
+
+test('the HUD draws the map the avatar has built, around where it stands', async (t) => {
+  const { ctx, document } = mount(t);
+  // One mapped tile at (1,0), which is where the avatar stands.
+  ctx.listeners.forEach((fn) => fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot() }));
+  const map = document.querySelector('.abyss-hud .abyss-map');
+  assert.equal(map.hidden, false);
+  const lines = map.textContent.split('\n');
+  assert.equal(lines.length, 31);
+  // The avatar's own tile is marked, an unmapped tile inside the level is not, and
+  // the window's corner is off the level rather than drawn as a tile.
+  assert.equal(lines[15][15], '@');
+  assert.equal(lines[15][14], '.');
+  assert.equal(lines[0][0], ' ');
+
+  // A level with no page yet shows no panel rather than an empty grid.
+  ctx.listeners.forEach((fn) =>
+    fn({ contract: 'abyss.ui.snapshot.v1', value: snapshot({ automap: '' }) }));
+  assert.equal(document.querySelector('.abyss-hud .abyss-map').hidden, true);
+});
 
 test('the HUD reads how far the light reaches', async (t) => {
   const { ctx, document } = mount(t);

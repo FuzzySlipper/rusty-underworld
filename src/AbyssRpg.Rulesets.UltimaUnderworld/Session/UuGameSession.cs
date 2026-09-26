@@ -142,7 +142,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 _avatarName,
                 hud.Hp, hud.MaxHp, hud.Mana, hud.MaxMana, hud.ChargeFraction, hud.YawRadians, hud.WindIndex,
                 _outcome, _session.Avatar.IsDefeated, _session.Swimming, _session.Flying,
-                PresentActors, ConversationView, LightRadius);
+                PresentActors, ConversationView, LightRadius,
+                _session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? mapped)
+                    ? mapped.EncodePage()
+                    : "",
+                AvatarTile.X, AvatarTile.Y);
         }
     }
 
@@ -697,6 +701,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public int MappedTiles => _session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page)
         ? page.MappedCount
         : 0;
+
+    /// <summary>The tile the avatar stands on, for the map's view of the world.</summary>
+    private (int X, int Y) AvatarTile => _player.Position is { } position
+        ? ((int)Math.Floor(position.X / TileUnits), (int)Math.Floor(position.Z / TileUnits))
+        : (0, 0);
 
     /// <summary>Records what the avatar's light reaches on this level's map.</summary>
     private void RevealAroundAvatar()

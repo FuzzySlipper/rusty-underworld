@@ -597,7 +597,10 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             PresentActors: status?.PresentActors ?? 0,
             Slots: slots.Count,
             Conversation: Conversation(status),
-            LightRadius: status?.LightRadius ?? 0));
+            LightRadius: status?.LightRadius ?? 0,
+            Automap: status?.AutomapEncoded ?? "",
+            AvatarTileX: status?.AvatarTileX ?? 0,
+            AvatarTileY: status?.AvatarTileY ?? 0));
     }
 
     /// <summary>

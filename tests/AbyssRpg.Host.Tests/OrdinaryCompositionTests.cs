@@ -876,6 +876,16 @@ public sealed class OrdinaryCompositionTests
         int drawn = graphics.LastSnapshot.Count;
         Assert.True(drawn > 1, "the light reaches the placements around the spawn");
 
+        // The map the avatar has built reaches the companion UI: the panel draws the
+        // tiles that were seen, around the tile the avatar stands on.
+        string automap = HudString(ui.LastProjection!.Value.Value, "automap");
+        Assert.StartsWith(automap[0] == '1' ? "1:" : "0:", automap, StringComparison.Ordinal);
+        Assert.True(session.MappedTiles > 0, "the spawn is on the map");
+        // The window is centred on the tile the avatar stands on, which in this
+        // fixture is the spawn tile the level placed it at.
+        Assert.Equal(0, (int)Field(ui.LastProjection!.Value.Value, "avatarTileX").NumberValue);
+        Assert.Equal(0, (int)Field(ui.LastProjection!.Value.Value, "avatarTileY").NumberValue);
+
         // The light the session carries reaches the companion UI: the HUD reads it,
         // so a player can see how far they can see.
         Assert.Equal(

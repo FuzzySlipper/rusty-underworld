@@ -291,7 +291,10 @@ public sealed record SessionStatus(
     bool Flying,
     int PresentActors,
     ConversationView? Conversation = null,
-    int LightRadius = 0);
+    int LightRadius = 0,
+    string AutomapEncoded = "",
+    int AvatarTileX = 0,
+    int AvatarTileY = 0);
 
 /// <summary>
 /// The conversation a session is in, as a product projects it: who is speaking,
