@@ -34,9 +34,12 @@ Bundle assembles. Host launches.**
 > record links to it, an object on the floor is taken into the avatar, a fallen
 > opponent's carried things are looted from it, and a runestone lands on the
 > casting shelf so spells can be cast from stones picked up in play. Placed things
-> are simulated but not drawn yet, carried items do not survive a save yet, and
-> the talk and barter owners are still neither composed nor dispatched to because
-> they need imported conversation content. Start with
+> are simulated but not drawn yet, carried items do not survive a save yet, and a
+> conversation is one pass: the imported conversations and the talk and barter
+> owners are live — using a creature runs its own script, the panel carries the
+> transcript, its speaker's name and the options it offers, and a vendor's script
+> trades against the imported values of what each side carries — but the avatar
+> cannot yet answer an option, which #8623 carries. Start with
 > `scripts/import-level.sh`; the operator step, the Crew profile, and the
 > observed limits are in [GPU playtesting](docs/gpu-playtesting.md), the slice
 > captures in [the composition evidence](docs/playtest-evidence/8587-8588/README.md),
@@ -44,7 +47,9 @@ Bundle assembles. Host launches.**
 > [the placement evidence](docs/playtest-evidence/8590/README.md), the level
 > transition in [the travel evidence](docs/playtest-evidence/8616/README.md), and
 > looting and rune pickup in
-> [the item evidence](docs/playtest-evidence/8615/README.md).
+> [the item evidence](docs/playtest-evidence/8615/README.md), and talking to the
+> Abyss' own inhabitants in
+> [the conversation evidence](docs/playtest-evidence/8614/README.md).
 
 ## Ownership
 

@@ -101,12 +101,15 @@ opens a placed door through that state. The level's objects are held by owners:
 a container yields what its own record links to it, an object on the floor is
 taken into the avatar, a fallen opponent's carried things are looted from it, and
 a runestone (the donor's item range 232-255) lays itself on the casting shelf, so
-spells cast from stones picked up in play. Named remainders, each carried by its
-own task: placed objects and actors are simulated but not drawn and the door stays
-solid until its tile's collision is replaced (#8592); talk and barter need
-imported conversation content (#8614); carried, equipped and container items are
-not in the save yet (#8621); nothing in play walks a level transition yet
-(#8620).
+spells cast from stones picked up in play. A creature is talked to through the
+same use channel: the script its own record names runs on the conversation VM, the
+panel carries the transcript, the speaker's name from the string block and the
+options the script offers, and a vendor's own script trades against the imported
+values of what each side carries. Named remainders, each carried by its own task:
+placed objects and actors are simulated but not drawn and the door stays solid
+until its tile's collision is replaced (#8592); a conversation cannot be answered
+yet, so it runs one pass (#8623); carried, equipped and container items are not in
+the save yet (#8621); nothing in play walks a level transition yet (#8620).
 `abyss.goto`, `abyss.actors` and `abyss.travel` are operator probes for placing
 the avatar on a tile, reading nearby actors, and entering another imported level;
 they are not a gameplay path. The tile probe refuses a tile the level does not
