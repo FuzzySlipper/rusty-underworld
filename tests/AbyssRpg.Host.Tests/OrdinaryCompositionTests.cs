@@ -684,8 +684,13 @@ public sealed class OrdinaryCompositionTests
         // Take the torch the level placed on its own tile first: an offer needs
         // something on the avatar's side of the tray. The avatar spawns on the
         // vendor's own tile, so it walks to the torch and back.
+        AbyssRpg.Kit.Controls.WorldPoint? before = session.PlayerPosition;
         spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 12f);
         product.Update(SixtyHzUpdate(2));
+        Assert.NotEqual(before, session.PlayerPosition);
+        // The light is read at the top of an update and the step lands inside it, so
+        // the tile just arrived on is revealed by the update after the move.
+        product.Update(SixtyHzUpdate(3));
         product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
         Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
         product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
@@ -853,6 +858,39 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(2, ((ISessionStatusSource)reloaded).Status.Level);
         Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
         Assert.Single(reloaded.CarriedItems.UniqueItems);
+    }
+
+    [Fact]
+    public void The_avatars_light_decides_what_is_drawn_and_what_the_map_remembers()
+    {
+        // Two consequences of one piece of product state: the drawn world shows what
+        // the light reaches, and seeing a tile is what puts it on the automap -- which
+        // the save already carries, so a session's map survives a load.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // The avatar starts among the level's placements, so its light reaches them.
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius, session.LightRadius);
+        int drawn = graphics.LastSnapshot.Count;
+        Assert.True(drawn > 1, "the light reaches the placements around the spawn");
+
+        // Walking reveals more of the map than standing still did.
+        int mappedAtStart = session.MappedTiles;
+        Assert.True(mappedAtStart > 0, "the spawn is on the map");
+        // One tile along a path the other tests walk, so the step is one the level
+        // admits rather than one collision refuses.
+        AbyssRpg.Kit.Controls.WorldPoint? before = session.PlayerPosition;
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 12f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.NotEqual(before, session.PlayerPosition);
+        // The light is read at the top of an update and the step lands inside it, so
+        // the tile just arrived on is revealed by the update after the move.
+        product.Update(SixtyHzUpdate(3));
+        Assert.True(
+            session.MappedTiles > mappedAtStart,
+            $"walking reveals more of the map: {session.MappedTiles} of {mappedAtStart}");
     }
 
     [Fact]

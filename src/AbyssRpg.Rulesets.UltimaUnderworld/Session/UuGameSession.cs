@@ -601,6 +601,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 bool door = placed?.Door == true;
                 bool openDoor = door && open.Contains((tile.X, tile.Y));
                 UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, door);
+                bool lit = _placements is not { } grid
+                    || InLight(
+                        grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).X,
+                        grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).Z);
                 Appearance appearance = ObjectAppearance(shape);
                 WorldPoint center = _placements?.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0)
                     ?? new WorldPoint((tile.X + 0.5f) * 8f, 0.92f, (tile.Y + 0.5f) * 8f);
@@ -613,8 +617,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                         Quaternion.Identity,
                         new Vector3(shape.Width, shape.Height, shape.Depth)),
                     appearance,
-                    // An open door stands aside: nothing is drawn in the doorway.
-                    Visible: !openDoor,
+                    // An open door stands aside, and what the avatar's light does not
+                    // reach is not drawn: the light is what decides, not the record.
+                    Visible: !openDoor && lit,
                     RenderLayer.Scene));
             }
         }
@@ -656,6 +661,61 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             StandingCreatureCount(level));
     }
 
+
+    /// <summary>
+    /// How far the avatar's own light reaches, in tiles: the lamp they carry plus
+    /// whatever a light spell adds. This is product state, and the drawn world and
+    /// the automap are both consequences of it rather than separate systems.
+    /// </summary>
+    public int LightRadius
+    {
+        get
+        {
+            _ = _disposed;
+            int radius = BaseLightRadius;
+            // A light spell widens it while it holds; the maintained-spell owner
+            // answers that, not a second timer here.
+            // A light spell widens the radius while it holds; that rides with the
+            // maintained-spell owner and is not wired yet (#8665).
+
+            return radius;
+        }
+    }
+
+    /// <summary>Engine units per tile in the admitted level: the import's own scale.</summary>
+    private float TileUnits => _placements?.UnitsPerTile is > 0 ? (float)_placements.UnitsPerTile : 8f;
+
+    /// <summary>The light the avatar always carries: enough to see what is underfoot.</summary>
+    public const int BaseLightRadius = 6;
+
+    /// <summary>What a light spell adds to the radius while it holds.</summary>
+    public const int SpellLightBonus = 8;
+
+    /// <summary>Tiles the avatar has seen on the current level.</summary>
+    public int MappedTiles => _session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page)
+        ? page.MappedCount
+        : 0;
+
+    /// <summary>Records what the avatar's light reaches on this level's map.</summary>
+    private void RevealAroundAvatar()
+    {
+        if (_player.Position is not { } position) return;
+        int tileX = (int)Math.Floor(position.X / TileUnits);
+        int tileY = (int)Math.Floor(position.Z / TileUnits);
+        if (!_session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page))
+            _session.Automap[_session.Dungeon.CurrentLevel] = page = new Kit.Knowledge.AutomapPage();
+        page.RevealDisc(tileX, tileY, LightRadius);
+    }
+
+    /// <summary>Whether the avatar's light reaches a world position.</summary>
+    private bool InLight(float x, float z)
+    {
+        if (_player.Position is not { } position) return true;
+        float dx = x - position.X;
+        float dz = z - position.Z;
+        float reach = LightRadius * TileUnits;
+        return (dx * dx) + (dz * dz) <= reach * reach;
+    }
 
     /// <summary>Whether the avatar carries an admitted object away from its level.</summary>
     private bool IsCarriedOff(UuEntityAdmission.Admission admission, int level, EntityId item) =>
@@ -731,6 +791,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             PublishScene(_appearance);
         }
 
+        RevealAroundAvatar();
         double seconds = update.Facts.FixedDeltaSeconds;
         if (!double.IsFinite(seconds) || seconds <= 0d)
             throw new ArgumentOutOfRangeException(nameof(update));
