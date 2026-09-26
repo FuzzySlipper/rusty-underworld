@@ -750,7 +750,7 @@ public sealed class OrdinaryCompositionTests
             carried.UniqueItems[0].Definition.Value);
         // The avatar's own view is what play reads, and it holds the torch once.
         // The floor's view can still name an entity the store no longer maps, which
-        // is #8635: a placement re-admitted while the save already accounts for it.
+        // is #8643: a placement re-admitted while the save already accounts for it.
         Assert.Equal(
             AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
             carried.UniqueItems[0].Definition.Value);
@@ -796,14 +796,14 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal("The sack is empty.", ((ISessionStatusSource)reloaded).Status.Outcome);
     }
 
-    [Fact(Skip = "Carried by #8635: after a container transfer the Engine inventory "
+    [Fact(Skip = "Carried by #8643: after a container transfer the Engine inventory "
         + "component view and the store read model disagree, so the save cannot say "
         + "truthfully where a looted item lies. Unskip with that task.")]
     public void A_looted_container_stays_empty_across_travel_and_a_save()
     {
         // The save names owners by durable identity, so a level's contents are put
         // back when admission rebuilds them rather than only for the fresh session.
-        // A save written on another level is #8636: the restore admits the bundle's
+        // A save written on another level is #8644: the restore admits the bundle's
         // first level, so resuming away from home is a separate requirement.
         using AbyssProduct product = TwoLevelSaveLoadProduct(
             out UiDouble ui, out EngineSpatialDouble spatial);
