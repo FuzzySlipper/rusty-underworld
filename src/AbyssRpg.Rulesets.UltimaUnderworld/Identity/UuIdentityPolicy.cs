@@ -26,6 +26,18 @@ public static class UuIdentityPolicy
         return new DurableIdentityReference(DurableIdentityKind.Item, checked((ulong)(level * 1024 + index)));
     }
 
+    /// <summary>
+    /// The durable identity of a level's floor: the owner that holds the level's
+    /// loose objects. It is one per level and outlives travel away and back.
+    /// </summary>
+    public static DurableIdentityReference LevelStorageIdentity(int level)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(level, 1);
+        return new DurableIdentityReference(DurableIdentityKind.Container, LevelStorageIdBase + checked((ulong)level));
+    }
+
+    private const ulong LevelStorageIdBase = 0x1_0000;
+
     public static DurableIdentityAllocator NewGameActorAllocator() =>
         new(DurableIdentityKind.Actor, FirstDynamicActorId, reserved: [AvatarId]);
 

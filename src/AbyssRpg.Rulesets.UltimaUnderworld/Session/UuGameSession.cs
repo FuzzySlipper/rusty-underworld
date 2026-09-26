@@ -2,6 +2,7 @@ using System.Numerics;
 using AbyssRpg.Kit;
 using AbyssRpg.Kit.Actors;
 using AbyssRpg.Kit.Controls;
+using AbyssRpg.Kit.Inventory;
 using AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 using AbyssRpg.Rulesets.UltimaUnderworld.Content;
 using AbyssRpg.Rulesets.UltimaUnderworld.Creation;
@@ -11,8 +12,9 @@ using AbyssRpg.Rulesets.UltimaUnderworld.Movement;
 using AbyssRpg.Rulesets.UltimaUnderworld.Presentation;
 using AbyssRpg.Rulesets.UltimaUnderworld.Survival;
 using Rusty.Engine;
-using Rusty.Engine.Debugging;
+using Rusty.Engine.Entities;
 using Rusty.Engine.Mechanics;
+using Rusty.Engine.Debugging;
 
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
 
@@ -90,6 +92,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _catalog = catalog;
         _items = items;
         _session = session;
+        if (items is not null)
+        {
+            InventoryStore store = session.Avatar.Actor.Get<InventoryComponent>().Store;
+            UuItemDefinitions definitions = new(items);
+            _levelItems = new UuLevelItems(
+                store,
+                session.Directory,
+                new MechanicsInventoryContainerCoordinator(store, session.Directory, definitions.Definitions),
+                definitions,
+                ownerIndex => ResolveLevelObject(session, ownerIndex));
+        }
         _movement = movement;
         _player = player;
         _camera = camera;
@@ -132,6 +145,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>The imported item catalog, when the bundle carries one.</summary>
     private readonly UuItemCatalog? _items;
+
+    /// <summary>The inventory side of the levels' placements, when the bundle carries a catalog.</summary>
+    private readonly UuLevelItems? _levelItems;
 
     /// <summary>
     /// The actor each placed critter slot became, per level, so a defeat can be
@@ -362,6 +378,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             gameSession._placedCrittersByLevel[prepared.FirstLevel.LevelNumber] = UuCritterAdmission
                 .AdmitLevel(session, prepared.FirstLevel, placedLevel, objectTables)
                 .ByObjectIndex;
+        }
+
+        // The level's items are held by owners: the floor for a loose object,
+        // the container that names it, and the critter that carries it.
+        if (gameSession._levelItems is { } levelItems
+            && session.PlacedAdmission(prepared.FirstLevel.LevelNumber) is { } admitted)
+        {
+            levelItems.AdoptLevel(prepared.FirstLevel.LevelNumber, admitted);
         }
 
         if (savedSnapshot is not null)
@@ -604,11 +628,77 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         if (PlacedObjectInReach(position) is { } placed)
         {
-            _outcome = $"You see {Describe(placed.ItemId)} here.";
+            Use(placed);
             return;
         }
 
         _outcome = "There is nothing here to use.";
+    }
+
+    /// <summary>
+    /// The Engine entity of a placed object on the level the avatar stands on:
+    /// a container's contents name the container, a critter's carried objects
+    /// name the critter, so both resolve here.
+    /// </summary>
+    private static EntityId? ResolveLevelObject(UuSession session, int objectIndex)
+    {
+        int level = session.Dungeon.CurrentLevel;
+        if (session.PlacedAdmission(level) is { } admission
+            && admission.ByIndex.TryGetValue(objectIndex, out EntityId entity))
+        {
+            return entity;
+        }
+
+        return session.TryGetPlacedActor(objectIndex, out ActorState actor) ? actor.Actor.Entity : null;
+    }
+
+    /// <summary>
+    /// Uses the object the avatar stands at: a container yields what it holds,
+    /// anything else is taken. Both are one transfer between owners, so the
+    /// Engine keeps owning what is where, and a taken object leaves the level
+    /// state the save carries.
+    /// </summary>
+    private void Use(AdmittedObject placed)
+    {
+        if (_levelItems is not { } items)
+        {
+            _outcome = $"You see {Describe(placed.ItemId)} here.";
+            return;
+        }
+
+        int level = _session.Dungeon.CurrentLevel;
+        if (Session.UuGameSession.PlacedEntity(_session, level, placed.Index) is not { } entity)
+        {
+            _outcome = $"You see {Describe(placed.ItemId)} here.";
+            return;
+        }
+
+        EntityId avatar = _session.Avatar.Actor.Entity;
+        bool isContainer = Content.UuObjectTablesContent.IsContainerItem(placed.ItemId);
+        if (isContainer)
+        {
+            InventoryContainerTransferReceipt looted = items.Loot(entity, avatar);
+            int count = looted.UniqueItems.Count;
+            _outcome = count == 0
+                ? $"The {Describe(placed.ItemId)} is empty."
+                : $"You loot {count} item{(count == 1 ? "" : "s")} from the {Describe(placed.ItemId)}.";
+            return;
+        }
+
+        // Taking leaves the floor: the level state records the removal, which is
+        // what a save carries, and the object moves into the avatar's inventory.
+        EntityId from = items.TryContainerOf(entity, out EntityId container) ? container : items.Floor(level);
+        items.Take(entity, from, avatar);
+        _session.Dungeon.Current.RemoveObject(placed.Index);
+        if (TryRuneIndex(placed.ItemId, out int rune))
+        {
+            CollectRune(rune);
+            ShelfRune(rune);
+            _outcome = $"You take the runestone and lay it on the shelf.";
+            return;
+        }
+
+        _outcome = $"You take the {Describe(placed.ItemId)}.";
     }
 
     /// <summary>The nearest object the level placed, within a hand's reach.</summary>
@@ -618,13 +708,23 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         float nearestDistance = InteractionReach;
         foreach (int index in _session.PlacedObjectIndexes(_session.Dungeon.CurrentLevel))
         {
+            // What the level no longer admits is not in reach: a taken or
+            // destroyed object has left the place it lay.
+            if (!_session.Dungeon.Current.IsLive(index)) continue;
             if (_session.PlacedObjectAt(_session.Dungeon.CurrentLevel, index, out (int X, int Y) tile) is not { } obj)
                 continue;
+            // Only what lies on the floor is in reach: a container's contents
+            // are reached by using the container.
+            if (tile.X < 0) continue;
             AdmittedTile? on = _placements?.Tile(tile.X, tile.Y);
             if (on is null) continue;
             WorldPoint center = _placements!.TileCenter(on.X, on.Y, on.FloorHeight);
             float distance = center.HorizontalDistanceTo(position);
+            // Out of reach, or farther than what is already in hand.
             if (distance > nearestDistance) continue;
+            // A tie keeps the object the chain names first: that is the one on
+            // top of what the tile carries, so a stack is taken from the top.
+            if (nearest is not null && distance >= nearestDistance) continue;
             nearest = obj;
             nearestDistance = distance;
         }
@@ -760,11 +860,42 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 .ByObjectIndex;
         }
 
+        if (_levelItems is { } levelItems && _session.PlacedAdmission(level) is { } admittedLevel)
+            levelItems.AdoptLevel(level, admittedLevel);
+
         WorldPoint anchor = AnchorPositionOf(definition);
         _player.Restore(anchor, DetachedMotion(anchor.Y));
         _camera.Update(_player);
         _outcome = $"You descend to level {level}.";
     }
+
+    /// <summary>
+    /// The Engine entity of a placed object on one level, whether it is held by
+    /// an owner or still loose.
+    /// </summary>
+    public static EntityId? PlacedEntity(UuSession session, int level, int objectIndex) =>
+        session.PlacedAdmission(level) is { } admission
+        && admission.ByIndex.TryGetValue(objectIndex, out EntityId entity)
+            ? entity
+            : null;
+
+    /// <summary>
+    /// The rune a runestone lays on the shelf. The donor's item range for
+    /// runestones is 232-255 (donor: src/objects/runestone.cs IsRunestone), and
+    /// the shelf's order is that range's order.
+    /// </summary>
+    public static bool TryRuneIndex(int itemId, out int runeIndex)
+    {
+        runeIndex = itemId - FirstRunestoneItemId;
+        return itemId >= FirstRunestoneItemId && itemId <= LastRunestoneItemId;
+    }
+
+    /// <summary>First and last item id the donor's runestone range covers.</summary>
+    public const int FirstRunestoneItemId = 232;
+    public const int LastRunestoneItemId = 255;
+
+    /// <summary>Lays an owned runestone on the casting shelf so a spell can be cast from it.</summary>
+    public void ShelfRune(int index) => _casting.ShelfRune(index);
 
     /// <summary>Releases the actors of a level the avatar has left.</summary>
     private void AbandonActors(int level)
@@ -793,6 +924,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>The imported item catalog this session reads names and mass from, when the bundle carries one.</summary>
     public UuItemCatalog? Items => _items;
+
+    /// <summary>The level's objects as inventory: the floor, containers and what a critter carries.</summary>
+    public UuLevelItems? LevelItems => _levelItems;
 
     /// <summary>Where the avatar's capsule center stands, before any new proposal.</summary>
     public WorldPoint? AvatarPosition => _player.Position;

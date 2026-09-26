@@ -19,6 +19,22 @@ public static class UuAvatarFactory
     public static readonly TrackId DefeatTrack = TrackId.Parse("abyss.defeat");
     public static readonly TrackId ManaTrack = TrackId.Parse("abyss.mana");
 
+    /// <summary>
+    /// Raises the avatar's mana pool to a larger one. Mana belongs to the
+    /// survival and progression owners; focused tests that are about another
+    /// system use this to give the avatar the pool that system needs.
+    /// </summary>
+    public static void GrantManaForTest(PlayerActorState avatar, double maximum)
+    {
+        ArgumentNullException.ThrowIfNull(avatar);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximum);
+        StatsComponent stats = avatar.Actor.Get<StatsComponent>();
+        Track existing = stats.GetTrack(ManaTrack);
+        if (maximum <= existing.MaximumValue) return;
+        stats.RemoveTrack(ManaTrack);
+        stats.AddTrack(ManaTrack, new Track(maximum, current: maximum));
+    }
+
     public static PlayerActorState CreateAvatar(
         ActorsState actors,
         ActorPose spawnPose,

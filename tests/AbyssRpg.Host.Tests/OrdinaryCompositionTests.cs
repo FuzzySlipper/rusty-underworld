@@ -398,7 +398,7 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
-    public void The_use_channel_names_a_placed_object_from_the_imported_item_catalog()
+    public void The_use_channel_takes_a_placed_object_into_the_avatar()
     {
         // The fixture's prop (item 200, the catalog's "torch") hangs on tile
         // (0,1), which the Engine's step stands the avatar on.
@@ -419,13 +419,138 @@ public sealed class OrdinaryCompositionTests
         Assert.NotNull(session.Items);
 
         product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
-        Assert.Equal("You see torch here.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
 
-        // Away from anything the level placed, the answer is still honest.
-        spatial.StepTranslation = new System.Numerics.Vector3(60f, 1f, 60f);
-        product.Update(SixtyHzUpdate(3));
+        // Taking it leaves the place it lay: the removal is level state, which
+        // is what a save carries, and the level stops admitting it.
+        Assert.False(session.State.Dungeon.Current.IsLive(TestContent.PropObjectIndex));
+        Assert.Contains(TestContent.PropObjectIndex, session.State.Dungeon.Current.RemovedObjects);
+
+        // The avatar carries it: one Engine transfer moved the item's durable
+        // entity from the level's floor into the avatar's own inventory.
+        var carried = session.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+        Assert.Single(carried.UniqueItems);
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
+            carried.UniqueItems[0].Definition.Value);
+
+        // Used a second time, the place is empty and the answer says so.
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
         product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
         Assert.Equal("There is nothing here to use.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
+    /// <summary>A product whose fixture level also places the two runestones a first-circle spell needs.</summary>
+    private static AbyssProduct RuneProduct(out UiDouble ui, out EngineSpatialDouble spatial)
+    {
+        ui = UiDouble.Create();
+        spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 20f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        return new AbyssProduct(
+            engine,
+            // A druid's starting skills train Mana, so it begins with the mana a
+            // first-circle spell costs and this test arranges only the runes.
+            TestContent.Build(withRunes: true, defaultClass: "druid"),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void Looting_a_placed_container_moves_its_imported_contents_into_the_avatar()
+    {
+        // The fixture's sack (item 128) hangs on tile (1,0) and holds one object,
+        // which the level's own record links to it.
+        UiDouble ui = UiDouble.Create();
+        var spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(12f, 1f, 4f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        using var product = new AbyssProduct(
+            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var sock = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuLevelItems)session.LevelItems!;
+        Rusty.Engine.Entities.EntityId sack = AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession
+            .PlacedEntity(session.State, 1, TestContent.ContainerObjectIndex)!.Value;
+        Assert.Single(sock.Read(sack).UniqueItems);
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You loot 1 item from the sack.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // The content moved: the sack holds nothing and the avatar holds it.
+        Assert.Empty(sock.Read(sack).UniqueItems);
+        var carried = session.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
+        Assert.Single(carried.UniqueItems);
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
+            carried.UniqueItems[0].Definition.Value);
+
+        // Looted a second time, the sack says it is empty rather than lying.
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("The sack is empty.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
+    [Fact]
+    public void Picking_up_placed_runestones_puts_them_on_the_shelf_and_a_spell_casts_from_them()
+    {
+        using AbyssProduct product = RuneProduct(out UiDouble ui, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Empty(session.Casting.Panel().Shelf);
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal(
+            "You take the runestone and lay it on the shelf.",
+            HudString(ui.LastProjection!.Value.Value, "outcome"));
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+
+        // "In" and "Lor", in the order they were taken.
+        Assert.Equal(
+            new[] { TestContent.InRuneIndex, TestContent.LorRuneIndex },
+            session.Casting.Panel().Shelf.ToArray());
+
+        // Mana is the survival/progression owners' business, and a starting
+        // avatar's pool depends on the creation walk's own choices. This test is
+        // about the rune path, so it grants the pool a first-circle spell needs.
+        AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.GrantManaForTest(
+            session.State.Avatar, 12d);
+
+        // The shelf spells "IL": Light. The cast roll itself is random, so the
+        // claim is that the runes and mana admit the spell at all — an empty
+        // shelf cannot — and that a cast from them lands.
+        AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastingHosting.CastOutcome attempt =
+            session.AttemptCast(TestContent.LightSpellId);
+        Assert.NotEqual(AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.NotASpell, attempt.Gate);
+        Assert.NotEqual(AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.NotEnoughMana, attempt.Gate);
+
+        AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastingHosting.CastOutcome outcome = attempt;
+        for (int tries = 0; tries < 50
+            && outcome.Gate != AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.Cast; tries++)
+        {
+            outcome = session.AttemptCast(TestContent.LightSpellId);
+        }
+
+        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastGates.GateResult.Cast, outcome.Gate);
+        Assert.False(outcome.Backfired);
+        Assert.NotNull(outcome.Effect);
+        Assert.Equal("The spell takes hold.", session.Status.Outcome);
+
+        // Both stones left the level state the save carries.
+        Assert.Contains(TestContent.FirstRunestoneObjectIndex, session.State.Dungeon.Current.RemovedObjects);
+        Assert.Contains(TestContent.SecondRunestoneObjectIndex, session.State.Dungeon.Current.RemovedObjects);
     }
 
     [Fact]

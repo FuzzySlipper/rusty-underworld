@@ -62,11 +62,42 @@ public static class UuEntityAdmission
             }
         }
 
+        // A container's contents hang off its own link, not off a tile, so they
+        // are admitted here and recorded without a tile: they are inside the
+        // container, not lying on the floor.
+        foreach (AdmittedObject container in objects.Values)
+        {
+            if (!IsContainer(container) || !state.IsLive(container.Index)) continue;
+            int index = container.Link;
+            var visited = new HashSet<int>();
+            while (index != 0)
+            {
+                if (index <= 0 || index > UuLevelState.MaxObjectIndex || !visited.Add(index))
+                    break;
+                if (!objects.TryGetValue(index, out AdmittedObject? content))
+                    break;
+                if (content.ItemId != 0 && state.IsLive(index) && !IsCritter(content))
+                {
+                    var identity = UuIdentityPolicy.LevelObjectIdentity(level.LevelNumber, index);
+                    if (!directory.TryResolve(identity, out EntityId entity))
+                        entity = directory.CreateItemEntity(identity, new EntityTypeId($"abyss.item.{content.ItemId}"));
+                    byIndex[index] = entity;
+                    identities[index] = identity;
+                    live[index] = content;
+                }
+
+                index = content.Next;
+            }
+        }
+
         return new Admission(byIndex, identities, live, tiles);
     }
 
     private static bool IsCritter(AdmittedObject obj) =>
         obj.Mobile && Content.UuObjectTablesContent.IsCritterItem(obj.ItemId);
+
+    private static bool IsContainer(AdmittedObject obj) =>
+        !obj.Mobile && Content.UuObjectTablesContent.IsContainerItem(obj.ItemId);
 
     public static void AbandonLevel(EntityDirectory directory, Admission admission)
     {

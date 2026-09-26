@@ -68,9 +68,15 @@ public sealed class UuSession : IDisposable
         tile = default;
         if (!_admissions.TryGetValue(level, out UuEntityAdmission.Admission? admission)) return null;
         if (!admission.Objects.TryGetValue(objectIndex, out AdmittedObject? obj)) return null;
-        tile = admission.Tiles.TryGetValue(objectIndex, out (int X, int Y) found) ? found : default;
+        // An object without a tile is inside a container rather than lying on
+        // the floor, so the caller is told that by a negative position.
+        tile = admission.Tiles.TryGetValue(objectIndex, out (int X, int Y) found) ? found : (-1, -1);
         return obj;
     }
+
+    /// <summary>The item admission a level currently has, or null when it is not admitted.</summary>
+    public UuEntityAdmission.Admission? PlacedAdmission(int level) =>
+        _admissions.TryGetValue(level, out UuEntityAdmission.Admission? admission) ? admission : null;
 
     /// <summary>The object indexes a level admits as live entities right now.</summary>
     public IReadOnlyCollection<int> PlacedObjectIndexes(int level) =>
@@ -116,8 +122,10 @@ public sealed class UuSession : IDisposable
         ArgumentNullException.ThrowIfNull(vitals);
         ArgumentNullException.ThrowIfNull(firstLevel);
 
-        var actors = new ActorsState();
+        // One entity store for the whole session: actors and level objects share
+        // it, so their Engine entity ids are unique together.
         var directory = new EntityDirectory();
+        var actors = new ActorsState(directory);
         var clock = new GameClock();
         PlayerActorState avatar = UuAvatarFactory.CreateAvatar(actors, spawnPose, choices, vitals);
         var dungeon = new UuDungeonSession(clock, new UuLevelState(firstLevel));
@@ -291,8 +299,9 @@ public sealed class UuSession : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        // The actors and the level objects share one directory, so it is
+        // disposed once, through the actors' owner.
         Actors.Dispose();
-        Directory.Dispose();
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

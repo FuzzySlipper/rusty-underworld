@@ -32,7 +32,7 @@ internal static class TestContent
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
-        bool withSecondLevel = false)
+        bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter")
     {
         List<ProductContentFile> files =
         [
@@ -70,7 +70,7 @@ internal static class TestContent
               "id": "abyssrpg.avatar-options",
               "genders": ["male", "female"],
               "handedness": ["left", "right"],
-              "classes": ["fighter", "mage", "ranger", "bard", "tinker", "druid", "paladin", "shepherd"],
+              "classes": ["__FIRST_CLASS__", "fighter", "mage", "ranger", "bard", "tinker", "druid", "paladin", "shepherd"],
               "difficulties": ["standard", "easy"],
               "defaultName": "Tester"
             }
@@ -97,11 +97,20 @@ internal static class TestContent
             File("abyss/content-packs/tuning.json", """{ "id": "abyssrpg.stygian-default", "clockTicksPerSecond": 255, "movement": "default" }"""),
         ];
 
-        if (withLevel) StageLevel(files, level, withPlacements, withCritter);
+        if (withLevel) StageLevel(files, level, withPlacements, withCritter, withRunes);
         if (withSecondLevel) StageLevel(files, SecondLevel, withPlacements: true, withCritter: true);
 
         // The descriptor grammar names one pack per level, so a bundle that
         // admits another level starts from the same staged tree.
+        files = files
+            .Select(file => Encoding.UTF8.GetString(file.Path.Span) is { } path
+                && path.EndsWith("avatar-options.json", StringComparison.Ordinal)
+                    ? File(
+                        path,
+                        Encoding.UTF8.GetString(file.Bytes.Span)
+                            .Replace("__FIRST_CLASS__", defaultClass, StringComparison.Ordinal))
+                    : file)
+            .ToList();
         files[0] = File(
             "abyss/bundles/stygian-abyss.bundle.json",
             Encoding.UTF8.GetString(files[0].Bytes.Span)
@@ -122,12 +131,13 @@ internal static class TestContent
     /// <summary>The door tile the second level places, distinct from the first level's.</summary>
     public static readonly (int X, int Y) SecondLevelDoorTile = (1, 2);
 
-    private static void StageLevel(List<ProductContentFile> files, int level, bool withPlacements, bool withCritter)
+    private static void StageLevel(
+        List<ProductContentFile> files, int level, bool withPlacements, bool withCritter, bool withRunes = false)
     {
         files.Add(File($"abyss/packs/test.level-{level}.pack.json", Pack($"abyssrpg.level-{level}", LevelPayloadPathFor(level))));
         files.Add(File(LevelPayloadPathFor(level), LevelManifest(level, withPlacements)));
         files.Add(File(RenderPathFor(level), RenderMesh(level)));
-        if (withPlacements) files.Add(File(PlacementsPathFor(level), Placements(level, withCritter)));
+        if (withPlacements) files.Add(File(PlacementsPathFor(level), Placements(level, withCritter, withRunes)));
     }
 
     internal static string LevelManifest(int level = 1, bool withPlacements = true) =>
@@ -154,6 +164,17 @@ internal static class TestContent
     /// fixture places: the prop, the container and its content, and both levels'
     /// critters.
     /// </summary>
+    /// <summary>The runestone slots, item ids and shelf indices the fixture places.</summary>
+    public const int FirstRunestoneObjectIndex = 504;
+    public const int SecondRunestoneObjectIndex = 505;
+    public const int InStoneItemId = 240;
+    public const int LorStoneItemId = 243;
+
+    /// <summary>The shelf indices those stones take, and the spell they spell.</summary>
+    public const int InRuneIndex = 8;
+    public const int LorRuneIndex = 11;
+    public const int LightSpellId = 2;
+
     internal static string ItemCatalog() => """
     {
       "schemaVersion": 1,
@@ -163,7 +184,9 @@ internal static class TestContent
         { "itemId": 66, "name": "giant spider", "massTenthStones": 14, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 2 },
         { "itemId": 128, "name": "sack", "massTenthStones": 2, "height": 4, "radius": 2, "canPickUp": true, "class": 2, "minorClass": 0, "classIndex": 0 },
         { "itemId": 176, "name": "piece of meat", "massTenthStones": 7, "height": 3, "radius": 1, "canPickUp": true, "class": 2, "minorClass": 3, "classIndex": 0 },
-        { "itemId": 200, "name": "torch", "massTenthStones": 4, "height": 5, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 8 }
+        { "itemId": 200, "name": "torch", "massTenthStones": 4, "height": 5, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 8 },
+        { "itemId": 240, "name": "In stone", "massTenthStones": 0, "height": 2, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 3, "classIndex": 8 },
+        { "itemId": 243, "name": "Lor stone", "massTenthStones": 0, "height": 2, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 3, "classIndex": 11 }
       ]
     }
     """;
@@ -191,7 +214,7 @@ internal static class TestContent
     /// order plus object rows) with one prop, one container with a content, and
     /// one critter standing on the spawn tile.
     /// </summary>
-    internal static string Placements(int level, bool withCritter = true)
+    internal static string Placements(int level, bool withCritter = true, bool withRunes = false)
     {
         var tiles = new System.Text.StringBuilder();
         for (int y = 0; y < 64; y++)
@@ -204,6 +227,8 @@ internal static class TestContent
                     (0, 0) => withCritter ? CritterObjectIndex : 0,
                     (0, 1) => PropObjectIndex,
                     (1, 0) => ContainerObjectIndex,
+                    // The runestones hang on their own tile, chained together.
+                    (0, 2) when withRunes => FirstRunestoneObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -216,6 +241,12 @@ internal static class TestContent
             }
         }
 
+        // Two runestones on tile (0,2), chained: the pair a first-circle spell
+        // needs, so casting is reachable by picking them up in play.
+        string runeRows = withRunes
+            ? $",\n            [{FirstRunestoneObjectIndex},0,{InStoneItemId},0,0,{SecondRunestoneObjectIndex},0,0,-1,-1,-1]"
+              + $",\n            [{SecondRunestoneObjectIndex},0,{LorStoneItemId},0,0,0,0,0,-1,-1,-1]"
+            : "";
         int critterItem = level == SecondLevel ? SecondLevelCritterItemId : CritterItemId;
         string critterRow = withCritter
             ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,0,0,0,0],\n            "
@@ -232,10 +263,11 @@ internal static class TestContent
           "objects": [
             {{critterRow}}[{{PropObjectIndex}},0,200,0,0,0,0,0,-1,-1,5],
             [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
-            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1,-1]
+            [{{ContainerContentIndex}},0,200,0,0,0,{{ContainerObjectIndex}},0,-1,-1,-1]__RUNE_ROWS__
           ]
         }
-        """;
+        """
+        .Replace("__RUNE_ROWS__", runeRows, StringComparison.Ordinal);
     }
 
     /// <summary>

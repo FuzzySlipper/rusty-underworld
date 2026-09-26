@@ -12,7 +12,14 @@ namespace AbyssRpg.Kit.Actors;
 /// <summary>Session actor construction and durable lookup over canonical Engine entities.</summary>
 public sealed class ActorsState : IDisposable
 {
-    public EntityDirectory Entities { get; } = new();
+    /// <summary>
+    /// Creates the actor state over its own entity directory, or over one the
+    /// session already owns: a session keeps one Engine entity store, so an
+    /// actor and an item can never hold the same Engine entity id.
+    /// </summary>
+    public ActorsState(EntityDirectory? directory = null) => Entities = directory ?? new EntityDirectory();
+
+    public EntityDirectory Entities { get; }
     public EntityStore Store => Entities.Store;
     public PlayerActorState Player { get; private set; } = null!;
     public IEnumerable<ActorState> All => Store.Query<ActorBody>()
