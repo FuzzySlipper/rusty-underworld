@@ -59,9 +59,35 @@ public sealed class UuHostingTests
             Assert.Equal(0, offer.Pop());
         }
 
-        // Ask records no phantom id.
+        // Typed input is asked for, and a menu's options are read out of the
+        // conversation's own memory as string indices (donor: babl_menu.cs).
         var ask = Script(hosting, "babl_ask", 0x42, 20, 0x42, 38);
         ask.Run();
-        Assert.Equal(["prompt:ask"], hosting.Panel("murgo", []).Prompts);
+        Assert.Equal([">"], hosting.Panel("murgo", []).Prompts);
+
+        // The option list is written into the conversation's own memory (STO
+        // takes an address then a value), terminated by an empty entry, and its
+        // start address is the call's argument. MemorySlots 4 puts the stack
+        // base above the four slots, so 64 is free scratch space.
+        short[] menuCode =
+        [
+            22, 64, 22, 11, 32,   // memory[64] = 11, a string index
+            22, 65, 22, 12, 32,   // memory[65] = 12
+            22, 66, 22, 0, 32,    // memory[66] = 0, the end of the list
+            22, 64,               // the list starts at 64
+            20, 0x43,             // CALLI babl_menu
+            38,
+        ];
+        var menu = new UuConversationVm(
+            new UuConversationVm.ConversationScript(
+                1, menuCode.Length, 7, 4,
+                [new UuConversationVm.ScriptImport("babl_menu", 0x43, false, 0)],
+                menuCode),
+            (block, index) => $"line {block}:{index}",
+            hosting,
+            new StubVariables());
+        menu.Run();
+        // A talk's panel accumulates what its script asked for.
+        Assert.Equal([">", "1. line 7:11", "2. line 7:12"], hosting.Panel("murgo", menu.Transcript).Prompts);
     }
 }

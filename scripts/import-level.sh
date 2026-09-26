@@ -34,6 +34,8 @@ if [[ -f "$data_dir/OBJECTS.DAT" ]]; then
   # The item catalog needs the common object table and the name strings too.
   [[ -f "$data_dir/COMOBJ.DAT" ]] && tables_args+=(--common "$data_dir/COMOBJ.DAT")
   [[ -f "$data_dir/STRINGS.PAK" ]] && tables_args+=(--strings "$data_dir/STRINGS.PAK")
+  # The conversations the game's own creatures hold, and the strings they read.
+  [[ -f "$data_dir/CNV.ARK" ]] && tables_args+=(--cnv "$data_dir/CNV.ARK")
 else
   tables_args=()
   echo "OBJECTS.DAT missing in $data_dir: the level imports without critter and container tables." >&2
@@ -85,5 +87,10 @@ admit_level
 if [[ -f "$packs/abyssrpg.item-catalog.pack.json" ]]; then
   admit_pack abyssrpg.item-catalog
 fi
+for generated in abyssrpg.strings abyssrpg.conversations; do
+  if [[ -f "$packs/$generated.pack.json" ]]; then
+    admit_pack "$generated"
+  fi
+done
 
 echo "Imported level $level into $out (placements included). Rebuild the product to stage it."

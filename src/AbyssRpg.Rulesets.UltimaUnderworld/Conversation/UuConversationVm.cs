@@ -79,6 +79,13 @@ public sealed class UuConversationVm
 
     public short At(int index) => (uint)index < MemorySize ? _memory[index] : (short)0;
 
+    /// <summary>
+    /// The text one of this conversation's own string indices names. A script
+    /// offers response options as indices into its string block, so the host
+    /// needs the block the running conversation reads.
+    /// </summary>
+    public string String(int index) => _strings(_conversation.StringBlock, index);
+
     public void Push(int value)
     {
         _stackPtr++;
