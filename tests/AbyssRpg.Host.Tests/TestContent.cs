@@ -32,7 +32,8 @@ internal static class TestContent
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
-        bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter")
+        bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter",
+        int creatureWhoAmI = 0)
     {
         List<ProductContentFile> files =
         [
@@ -47,6 +48,8 @@ internal static class TestContent
                 { "id": "abyssrpg.starting-kit" },
                 { "id": "abyssrpg.object-tables" },
                 { "id": "abyssrpg.item-catalog" },
+                { "id": "abyssrpg.strings" },
+                { "id": "abyssrpg.conversations" },
                 { "id": "abyssrpg.level-__LEVEL__" }__SECOND_LEVEL__
               ],
               "tuning": { "id": "abyssrpg.stygian-default" }
@@ -57,6 +60,10 @@ internal static class TestContent
             File("abyss/packs/test.starting-kit.pack.json", Pack("abyssrpg.starting-kit", "abyss/content-packs/starting-kit.json")),
             File("abyss/packs/abyssrpg.item-catalog.pack.json", Pack("abyssrpg.item-catalog", "abyss/imports/object-tables/abyssrpg.item-catalog.json")),
             File("abyss/imports/object-tables/abyssrpg.item-catalog.json", ItemCatalog()),
+            File("abyss/packs/abyssrpg.conversations.pack.json", Pack("abyssrpg.conversations", "abyss/imports/object-tables/abyssrpg.conversations.json")),
+            File("abyss/imports/object-tables/abyssrpg.conversations.json", Conversations()),
+            File("abyss/packs/abyssrpg.strings.pack.json", Pack("abyssrpg.strings", "abyss/imports/object-tables/abyssrpg.strings.json")),
+            File("abyss/imports/object-tables/abyssrpg.strings.json", Strings()),
             File("abyss/tuning/test.tuning.json", """
             {
               "kind": "abyssrpg.tuning-profile",
@@ -97,7 +104,7 @@ internal static class TestContent
             File("abyss/content-packs/tuning.json", """{ "id": "abyssrpg.stygian-default", "clockTicksPerSecond": 255, "movement": "default" }"""),
         ];
 
-        if (withLevel) StageLevel(files, level, withPlacements, withCritter, withRunes);
+        if (withLevel) StageLevel(files, level, withPlacements, withCritter, withRunes, creatureWhoAmI);
         if (withSecondLevel) StageLevel(files, SecondLevel, withPlacements: true, withCritter: true);
 
         // The descriptor grammar names one pack per level, so a bundle that
@@ -132,12 +139,14 @@ internal static class TestContent
     public static readonly (int X, int Y) SecondLevelDoorTile = (1, 2);
 
     private static void StageLevel(
-        List<ProductContentFile> files, int level, bool withPlacements, bool withCritter, bool withRunes = false)
+        List<ProductContentFile> files, int level, bool withPlacements, bool withCritter, bool withRunes = false,
+        int creatureWhoAmI = 0)
     {
         files.Add(File($"abyss/packs/test.level-{level}.pack.json", Pack($"abyssrpg.level-{level}", LevelPayloadPathFor(level))));
         files.Add(File(LevelPayloadPathFor(level), LevelManifest(level, withPlacements)));
         files.Add(File(RenderPathFor(level), RenderMesh(level)));
-        if (withPlacements) files.Add(File(PlacementsPathFor(level), Placements(level, withCritter, withRunes)));
+        if (withPlacements)
+            files.Add(File(PlacementsPathFor(level), Placements(level, withCritter, withRunes, creatureWhoAmI)));
     }
 
     internal static string LevelManifest(int level = 1, bool withPlacements = true) =>
@@ -164,8 +173,71 @@ internal static class TestContent
     /// fixture places: the prop, the container and its content, and both levels'
     /// critters.
     /// </summary>
+    /// <summary>The conversation number the fixture's own creature holds, and its name whoami.</summary>
+    public const int CreatureWhoAmI = 5;
+    public const int CreatureConversation = 5;
+
+    /// <summary>The fixture's conversation string block and the lines it says.</summary>
+    public const int ConversationStringBlock = 3585;
+    public static readonly string[] ConversationLines = ["A stranger walks the Abyss.", "What do you want of me?"];
+
+    /// <summary>A trade line the fixture's vendor says after the offer resolves.</summary>
+    public const string TradeLine = "So be it: we trade.";
+
+    /// <summary>
+    /// The conversations the fixture stages: one creature that says two lines,
+    /// and one vendor whose script calls the trade import before it says its
+    /// line. The code is the same 42-opcode machine the runtime runs, so these
+    /// scripts exercise the real path (SAY = 39, CALLI = 20, PUSHI = 22, EXIT = 38).
+    /// </summary>
+    internal static string Conversations() => $$"""
+    {
+      "schemaVersion": 1,
+      "source": { "SourceGame": "UW1", "SourceFile": "UW/DATA/CNV.ARK", "ByteLength": 0, "Sha256Hex": "00" },
+      "conversations": [
+        {
+          "index": {{CreatureConversation}},
+          "codeSize": 7,
+          "stringBlock": {{ConversationStringBlock}},
+          "memorySlots": 8,
+          "imports": [],
+          "code": [22, 0, 39, 22, 1, 39, 38]
+        },
+        {
+          "index": {{VendorConversation}},
+          "codeSize": 8,
+          "stringBlock": {{ConversationStringBlock}},
+          "memorySlots": 8,
+          "imports": [
+            { "name": "setup_to_barter", "idOrAddress": 271, "isVariable": false, "returnType": 0 },
+            { "name": "do_offer", "idOrAddress": 272, "isVariable": false, "returnType": 0 }
+          ],
+          "code": [20, 271, 20, 272, 22, 2, 39, 38]
+        }
+      ]
+    }
+    """;
+
+    internal static string Strings() => $$"""
+    {
+      "schemaVersion": 1,
+      "source": { "SourceGame": "UW1", "SourceFile": "UW/DATA/STRINGS.PAK", "ByteLength": 0, "Sha256Hex": "00" },
+      "blocks": {
+        "1": ["You cannot talk to that!", "You get no response."],
+        "7": [{{string.Join(", ", Enumerable.Repeat("\"\"", 22).Select((empty, index) => index == CreatureWhoAmI + 16 ? "\"a hooded figure\"" : empty))}}],
+        "{{ConversationStringBlock}}": [{{string.Join(", ", ConversationLines.Append(TradeLine).Select(line => $"\"{line}\""))}}]
+      }
+    }
+    """;
+
+    /// <summary>The vendor conversation number the fixture's second creature holds.</summary>
+    public const int VendorConversation = 29;
+
     /// <summary>The object the fixture's critter carries, linked from its own record.</summary>
     public const int CarriedObjectIndex = 506;
+
+    /// <summary>The item the fixture's creature carries: a bone, worth little.</summary>
+    public const int CarriedItemId = 196;
 
     /// <summary>The runestone slots, item ids and shelf indices the fixture places.</summary>
     public const int FirstRunestoneObjectIndex = 504;
@@ -187,7 +259,8 @@ internal static class TestContent
         { "itemId": 66, "name": "giant spider", "massTenthStones": 14, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 2 },
         { "itemId": 128, "name": "sack", "massTenthStones": 2, "height": 4, "radius": 2, "canPickUp": true, "class": 2, "minorClass": 0, "classIndex": 0 },
         { "itemId": 176, "name": "piece of meat", "massTenthStones": 7, "height": 3, "radius": 1, "canPickUp": true, "class": 2, "minorClass": 3, "classIndex": 0 },
-        { "itemId": 200, "name": "torch", "massTenthStones": 4, "height": 5, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 8 },
+        { "itemId": 196, "name": "bone", "value": 1, "massTenthStones": 3, "height": 3, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 4 },
+        { "itemId": 200, "name": "torch", "value": 100, "massTenthStones": 4, "height": 5, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 0, "classIndex": 8 },
         { "itemId": 240, "name": "In stone", "massTenthStones": 0, "height": 2, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 3, "classIndex": 8 },
         { "itemId": 243, "name": "Lor stone", "massTenthStones": 0, "height": 2, "radius": 1, "canPickUp": true, "class": 3, "minorClass": 3, "classIndex": 11 }
       ]
@@ -217,7 +290,7 @@ internal static class TestContent
     /// order plus object rows) with one prop, one container with a content, and
     /// one critter standing on the spawn tile.
     /// </summary>
-    internal static string Placements(int level, bool withCritter = true, bool withRunes = false)
+    internal static string Placements(int level, bool withCritter = true, bool withRunes = false, int creatureWhoAmI = 0)
     {
         var tiles = new System.Text.StringBuilder();
         for (int y = 0; y < 64; y++)
@@ -253,7 +326,7 @@ internal static class TestContent
         int critterItem = level == SecondLevel ? SecondLevelCritterItemId : CritterItemId;
         // The critter's own record links what it carries.
         string critterRow = withCritter
-            ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,{CarriedObjectIndex},0,0,0],\n            "
+            ? $"[{CritterObjectIndex},1,{critterItem},0,0,0,0,{CarriedObjectIndex},0,0,0,{creatureWhoAmI}],\n            "
             : "";
         return $$"""
         {
@@ -275,7 +348,7 @@ internal static class TestContent
         .Replace(
             "__CARRIED_ROW__",
             withCritter
-                ? $",\n            [{CarriedObjectIndex},0,200,0,0,0,{CritterObjectIndex},0,-1,-1,-1]"
+                ? $",\n            [{CarriedObjectIndex},0,{CarriedItemId},0,0,0,{CritterObjectIndex},0,-1,-1,-1]"
                 : "",
             StringComparison.Ordinal);
     }

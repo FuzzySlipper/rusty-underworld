@@ -96,6 +96,15 @@ interface SnapshotView {
   readonly avatar: string;
   readonly defeated: boolean;
   readonly menu: MenuView;
+  readonly conversation: ConversationView | null;
+}
+
+interface ConversationView {
+  readonly npc: string;
+  readonly lines: readonly string[];
+  readonly prompts: readonly string[];
+  readonly attitude: number;
+  readonly lastTrade: string;
 }
 
 const STYLES = `
@@ -117,6 +126,15 @@ const STYLES = `
 .abyss-hud .hp .fill { background: #b04434; }
 .abyss-hud .mana .fill { background: #3f6fb5; }
 .abyss-hud .charge .fill { background: #c9a13b; }
+.abyss-talk {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(210, 196, 158, 0.25);
+  max-width: 22rem;
+}
+.abyss-talk .title { margin: 0 0 0.2rem; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
+.abyss-talk .say { margin: 0; }
+.abyss-talk .prompts { margin: 0.2rem 0 0; opacity: 0.75; }
 .abyss-hud .label { display: block; opacity: 0.75; font-size: 10px; line-height: 1.2; text-transform: uppercase; letter-spacing: 0.06em; }
 .abyss-hud .status { margin: 0.4rem 0 0; max-width: 16rem; }
 .abyss-hud[data-ready="false"] .bar { opacity: 0.35; }
@@ -175,11 +193,26 @@ function readMenu(value: unknown): MenuView | null {
   };
 }
 
+/** Reads the conversation the session is in, or undefined when the shape is wrong. */
+function readConversation(value: unknown): ConversationView | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (!isRecord(value)) return undefined;
+  const { npc, lines, prompts, attitude, lastTrade } = value;
+  if (
+    typeof npc !== 'string' || typeof attitude !== 'number' || typeof lastTrade !== 'string' ||
+    !Array.isArray(lines) || !lines.every((line) => typeof line === 'string') ||
+    !Array.isArray(prompts) || !prompts.every((prompt) => typeof prompt === 'string')
+  ) {
+    return undefined;
+  }
+  return { npc, lines: lines as string[], prompts: prompts as string[], attitude, lastTrade };
+}
+
 /** Rejects a snapshot that is not the declared contract in full. */
 function readSnapshot(value: unknown): SnapshotView | null {
   if (!isRecord(value)) return null;
   const {
-    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu,
+    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu, conversation,
   } = value;
   if (
     typeof ready !== 'boolean' || typeof mode !== 'string' ||
@@ -193,7 +226,12 @@ function readSnapshot(value: unknown): SnapshotView | null {
   }
   const view = readMenu(menu);
   if (view === null) return null;
-  return { ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu: view };
+  const talk = readConversation(conversation);
+  if (talk === undefined) return null;
+  return {
+    ready, mode, hp, maxHp, mana, maxMana, charge, outcome, level, avatar, defeated, menu: view,
+    conversation: talk,
+  };
 }
 
 function bar(className: string, label: string): { root: HTMLElement; fill: HTMLElement } {
@@ -240,6 +278,18 @@ export function mountProductUi(
   // rendering full bars, which is what an unset width looks like.
   status.textContent = 'Waiting for the first session snapshot…';
   hud.append(hpBar.root, manaBar.root, chargeBar.root, status);
+
+  // The conversation panel: hidden until a session says the avatar is talking
+  // to someone, and it is not interactive, so the world keeps the pointer.
+  const talkPanel = document.createElement('section');
+  talkPanel.className = 'abyss-talk';
+  talkPanel.hidden = true;
+  const talkTitle = document.createElement('p');
+  talkTitle.className = 'title';
+  const talkBody = document.createElement('div');
+  talkBody.className = 'body';
+  talkPanel.append(talkTitle, talkBody);
+  hud.append(talkPanel);
 
   const menu = document.createElement('nav');
   menu.className = 'abyss-menu';
@@ -433,6 +483,27 @@ export function mountProductUi(
     }));
   };
 
+  const renderConversation = (talk: ConversationView | null): void => {
+    talkPanel.hidden = talk === null;
+    if (talk === null) {
+      talkBody.replaceChildren();
+      talkTitle.textContent = '';
+      return;
+    }
+    const attitude = ['hostile', 'upset', 'mellow', 'friendly'][talk.attitude] ?? `attitude ${talk.attitude}`;
+    talkTitle.textContent = talk.lastTrade === '' ? talk.npc || attitude : `${talk.npc || attitude} — ${talk.lastTrade}`;
+    const say = document.createElement('p');
+    say.className = 'say';
+    say.textContent = talk.lines.join(' ');
+    const prompts = talk.prompts.length === 0
+      ? []
+      : [Object.assign(document.createElement('p'), {
+        className: 'prompts',
+        textContent: talk.prompts.join(' · '),
+      })];
+    talkBody.replaceChildren(say, ...prompts);
+  };
+
   const renderSnapshot = (view: SnapshotView): void => {
     hud.dataset['ready'] = String(view.ready);
     const percent = (value: number, maximum: number): string =>
@@ -445,6 +516,7 @@ export function mountProductUi(
     status.textContent = view.outcome === ''
       ? `${view.ready ? vitals : 'No live session'} · level ${view.level}`
       : view.outcome;
+    renderConversation(view.conversation);
     renderMenu(view.menu, view.defeated);
   };
 

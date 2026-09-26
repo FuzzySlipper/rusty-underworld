@@ -20,6 +20,7 @@ public static class ItemCatalogPack
     public sealed record ItemRow(
         int ItemId,
         string Name,
+        int MonetaryValue,
         int MassTenthStones,
         int Height,
         int Radius,
@@ -51,6 +52,7 @@ public static class ItemCatalogPack
             .Select((row, itemId) => new ItemRow(
                 itemId,
                 CleanName(itemId < names.Count ? names[itemId] : null),
+                row.MonetaryValue,
                 row.MassTenthStones,
                 row.Height,
                 row.Radius,
@@ -95,6 +97,7 @@ public static class ItemCatalogPack
             {
                 itemId = item.ItemId,
                 name = item.Name,
+                value = item.MonetaryValue,
                 massTenthStones = item.MassTenthStones,
                 height = item.Height,
                 radius = item.Radius,

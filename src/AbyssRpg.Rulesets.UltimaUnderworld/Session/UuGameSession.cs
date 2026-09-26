@@ -14,6 +14,7 @@ using AbyssRpg.Rulesets.UltimaUnderworld.Survival;
 using Rusty.Engine;
 using Rusty.Engine.Entities;
 using Rusty.Engine.Mechanics;
+using AbyssRpg.Rulesets.UltimaUnderworld.Conversation;
 using Rusty.Engine.Debugging;
 
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
@@ -76,6 +77,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuLevelPlacements? placements,
         UuLevelCatalog? catalog,
         UuItemCatalog? items,
+        UuConversationCatalog? conversations,
+        UuStrings? strings,
         UuSession session,
         SpatialMovementSystem movement,
         PlayerControlState player,
@@ -91,6 +94,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _placements = placements;
         _catalog = catalog;
         _items = items;
+        _conversations = conversations;
+        _strings = strings;
         _session = session;
         if (items is not null)
         {
@@ -132,7 +137,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 _avatarName,
                 hud.Hp, hud.MaxHp, hud.Mana, hud.MaxMana, hud.ChargeFraction, hud.YawRadians, hud.WindIndex,
                 _outcome, _session.Avatar.IsDefeated, _session.Swimming, _session.Flying,
-                PresentActors);
+                PresentActors, ConversationView);
         }
     }
 
@@ -145,6 +150,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>The imported item catalog, when the bundle carries one.</summary>
     private readonly UuItemCatalog? _items;
+
+    /// <summary>The conversations the import produced, when the bundle carries them.</summary>
+    private readonly UuConversationCatalog? _conversations;
+
+    /// <summary>The last conversation's transcript and panel, which the projection publishes.</summary>
+    private string[] _transcript = [];
+    private UuConversationHosting.PanelData? _panel;
+
+    /// <summary>The string blocks those conversations read.</summary>
+    private readonly UuStrings? _strings;
 
     /// <summary>The inventory side of the levels' placements, when the bundle carries a catalog.</summary>
     private readonly UuLevelItems? _levelItems;
@@ -233,6 +248,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuLevelPlacements? Placements,
         UuObjectTables? Tables,
         UuItemCatalog? Items,
+        UuConversationCatalog? Conversations,
+        UuStrings? Strings,
         UuSessionSnapshot? Snapshot,
         int WorldSeed,
         string DefaultAvatarName);
@@ -290,12 +307,23 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuItemCatalog? items = itemsPack is null
             ? null
             : UuItemCatalogContent.Read(itemsPack.Payload, $"content pack '{itemsPack.Id.Value}'");
+        ContentPack? conversationsPack = composition.ContentPacks
+            .SingleOrDefault(pack => pack.Id.Value == UuConversationCatalog.PackId);
+        UuConversationCatalog? conversations = conversationsPack is null
+            ? null
+            : UuConversationCatalog.Read(conversationsPack.Payload, $"content pack '{conversationsPack.Id.Value}'");
+        ContentPack? stringsPack = composition.ContentPacks
+            .SingleOrDefault(pack => pack.Id.Value == UuStrings.PackId);
+        UuStrings? strings = stringsPack is null
+            ? null
+            : UuStrings.Read(stringsPack.Payload, $"content pack '{stringsPack.Id.Value}'");
         AdmittedLevel firstLevel = placements is null
             ? new AdmittedLevel(level.Level, [], [])
             : new AdmittedLevel(level.Level, placements.Tiles, placements.Objects);
 
         return new Prepared(
-            tuning, level, choices, vitals, firstLevel, placements, tables, items, savedSnapshot, worldSeed,
+            tuning, level, choices, vitals, firstLevel, placements, tables, items, conversations, strings,
+            savedSnapshot, worldSeed,
             creation.Defaults.Name);
     }
 
@@ -359,6 +387,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             prepared.Placements,
             new UuLevelCatalog(context.Composition),
             prepared.Items,
+            prepared.Conversations,
+            prepared.Strings,
             session,
             movement,
             player,
@@ -618,6 +648,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
+        // A living creature is talked to: the conversation owner runs the script
+        // its own record names, and the transcript is what the projection shows.
+        if (LiveOpponentInReach(position) is { } talker)
+        {
+            Talk(talker);
+            return;
+        }
+
         // A fallen opponent is looted where it lies: what it carried is held by
         // its own record, so the same transfer serves a corpse and a container.
         if (_levelItems is { } carried && FallenOpponentInReach(position) is { } fallen)
@@ -712,6 +750,128 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         _outcome = $"You take the {Describe(placed.ItemId)}.";
     }
+
+    /// <summary>The nearest living creature within a hand's reach, if any.</summary>
+    private ActorState? LiveOpponentInReach(WorldPoint position)
+    {
+        ActorState? nearest = null;
+        float nearestDistance = InteractionReach;
+        foreach (ActorState actor in PlacedCritters.Values)
+        {
+            if (actor.IsDefeated) continue;
+            float distance = actor.Position.HorizontalDistanceTo(position);
+            if (distance > nearestDistance) continue;
+            nearest = actor;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    /// <summary>
+    /// Talks to a creature the level placed. Its record selects the
+    /// conversation: a whoami byte names one outright, and a creature without
+    /// one speaks its own kind's generic conversation, which the donor numbers
+    /// 256 + (item id - 64) (donor:
+    /// src/conversation/conversationinitialisation.cs GetConversationNumber).
+    /// </summary>
+    private void Talk(ActorState talker)
+    {
+        int itemId = ItemIdOf(talker);
+        int whoami = WhoAmIOf(talker);
+        if (whoami == NoResponseWhoAmI)
+        {
+            _outcome = "You get no response.";
+            return;
+        }
+
+        int conversation = whoami != 0 ? whoami : GenericConversationBase + (itemId - FirstCritterItemId);
+        UuConversationVm.ConversationScript? script = _conversations?.Script(conversation);
+        if (script is null || script.CodeSize == 0)
+        {
+            _outcome = "You get no response.";
+            return;
+        }
+
+        string npc = _strings?.CreatureName(whoami) is { Length: > 0 } name ? name : $"creature {itemId}";
+        UuConversationHosting.TalkResult result = UuConversationHosting.Talk(
+            _session,
+            script,
+            _strings?.Provider ?? ((_, _) => ""),
+            npc,
+            tray: Tray(talker),
+            avatar: new UuConversationHosting.AvatarPresence(
+                CharmSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.15")).Value,
+                Level: 1,
+                Hp: (int)_session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current,
+                Vitality: (int)_session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current),
+            talker: new UuConversationHosting.NpcRecord(
+                Level: 1,
+                Hp: (int)talker.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current,
+                MaxHp: (int)talker.Stats.GetTrack(UuAvatarFactory.DefeatTrack).MaximumValue));
+        _transcript = result.Transcript.ToArray();
+        _panel = result.Panel;
+        _speaker = npc;
+        _outcome = _transcript.Length > 0
+            ? _transcript[^1]
+            : _strings?.Text(UuStrings.ConversationBlock, 1) is { Length: > 0 } nothing ? nothing : "You get no response.";
+    }
+
+    /// <summary>
+    /// What each side of a trade holds. The values are the imported monetary
+    /// values of the items carried (donor: src/loaders/comobjloader.cs
+    /// monetaryvalue), so a merchant's own stock and the avatar's pack are what
+    /// the barter policy weighs.
+    /// </summary>
+    private UuConversationHosting.BarterTray Tray(ActorState talker)
+    {
+        int npcValue = 0;
+        int playerValue = 0;
+        if (_levelItems is { } items)
+        {
+            foreach (Rusty.Engine.Mechanics.UniqueInventoryItem held in items.Read(talker.Actor.Entity).UniqueItems)
+                npcValue += ValueOf(held.Definition.Value);
+            foreach (Rusty.Engine.Mechanics.UniqueInventoryItem held in items.Read(_session.Avatar.Actor.Entity).UniqueItems)
+                playerValue += ValueOf(held.Definition.Value);
+        }
+
+        return new UuConversationHosting.BarterTray(
+            NpcValue: npcValue,
+            PlayerValue: playerValue,
+            CharmSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.15")).Value,
+            AppraisalSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.18")).Value,
+            MaxPatience: 3);
+    }
+
+    /// <summary>The imported monetary value of one runtime item identity.</summary>
+    private int ValueOf(string itemDefinition)
+    {
+        if (_items is null) return 0;
+        string id = itemDefinition.StartsWith(UuItemDefinitions.ItemIdPrefix, StringComparison.Ordinal)
+            ? itemDefinition[UuItemDefinitions.ItemIdPrefix.Length..]
+            : itemDefinition;
+        return int.TryParse(id, out int itemId) ? _items.Find(itemId)?.MonetaryValue ?? 0 : 0;
+    }
+
+    /// <summary>The item id a placed creature was admitted from.</summary>
+    private int ItemIdOf(ActorState actor) => FallenItemId(actor);
+
+    /// <summary>The whoami byte the creature's own placement record carries.</summary>
+    private int WhoAmIOf(ActorState actor)
+    {
+        foreach (KeyValuePair<int, ActorState> placed in PlacedCritters)
+        {
+            if (placed.Value.DurableId != actor.DurableId) continue;
+            return _placements?.Object(placed.Key)?.WhoAmI ?? 0;
+        }
+
+        return 0;
+    }
+
+    /// <summary>The conversation a creature without a whoami byte speaks, and the whoami that answers nothing.</summary>
+    public const int GenericConversationBase = 256;
+    public const int FirstCritterItemId = 64;
+    public const int NoResponseWhoAmI = 255;
 
     /// <summary>The nearest fallen opponent within a hand's reach, if any.</summary>
     private ActorState? FallenOpponentInReach(WorldPoint position)
@@ -964,6 +1124,18 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             .Take(take)
             .ToArray();
     }
+
+    /// <summary>The conversation the avatar is in: the transcript so far, and the panel with it.</summary>
+    public UuConversationHosting.TalkResult? Conversation =>
+        _panel is null ? null : new UuConversationHosting.TalkResult(_transcript, _panel);
+
+    /// <summary>The same conversation as the product-facing view a projection carries.</summary>
+    private ConversationView? ConversationView => _panel is null
+        ? null
+        : new ConversationView(_speaker, _transcript, _panel.Prompts, _panel.Attitude, _panel.LastTrade ?? "");
+
+    /// <summary>Who the avatar is speaking to, named from the conversation strings.</summary>
+    private string _speaker = "";
 
     /// <summary>The imported item catalog this session reads names and mass from, when the bundle carries one.</summary>
     public UuItemCatalog? Items => _items;

@@ -18,6 +18,7 @@ public static class CommonObjDatReader
         int Height,
         int Radius,
         int MassTenthStones,
+        int MonetaryValue,
         bool CanBePickedUp,
         byte[] Raw);
 
@@ -34,10 +35,14 @@ public static class CommonObjDatReader
         {
             int at = RecordOffset + (i * RecordSize);
             int radiusMass = data[at + 1] | (data[at + 2] << 8);
+            // The int16 at +4 is the item's monetary value (donor:
+            // src/loaders/comobjloader.cs monetaryvalue).
+            int value = data[at + 4] | (data[at + 5] << 8);
             rows[i] = new CommonObjRow(
                 Height: data[at],
                 Radius: radiusMass & 0x7,
                 MassTenthStones: (radiusMass >> 4) & 0xFFF,
+                MonetaryValue: value,
                 CanBePickedUp: ((data[at + 3] >> 5) & 1) == 1,
                 Raw: data.Slice(at, RecordSize).ToArray());
         }

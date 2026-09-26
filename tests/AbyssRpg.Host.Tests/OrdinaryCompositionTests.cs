@@ -44,7 +44,7 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(BuiltInRulesets.UltimaUnderworld, product.CompositionIdentity.Ruleset);
         Assert.Equal("abyssrpg.stygian-default", product.CompositionIdentity.Tuning.Value);
         Assert.Equal(
-            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.item-catalog", "abyssrpg.level-1", "abyssrpg.object-tables", "abyssrpg.starting-kit"],
+            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.conversations", "abyssrpg.item-catalog", "abyssrpg.level-1", "abyssrpg.object-tables", "abyssrpg.starting-kit", "abyssrpg.strings"],
             product.CompositionIdentity.ContentPacks.Select(pack => pack.Value).OrderBy(value => value, StringComparer.Ordinal));
         Assert.NotNull(product.Session);
         Assert.True(product.Session is ISessionStatusSource);
@@ -596,8 +596,93 @@ public sealed class OrdinaryCompositionTests
         var carried = session.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
         Assert.Single(carried.UniqueItems);
         Assert.Equal(
-            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(TestContent.CarriedItemId).Value,
             carried.UniqueItems[0].Definition.Value);
+    }
+
+    /// <summary>A product whose fixture creature holds a conversation, and one whose creature is a vendor.</summary>
+    private static AbyssProduct TalkingProduct(out UiDouble ui, int whoami, out EngineSpatialDouble spatial)
+    {
+        ui = UiDouble.Create();
+        spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 4f));
+        IEngineContext engine = EngineContextFake.Create(
+            persistence: new InMemoryPersistenceService(),
+            spatial: spatial.Service,
+            content: SpatialContentDouble.Create().Service,
+            ui: ui.Service,
+            cameraView: CameraViewDouble.Create().Service,
+            graphics: new GraphicsDouble());
+        return new AbyssProduct(
+            engine,
+            TestContent.Build(creatureWhoAmI: whoami),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void Talking_to_a_placed_creature_runs_its_own_conversation_script()
+    {
+        // The fixture's creature carries whoami 5, which selects conversation 5:
+        // a script of the game's own opcodes that says two lines.
+        using AbyssProduct product = TalkingProduct(out UiDouble ui, TestContent.CreatureWhoAmI, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+
+        AbyssRpg.Rulesets.UltimaUnderworld.Conversation.UuConversationHosting.TalkResult conversation = session.Conversation
+            ?? throw new InvalidOperationException("the creature answered nothing");
+        Assert.Equal(TestContent.ConversationLines, conversation.Transcript.ToArray());
+        Assert.Equal("What do you want of me?", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        // The creature is named from the conversation string block, and the panel
+        // publishes the attitude the talk started with.
+        Assert.Equal(
+            AbyssRpg.Rulesets.UltimaUnderworld.Social.UuAttitude.Mellow,
+            conversation.Panel.Attitude);
+    }
+
+    [Fact]
+    public void A_creature_that_holds_no_conversation_answers_nothing()
+    {
+        // whoami 255 is the donor's "no response", so the talk reports it rather
+        // than running a script that is not there.
+        using AbyssProduct product = TalkingProduct(out UiDouble ui, 255, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You get no response.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
+    [Fact]
+    public void A_vendors_own_script_trades_against_what_each_side_carries()
+    {
+        // The vendor conversation's script calls the trade imports, so the offer
+        // is the real barter policy over the imported values of what each side
+        // holds: the creature carries a bone (1) and the avatar offers a torch
+        // (100), which the trader takes.
+        using AbyssProduct product = TalkingProduct(out UiDouble ui, TestContent.VendorConversation, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // Take the torch the level placed on its own tile first: an offer needs
+        // something on the avatar's side of the tray. The avatar spawns on the
+        // vendor's own tile, so it walks to the torch and back.
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 12f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal("You take the torch.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+        product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
+
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(5));
+        product.Update(new ProductUpdate(Facts(6), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+
+        AbyssRpg.Rulesets.UltimaUnderworld.Conversation.UuConversationHosting.TalkResult conversation = session.Conversation
+            ?? throw new InvalidOperationException("the vendor answered nothing");
+        Assert.Equal("Accepted", conversation.Panel.LastTrade);
+        Assert.Contains(TestContent.TradeLine, conversation.Transcript);
     }
 
     [Fact]

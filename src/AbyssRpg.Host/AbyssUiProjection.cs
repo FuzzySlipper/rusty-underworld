@@ -86,7 +86,8 @@ public sealed record AbyssUiSnapshot(
     bool Swimming,
     bool Flying,
     int PresentActors,
-    int Slots)
+    int Slots,
+    AbyssConversationView? Conversation)
 {
     public static uint Write(UiValueBuilder builder, AbyssUiSnapshot snapshot)
     {
@@ -111,6 +112,14 @@ public sealed record AbyssUiSnapshot(
             ("invertY", builder.Boolean(menu.InvertY)),
             ("detail", builder.String(menu.Detail)),
             ("slots", slots));
+        uint conversation = snapshot.Conversation is { } talk
+            ? builder.Object(
+                ("npc", builder.String(talk.Npc)),
+                ("lines", builder.Array(talk.Lines.Select(line => builder.String(line)).ToArray())),
+                ("prompts", builder.Array(talk.Prompts.Select(prompt => builder.String(prompt)).ToArray())),
+                ("attitude", builder.Number(talk.Attitude)),
+                ("lastTrade", builder.String(talk.LastTrade)))
+            : builder.Null();
         return builder.Object(
             ("ready", builder.Boolean(snapshot.Ready)),
             ("mode", builder.String(snapshot.Mode)),
@@ -129,9 +138,22 @@ public sealed record AbyssUiSnapshot(
             ("swimming", builder.Boolean(snapshot.Swimming)),
             ("flying", builder.Boolean(snapshot.Flying)),
             ("presentActors", builder.Number(snapshot.PresentActors)),
-            ("slots", builder.Number(snapshot.Slots)));
+            ("slots", builder.Number(snapshot.Slots)),
+            ("conversation", conversation));
     }
 }
+
+/// <summary>
+/// The conversation the avatar is in, as the projection carries it: who is
+/// speaking, what has been said, the prompts the script offered, the attitude it
+/// holds and the last trade the barter policy returned.
+/// </summary>
+public sealed record AbyssConversationView(
+    string Npc,
+    IReadOnlyList<string> Lines,
+    IReadOnlyList<string> Prompts,
+    int Attitude,
+    string LastTrade);
 
 /// <summary>
 /// The Host's projection writer over the declared stream. It opens the stream

@@ -289,7 +289,21 @@ public sealed record SessionStatus(
     bool Defeated,
     bool Swimming,
     bool Flying,
-    int PresentActors);
+    int PresentActors,
+    ConversationView? Conversation = null);
+
+/// <summary>
+/// The conversation a session is in, as a product projects it: who is speaking,
+/// what has been said, the prompts the speaker offered, their attitude, and the
+/// last trade a barter resolved to. A session with no conversation publishes
+/// null, so a projection never invents one.
+/// </summary>
+public sealed record ConversationView(
+    string Speaker,
+    IReadOnlyList<string> Lines,
+    IReadOnlyList<string> Prompts,
+    int Attitude,
+    string LastTrade);
 
 /// <summary>Optional seam for a session whose state a product projects each update.</summary>
 public interface ISessionStatusSource

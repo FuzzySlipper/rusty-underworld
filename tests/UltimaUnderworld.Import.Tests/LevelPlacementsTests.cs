@@ -86,7 +86,9 @@ public sealed class LevelPlacementsTests
         Assert.Equal(1.0, root.GetProperty("heightUnitsPerStep").GetDouble());
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
-        Assert.Equal(11, root.GetProperty("objects")[0].GetArrayLength());
+        // Twelve columns: the whoami byte that selects a creature's conversation.
+        Assert.Equal(12, root.GetProperty("objects")[0].GetArrayLength());
+        Assert.Equal(0, root.GetProperty("objects")[0][11].GetInt32());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }
 

@@ -176,11 +176,14 @@ public static class UuLevelContent
         at = 0;
         foreach (JsonElement row in objectsElement.EnumerateArray())
         {
-            if (row.GetArrayLength() != 11)
+            // A row written before the whoami byte existed carries eleven
+            // columns; the creature simply holds no conversation of its own.
+            int columns = row.GetArrayLength();
+            if (columns is not (11 or 12))
             {
                 throw new InvalidOperationException(
                     $"'{payloadLabel}' object rows must be "
-                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading].");
+                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading, whoami].");
             }
 
             objects[at++] = new AdmittedObject(
@@ -193,7 +196,8 @@ public static class UuLevelContent
                 Mobile: row[1].GetDouble() != 0d,
                 HomeTileX: (int)row[8].GetDouble(),
                 HomeTileY: (int)row[9].GetDouble(),
-                Heading: (int)row[10].GetDouble());
+                Heading: (int)row[10].GetDouble(),
+                WhoAmI: columns == 12 ? (int)row[11].GetDouble() : 0);
         }
 
         return new UuLevelPlacements(unitsPerTile, heightUnitsPerStep, tiles, objects);

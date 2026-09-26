@@ -32,6 +32,28 @@ try
     string? packsDirectory = Array.IndexOf(args, "--packs") >= 0 ? Get("--packs") : null;
     string? commonDatPath = Array.IndexOf(args, "--common") >= 0 ? Get("--common") : null;
     string? stringsPakPath = Array.IndexOf(args, "--strings") >= 0 ? Get("--strings") : null;
+    string? cnvPath = Array.IndexOf(args, "--cnv") >= 0 ? Get("--cnv") : null;
+
+    // One generated pack: its payload beside its descriptor, with the content
+    // root-relative payload path the resolver expects and the operator's own
+    // file recorded as provenance.
+    void WriteGeneratedPack(string directory, string id, string origin, string json)
+    {
+        Directory.CreateDirectory(directory);
+        string file = $"{id}.json";
+        File.WriteAllText(Path.Combine(directory, file), json);
+        File.WriteAllText(
+            Path.Combine(directory, $"{id}.pack.json"),
+            JsonSerializer.Serialize(new
+            {
+                kind = "abyssrpg.content-pack",
+                id,
+                ruleset = "abyssrpg.ultima-underworld",
+                dependencies = Array.Empty<object>(),
+                payload = $"{ContentPrefix(directory)}{file}",
+                provenance = new { source = "UW1", origin, sha256 = Sha256(json) },
+            }, new JsonSerializerOptions { WriteIndented = true }));
+    }
 
     byte[] archive = File.ReadAllBytes(levArk);
     byte[] terrain = File.ReadAllBytes(terrainPath);
@@ -191,6 +213,27 @@ try
                 }, new JsonSerializerOptions { WriteIndented = true }));
             int named = catalog.Items.Count(item => item.Name.Length > 0);
             Console.WriteLine($"Emitted item catalog: {catalog.Items.Count} item ids, {named} named.");
+
+            // The conversations are install-global too: the runtime runs the
+            // scripts the operator's own game carries, and reads the string
+            // blocks they index.
+            if (File.Exists(cnvPath))
+            {
+                byte[] cnvBytes = File.ReadAllBytes(cnvPath);
+                ConversationPack.Catalog conversations = ConversationPack.Emit(
+                    CnvArkReader.ReadPack(cnvBytes, "UW/DATA/CNV.ARK"));
+                ConversationPack.Strings strings = ConversationPack.EmitStrings(
+                    conversations,
+                    StringsPakReader.Decode(stringsBytes, "UW/DATA/STRINGS.PAK"),
+                    UwTableProvenance.FromBytes("UW1", "UW/DATA/STRINGS.PAK", stringsBytes));
+                WriteGeneratedPack(
+                    packsDirectory, ConversationPack.PackId, "UW/DATA/CNV.ARK", ConversationPack.ToJson(conversations));
+                WriteGeneratedPack(
+                    packsDirectory, ConversationPack.StringsPackId, "UW/DATA/STRINGS.PAK", ConversationPack.ToJson(strings));
+                Console.WriteLine(
+                    $"Emitted conversations: {conversations.Conversations.Count} scripts, "
+                    + $"{strings.Blocks.Count} string blocks.");
+            }
         }
     }
 

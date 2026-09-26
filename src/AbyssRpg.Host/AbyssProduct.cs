@@ -545,8 +545,18 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             Swimming: status?.Swimming ?? false,
             Flying: status?.Flying ?? false,
             PresentActors: status?.PresentActors ?? 0,
-            Slots: slots.Count));
+            Slots: slots.Count,
+            Conversation: Conversation(status)));
     }
+
+    /// <summary>
+    /// The conversation the live session is in, as the projection carries it, or
+    /// null when the avatar is not talking to anyone.
+    /// </summary>
+    private static AbyssConversationView? Conversation(SessionStatus? status) =>
+        status?.Conversation is { } talk
+            ? new AbyssConversationView(talk.Speaker, talk.Lines, talk.Prompts, talk.Attitude, talk.LastTrade)
+            : null;
 
     /// <summary>Registers this product's commands plus the live session's own module.</summary>
     public void RegisterDebugCommands(IDebugCommandModuleRegistrar registrar)

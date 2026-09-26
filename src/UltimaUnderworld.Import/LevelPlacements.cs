@@ -21,7 +21,7 @@ public static class LevelPlacements
     /// </summary>
     public sealed record PlacedObject(
         int Index, bool Mobile, int ItemId, int Flags, int Quality, int Next, int Owner, int Link,
-        int HomeTileX, int HomeTileY, int Heading);
+        int HomeTileX, int HomeTileY, int Heading, int WhoAmI);
 
     public sealed record Placements(
         int Level,
@@ -51,7 +51,7 @@ public static class LevelPlacements
                 (int homeX, int homeY) = HomeTile(obj);
                 return new PlacedObject(
                     obj.Index, obj.IsMobile, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
-                    homeX, homeY, Heading(obj));
+                    homeX, homeY, Heading(obj), WhoAmI(obj));
             })
             .ToArray();
         return new Placements(
@@ -70,6 +70,16 @@ public static class LevelPlacements
     /// bits 7-9 of the word at offset 2 (donor: <c>uwobject.heading</c>). Both
     /// are in 32 steps per full turn; -1 means the record holds none.
     /// </summary>
+    /// <summary>
+    /// A mobile record's whoami byte, which selects the conversation it holds
+    /// (donor: <c>uwobject.npc_whoami</c>, byte 0x1A; 0 means the creature's own
+    /// kind speaks, 255 means it answers nothing).
+    /// </summary>
+    private static int WhoAmI(LevArkReader.LevelObject obj) =>
+        obj.IsMobile && obj.Raw.Length > MobileWhoAmIOffset ? obj.Raw[MobileWhoAmIOffset] : 0;
+
+    private const int MobileWhoAmIOffset = 0x1A;
+
     private static int Heading(LevArkReader.LevelObject obj)
     {
         if (obj.IsMobile)
@@ -116,12 +126,13 @@ public static class LevelPlacements
             }),
             // One row per object slot: index, mobile, item id, flags, quality,
             // next in the chain, owner (container), link (first content), the
-            // mobile's own tile (-1 when the record holds none), and the
-            // record's facing in its own 32-step units (-1 when it holds none).
+            // mobile's own tile (-1 when the record holds none), the record's
+            // facing in its own 32-step units, and the whoami byte that selects
+            // the conversation a creature holds.
             objects = placements.Objects.Select(obj => new[]
             {
                 obj.Index, obj.Mobile ? 1 : 0, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
-                obj.HomeTileX, obj.HomeTileY, obj.Heading,
+                obj.HomeTileX, obj.HomeTileY, obj.Heading, obj.WhoAmI,
             }),
         };
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = false });

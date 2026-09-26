@@ -90,6 +90,7 @@ const snapshot = (overrides = {}) => ({
   presentActors: 0,
   slots: 1,
   menu: baseMenu(),
+  conversation: null,
   ...overrides,
 });
 
@@ -364,4 +365,59 @@ test('the packaged Engine live-debug module exports and mounts', async (t) => {
     globalThis.Node = previous.Node;
     dom.window.close();
   }
+});
+
+test('the HUD shows the conversation the session projects, and hides it again', (t) => {
+  const ctx = context();
+  mount(t, ctx);
+  const panel = () => globalThis.document.querySelector('.abyss-talk');
+
+  // No conversation: the panel stays out of the way.
+  assert.equal(panel().hidden, true);
+
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({
+      conversation: {
+        npc: 'a hooded figure',
+        lines: ['A stranger walks the Abyss.', 'What do you want of me?'],
+        prompts: ['name', 'job'],
+        attitude: 2,
+        lastTrade: '',
+      },
+    }),
+  }));
+
+  assert.equal(panel().hidden, false);
+  assert.match(panel().querySelector('.title').textContent, /a hooded figure/);
+  assert.match(panel().querySelector('.say').textContent, /A stranger walks the Abyss\./);
+  assert.match(panel().querySelector('.say').textContent, /What do you want of me\?/);
+  assert.match(panel().querySelector('.prompts').textContent, /name · job/);
+
+  // A trade shows in the panel's title, and ending the talk hides it again.
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({
+      conversation: {
+        npc: 'a merchant', lines: ['Done.'], prompts: [], attitude: 3, lastTrade: 'Accepted',
+      },
+    }),
+  }));
+  assert.match(panel().querySelector('.title').textContent, /Accepted/);
+
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({ conversation: null }),
+  }));
+  assert.equal(panel().hidden, true);
+});
+
+test('a conversation of the wrong shape is not rendered as a contract', (t) => {
+  const ctx = context();
+  mount(t, ctx);
+  ctx.listeners.forEach((fn) => fn({
+    contract: 'abyss.ui.snapshot.v1',
+    value: snapshot({ conversation: { npc: 5, lines: 'not a list' } }),
+  }));
+  assert.equal(globalThis.document.querySelector('.abyss-talk').hidden, true);
 });

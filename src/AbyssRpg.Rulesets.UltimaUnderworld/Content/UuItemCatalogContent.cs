@@ -19,6 +19,7 @@ public sealed record UuItemCatalog(IReadOnlyDictionary<int, UuItemDefinition> It
 public sealed record UuItemDefinition(
     int ItemId,
     string Name,
+    int MonetaryValue,
     int MassTenthStones,
     int Height,
     int Radius,
@@ -57,6 +58,7 @@ public static class UuItemCatalogContent
                 if (!items.TryAdd(itemId, new UuItemDefinition(
                     itemId,
                     Text(row, "name"),
+                    (int)UuContentJson.OptionalNumber(row, "value"),
                     (int)Number(row, "massTenthStones"),
                     (int)Number(row, "height"),
                     (int)Number(row, "radius"),

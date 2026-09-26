@@ -40,7 +40,9 @@ public sealed class BundleDeclarationTests
             // resolver would find it under the content root.
             if (id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
                 || id == "abyssrpg.object-tables"
-                || id == "abyssrpg.item-catalog")
+                || id == "abyssrpg.item-catalog"
+                || id == "abyssrpg.strings"
+                || id == "abyssrpg.conversations")
             {
                 string generated = Directory
                     .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)
