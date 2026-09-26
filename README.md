@@ -30,15 +30,21 @@ Bundle assembles. Host launches.**
 > state), and the use channel opens a placed door through that state. Every
 > imported level is admitted on arrival when the avatar travels, with its own
 > collision, geometry and inhabitants, while the level left behind keeps its
-> state. Placed things are simulated but not drawn yet, and the talk, barter and
-> loot owners
-> are still neither composed nor dispatched to because they need imported
-> conversation content and an item catalog. Start with
+> state. The level's objects are held by owners: a container yields what its own
+> record links to it, an object on the floor is taken into the avatar, a fallen
+> opponent's carried things are looted from it, and a runestone lands on the
+> casting shelf so spells can be cast from stones picked up in play. Placed things
+> are simulated but not drawn yet, carried items do not survive a save yet, and
+> the talk and barter owners are still neither composed nor dispatched to because
+> they need imported conversation content. Start with
 > `scripts/import-level.sh`; the operator step, the Crew profile, and the
 > observed limits are in [GPU playtesting](docs/gpu-playtesting.md), the slice
 > captures in [the composition evidence](docs/playtest-evidence/8587-8588/README.md),
-> and the placement captures in
-> [the placement evidence](docs/playtest-evidence/8590/README.md).
+> the placement captures in
+> [the placement evidence](docs/playtest-evidence/8590/README.md), the level
+> transition in [the travel evidence](docs/playtest-evidence/8616/README.md), and
+> looting and rune pickup in
+> [the item evidence](docs/playtest-evidence/8615/README.md).
 
 ## Ownership
 

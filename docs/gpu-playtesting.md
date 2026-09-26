@@ -97,12 +97,16 @@ The slice imports a level's collision, visible geometry, spawn, object
 placements and the object tables. Placed props become durable entities and
 placed critters become actors on their own tiles, so melee damages and can drop a
 real opponent (the kill is recorded in the saved level state) and the use channel
-opens a placed door through that state. Named remainders, each carried by its own
-task: placed objects and actors are simulated but not drawn, the door stays solid
-until its tile's collision is replaced, and talk and barter need imported
-conversation content (#8592, #8614); loot needs an item catalog and casting is
-reachable through the debug lane (`abyss.rune`, `abyss.cast`) rather than from a
-collected world rune (#8615); a travelled-to level admits no actors yet (#8616).
+opens a placed door through that state. The level's objects are held by owners:
+a container yields what its own record links to it, an object on the floor is
+taken into the avatar, a fallen opponent's carried things are looted from it, and
+a runestone (the donor's item range 232-255) lays itself on the casting shelf, so
+spells cast from stones picked up in play. Named remainders, each carried by its
+own task: placed objects and actors are simulated but not drawn and the door stays
+solid until its tile's collision is replaced (#8592); talk and barter need
+imported conversation content (#8614); carried, equipped and container items are
+not in the save yet (#8621); nothing in play walks a level transition yet
+(#8620).
 `abyss.goto`, `abyss.actors` and `abyss.travel` are operator probes for placing
 the avatar on a tile, reading nearby actors, and entering another imported level;
 they are not a gameplay path. The tile probe refuses a tile the level does not
