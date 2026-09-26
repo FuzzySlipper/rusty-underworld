@@ -633,10 +633,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         // where they stand now rather than where content placed them.
         if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures))
         {
-            UuObjectShape shape = UuObjectShape.Of(0, mobile: true, door: false);
+            UuObjectShape creatureShape = UuObjectShape.Of(0, mobile: true, door: false);
             foreach (ActorState creature in creatures.Values)
             {
-                if (creature.IsDefeated) continue;
+                // A fallen creature is a corpse where it fell, not a gap: it stays
+                // drawn, lying down, until it is looted and its record is gone.
+                UuObjectShape shape = creature.IsDefeated ? UuObjectShape.Corpse : creatureShape;
                 int creatureBand = BandAt(creature.Position.X, creature.Position.Z);
                 if (creatureBand >= Presentation.UuLightBands.Hidden) continue;
                 facts.Add(new AppearanceFact(
@@ -664,7 +666,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             LiveObjectCount(level),
             _session.Dungeon.Current.OpenedDoors.Count,
             CarriedItems.UniqueItems.Count,
-            StandingCreatureCount(level));
+            StandingCreatureCount(level),
+            FallenCreatureCount(level));
     }
 
 
@@ -813,6 +816,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         || (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? actors)
             && actors.Values.Any(actor => actor.Actor.Entity.Value == owner.Value));
 
+    /// <summary>How many of a level's creatures have been struck down.</summary>
+    private int FallenCreatureCount(int level) =>
+        _placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? fallen)
+            ? fallen.Values.Count(creature => creature.IsDefeated)
+            : 0;
+
     /// <summary>How many of a level's creatures are still standing.</summary>
     private int StandingCreatureCount(int level) =>
         _placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures)
@@ -843,7 +852,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly Dictionary<(UuObjectShapeKind Class, int Band), Appearance> _objectAppearances = [];
 
     /// <summary>What the published scene was drawn from, so it is redrawn only when it changes.</summary>
-    private (int Level, int Objects, int Doors, int Carried, int Creatures) _publishedScene = (-1, -1, -1, -1, -1);
+    private (int Level, int Objects, int Doors, int Carried, int Creatures, int Fallen) _publishedScene
+        = (-1, -1, -1, -1, -1, -1);
 
     /// <summary>Keeps the generation being replaced until the session releases it.</summary>
     private void RetireLevelResources()
@@ -870,7 +880,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 LiveObjectCount(_session.Dungeon.CurrentLevel),
                 _session.Dungeon.Current.OpenedDoors.Count,
                 CarriedItems.UniqueItems.Count,
-                StandingCreatureCount(_session.Dungeon.CurrentLevel)))
+                StandingCreatureCount(_session.Dungeon.CurrentLevel),
+                FallenCreatureCount(_session.Dungeon.CurrentLevel)))
         {
             PublishScene(_appearance);
         }

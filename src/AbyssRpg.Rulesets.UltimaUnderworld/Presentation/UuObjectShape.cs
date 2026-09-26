@@ -8,6 +8,9 @@ public readonly record struct UuObjectShape(
     float Depth,
     Rusty.Engine.Color Color)
 {
+    /// <summary>A creature that has been struck down: the same creature, lying down.</summary>
+    public static UuObjectShape Corpse => new(UuObjectShapeKind.Corpse, 1.2f, 0.25f, 0.7f, new(0.4f, 0.16f, 0.14f, 1f));
+
     public static UuObjectShape Of(int itemId, bool mobile, bool door)
     {
         if (mobile) return new(UuObjectShapeKind.Creature, 0.7f, 1.5f, 0.7f, new(0.72f, 0.24f, 0.2f, 1f));
@@ -27,4 +30,5 @@ public enum UuObjectShapeKind
     Creature,
     Door,
     Rune,
+    Corpse,
 }

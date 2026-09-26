@@ -1044,7 +1044,10 @@ public sealed class OrdinaryCompositionTests
         }
 
         Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "the opponent can be struck down");
-        Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == creatureId);
+        // It is still drawn, lying down: a corpse is what a fallen creature is, not
+        // an absence, and it stays until it is looted.
+        AppearanceFact fallen = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == creatureId);
+        Assert.True(fallen.Transform.Scale.Y < fallen.Transform.Scale.X, "the fallen creature lies down");
     }
 
     [Fact]
