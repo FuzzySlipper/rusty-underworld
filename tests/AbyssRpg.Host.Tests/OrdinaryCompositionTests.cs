@@ -824,6 +824,37 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal("Resumed quicksave/0.", HudString(ui.LastProjection!.Value.Value, "outcome"));
     }
 
+    [Fact(Skip = "Verification blocked by #8643: leaving a level destroys its entities, "
+        + "so a re-admitted level is rebuilt from content and the looted state this "
+        + "asserts cannot survive the trip until one authority owns containment. The "
+        + "fix it would cover -- a level's saved world is applied once, not on every "
+        + "admission -- is in place; unskip with that task.")]
+    public void Play_after_a_load_is_not_undone_by_travel()
+    {
+        // A loaded snapshot is input to the level it restores, not a standing
+        // authority: re-applying it on every admission would take back what the
+        // player looted after the load.
+        using AbyssProduct product = TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        Assert.Equal("quicksave/0", product.Quicksave());
+        Assert.True(product.LoadSlot("quicksave/0"));
+
+        UseAt(product, spatial, 4, 12f, 4f);
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal("You loot 1 item from the sack.", ((ISessionStatusSource)session).Status.Outcome);
+        Assert.Single(session.CarriedItems.UniqueItems);
+
+        session.TravelToLevel(2, 0);
+        product.Update(SixtyHzUpdate(10));
+        session.TravelToLevel(1, 0);
+        product.Update(SixtyHzUpdate(15));
+
+        UseAt(product, spatial, 20, 12f, 4f);
+        Assert.Equal("The sack is empty.", ((ISessionStatusSource)session).Status.Outcome);
+        Assert.Single(session.CarriedItems.UniqueItems);
+    }
+
     [Fact(Skip = "Carried by #8643: after a container transfer the Engine inventory "
         + "component view and the store read model disagree, so the save cannot say "
         + "truthfully where a looted item lies. Unskip with that task.")]

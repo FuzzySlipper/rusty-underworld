@@ -1358,6 +1358,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private void ApplySavedWorld(int level)
     {
         if (_levelItems is not { } items) return;
+        // A level's saved world is input to its first admission, not a standing
+        // authority over it: re-applying it after every travel would undo what the
+        // player did since the load and heal what they wounded.
+        if (!_appliedSavedWorld.Add(level)) return;
         // Where every item of this level stands right now, as content admission
         // left it. An item the save places somewhere else is moved out of the
         // owner it was admitted into, through the same transfer play uses, so the
@@ -1435,6 +1439,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private UuHoldingDto[] _savedHoldings = [];
 
     private UuCreatureDto[] _savedCreatures = [];
+
+    /// <summary>The levels whose saved world has already been put back.</summary>
+    private readonly HashSet<int> _appliedSavedWorld = [];
 
     /// <summary>Returns the avatar to the level spawn and restores its vitals: the defeat outcome.</summary>
     public void RespawnAtAnchor()
