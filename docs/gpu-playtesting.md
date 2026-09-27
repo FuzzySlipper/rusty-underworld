@@ -49,10 +49,15 @@ playtest stop SESSION
 
 Use this Crew CLI, not the retired `mcp__den_playtest__playtest_start` tools.
 The latter expects a different broker manifest and does not use this profile.
-Wolf provides the remote GPU browser and native input; a headless browser run
-is separate evidence. Keep original captures, action receipts, and cleanup
-receipts. The maintained reference is
-`/home/dev/crew-services/docs/playtest.md`.
+The service runs the browser on the same machine as the product, so the capture
+is the GPU's own output; the maintained reference is
+`/home/agent/dev/crew-services/docs/playtest.md`.
+
+Registering or editing a product profile takes effect with `playtest reload`,
+which re-reads the profile list and the pool from disk atomically and leaves
+running sessions alone. A profile that is in the file but not loaded answers
+`unknown game`, which is a stale registry rather than a bad profile. Keep
+original captures, action receipts, and cleanup receipts.
 
 ## Import the level the product launches
 
@@ -105,7 +110,7 @@ and `m` (renderer metrics). The renderer reports `GPU timer: unavailable` on
 this host, and the metrics readout is the only frame-pacing evidence available
 from the product side.
 
-A connected Wolf session is still not by itself gameplay acceptance: the captures
+A connected session is still not by itself gameplay acceptance: the captures
 and the state reads recorded in the Den document `playtest-evidence-log` are what
 establish the visible result, and the earlier failed run remains recorded in that
 document's task 8576 section.
