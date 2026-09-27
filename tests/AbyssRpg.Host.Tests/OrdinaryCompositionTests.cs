@@ -86,6 +86,8 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
+        // Nine of the level's records are drawn: the poisoning trap stands on the
+        // sixth tile, which is the outer edge of the avatar's light.
         Assert.Equal(9, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
@@ -478,6 +480,28 @@ public sealed class OrdinaryCompositionTests
             // first-circle spell costs and this test arranges only the runes.
             TestContent.Build(withRunes: true, defaultClass: "druid"),
             BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void A_trap_with_an_owner_poisons_instead_of_wounding()
+    {
+        // The same trap kind with a non-zero owner poisons: it leaves a lasting
+        // condition the survival owner carries rather than taking health now, and
+        // the poison it leaves is capped at fifteen (donor: a_damagetrap.cs).
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int health = session.Status.Hp;
+
+        spatial.StepTranslation = new System.Numerics.Vector3(
+            (TestContent.PoisonTrapTileX + 0.5f) * 8f, 1f, (TestContent.PoisonTrapTileY + 0.5f) * 8f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+
+        Assert.Equal(health, session.Status.Hp);
+        Assert.Equal(TestContent.DamageTrapQuality, session.State.Survival.Poison);
+        Assert.StartsWith("A trap's poison burns you", HudString(ui.LastProjection!.Value.Value, "outcome"));
     }
 
     [Fact]

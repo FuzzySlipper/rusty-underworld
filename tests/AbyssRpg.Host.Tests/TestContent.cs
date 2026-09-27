@@ -51,6 +51,13 @@ internal static class TestContent
 
     public const int DamageTrapTileY = 0;
 
+    /// <summary>A poisoning trap: the same kind, with a non-zero owner.</summary>
+    public const int PoisonTrapObjectIndex = 515;
+
+    public const int PoisonTrapTileX = 6;
+
+    public const int PoisonTrapTileY = 0;
+
     /// <summary>What the fixture's damage trap strikes for.</summary>
     public const int DamageTrapQuality = 5;
 
@@ -360,6 +367,7 @@ internal static class TestContent
                     (3, 0) => PlateObjectIndex,
                     (4, 0) => PitObjectIndex,
                     (5, 0) => DamageTrapObjectIndex,
+                    (6, 0) => PoisonTrapObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -389,7 +397,7 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 9,
+          "liveObjects": 10,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
@@ -400,7 +408,8 @@ internal static class TestContent
             [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1],
             [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
-            [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1],
+            [{{PoisonTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

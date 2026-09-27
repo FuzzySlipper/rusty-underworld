@@ -784,14 +784,20 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         int damage = trap.Quality;
         if (damage <= 0) return;
-        bool poison = trap.Owner != 0;
-        // Poison and wounds both come off the defeat track here: the ruleset's
-        // condition owner holds the lasting effect, and this is the harm itself.
-        ApplyDefeatDamage(
-            damage,
-            poison
-                ? $"A trap's poison burns you for {damage}."
-                : $"A trap strikes you for {damage}.");
+        if (trap.Owner != 0)
+        {
+            // A trap with an owner poisons rather than wounds, and the poison it
+            // leaves is capped at fifteen (donor: a_damagetrap.cs sets
+            // play_poison to min(basedamage, 0xF)). The survival owner carries it,
+            // so the damage it does over time is that owner's business, not this
+            // trap's.
+            int poisoned = Math.Max(_session.Survival.Poison, Math.Min(damage, 0xF));
+            _session.Survival.Poison = poisoned;
+            _outcome = $"A trap's poison burns you: poison {poisoned}.";
+            return;
+        }
+
+        ApplyDefeatDamage(damage, $"A trap strikes you for {damage}.");
     }
 
     /// <summary>
