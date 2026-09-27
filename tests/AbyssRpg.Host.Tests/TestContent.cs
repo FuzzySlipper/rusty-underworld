@@ -354,6 +354,7 @@ internal static class TestContent
         { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 },
         { "itemId": 66, "level": 2, "avgHp": 20, "strength": 18, "dexterity": 10, "intelligence": 4, "speed": 4, "corpseIndex": 4, "swimmer": false, "flier": false, "faction": 2 }
       ],
+      "triggerTypes": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 }
       ]

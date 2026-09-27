@@ -15,7 +15,8 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Content;
 /// </summary>
 public sealed record UuObjectTables(
     IReadOnlyDictionary<int, UuCritterFactory.CritterDefinition> Critters,
-    IReadOnlyDictionary<int, UuContainerDefinition> Containers);
+    IReadOnlyDictionary<int, UuContainerDefinition> Containers,
+    IReadOnlyList<int> TriggerTypes);
 
 /// <summary>One container item id's source capacity and mask, with its class index.</summary>
 public sealed record UuContainerDefinition(
@@ -92,7 +93,23 @@ public static class UuObjectTablesContent
         if (critters.Count == 0 || containers.Count == 0)
             throw new InvalidOperationException($"'{payloadLabel}' must define at least one critter and one container.");
 
-        return new UuObjectTables(critters, containers);
+        // Missing or shortened tables would silently assign the wrong behavior
+        // to placed triggers. Require the current pack and name the repair.
+        if (!root.TryGetProperty("triggerTypes", out JsonElement triggerRows)
+            || triggerRows.ValueKind != JsonValueKind.Array || triggerRows.GetArrayLength() != 16)
+            throw new InvalidOperationException(
+                $"'{payloadLabel}' must define 16 triggerTypes; regenerate the object-tables import.");
+        int[] triggerTypes = new int[16];
+        int triggerIndex = 0;
+        foreach (JsonElement value in triggerRows.EnumerateArray())
+        {
+            if (value.ValueKind != JsonValueKind.Number
+                || !value.TryGetInt32(out int type) || type < 0 || type > byte.MaxValue)
+                throw new InvalidOperationException($"'{payloadLabel}' triggerTypes must contain byte values.");
+            triggerTypes[triggerIndex++] = type;
+        }
+
+        return new UuObjectTables(critters, containers, triggerTypes);
     }
 
     private static JsonDocument Parse(ReadOnlyMemory<byte> payload, string label)

@@ -23,6 +23,25 @@ public sealed class ObjectTableTests
     }
 
     [Fact]
+    public void Trigger_table_survives_pack_serialization_with_source_provenance()
+    {
+        // Distinct values at every slot catch an offset error, a truncated table,
+        // or substituting the familiar shipped values for the operator's bytes.
+        byte[] raw = new byte[ObjectsDatReader.MinimumLength];
+        int[] expected = Enumerable.Range(0, 16).Select(i => i * 17).ToArray();
+        for (int i = 0; i < expected.Length; i++)
+            raw[ObjectsDatReader.TriggerTypeOffset + i] = (byte)expected[i];
+        UwTableProvenance provenance = UwTableProvenance.FromBytes("UW1", "UW/DATA/OBJECTS.DAT", raw);
+        ObjectTablePack.Tables pack = ObjectTablePack.Emit(ObjectsDatReader.Read(raw), provenance);
+
+        using System.Text.Json.JsonDocument json = System.Text.Json.JsonDocument.Parse(ObjectTablePack.ToJson(pack));
+        Assert.Equal(expected, json.RootElement.GetProperty("triggerTypes").EnumerateArray().Select(value => value.GetInt32()));
+        Assert.Equal("UW1", json.RootElement.GetProperty("source").GetProperty("SourceGame").GetString());
+        Assert.Equal(provenance.Sha256Hex, json.RootElement.GetProperty("source").GetProperty("Sha256Hex").GetString());
+        Assert.Equal("UW/DATA/OBJECTS.DAT", json.RootElement.GetProperty("source").GetProperty("SourceFile").GetString());
+    }
+
+    [Fact]
     public void Rejects_short_common_object_and_skill_input()
     {
         Assert.Throws<InvalidDataException>(() => CommonObjDatReader.Read(new byte[10]));

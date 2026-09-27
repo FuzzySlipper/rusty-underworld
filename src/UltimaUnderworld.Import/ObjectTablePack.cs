@@ -5,7 +5,8 @@ namespace UltimaUnderworld.Import;
 /// <summary>
 /// Emits the runtime-facing slice of UW1 OBJECTS.DAT as a content pack: the
 /// critter table indexed by item id 64-127 and the container table indexed by
-/// item id 128-143. The tables carry source numbers; their game meaning is
+/// item id 128-143, and the trigger type table indexed by the low four item-id
+/// bits. The tables carry source numbers; their game meaning is
 /// ruleset policy (see the class rule in the donor's <c>src/World/uwobject.cs</c>:
 /// majorclass is <c>item_id &gt;&gt; 6</c>).
 /// </summary>
@@ -31,6 +32,7 @@ public static class ObjectTablePack
     public sealed record Tables(
         IReadOnlyList<CritterRow> Critters,
         IReadOnlyList<ContainerRow> Containers,
+        IReadOnlyList<int> TriggerTypes,
         UwTableProvenance Provenance);
 
     public static Tables Emit(ObjectsDatReader.ObjectTables tables, UwTableProvenance provenance)
@@ -52,7 +54,9 @@ public static class ObjectTablePack
             .Select((row, index) => new ContainerRow(128 + index, row.CapacityTenthStones, row.ObjectsMask, row.Slots))
             .ToArray();
 
-        return new Tables(critters, containers, provenance);
+        // UnderworldGodot src/objectdata/triggerobjectdat.cs reads these bytes
+        // from the same OBJECTS.DAT buffer (src/loaders/objectdatloader.cs).
+        return new Tables(critters, containers, tables.TriggerTypes.ToArray(), provenance);
     }
 
     public static string ToJson(Tables tables)
@@ -62,6 +66,7 @@ public static class ObjectTablePack
         {
             schemaVersion = SchemaVersion,
             source = tables.Provenance,
+            triggerTypes = tables.TriggerTypes,
             critters = tables.Critters.Select(critter => new
             {
                 itemId = critter.ItemId,

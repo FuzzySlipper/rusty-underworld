@@ -19,6 +19,7 @@ public sealed class UuPlacementContentTests
         { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 },
         { "itemId": 127, "level": 5, "avgHp": 30, "strength": 20, "dexterity": 8, "intelligence": 4, "speed": 6, "corpseIndex": 5, "swimmer": true, "flier": false, "faction": 1 }
       ],
+      "triggerTypes": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 },
         { "itemId": 143, "capacityTenthStones": 40, "objectsMask": 7, "slots": 3 }
@@ -87,6 +88,33 @@ public sealed class UuPlacementContentTests
         Assert.Equal(125, tables.Containers[128].CapacityTenthStones);
         Assert.Equal(3, tables.Containers[143].Slots);
         Assert.Equal(0xF, tables.Containers[143].ClassIndex);
+        Assert.Equal(new[] { 0, 2, 4, 5, 1, 7, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, tables.TriggerTypes);
+    }
+
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0,0]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,256]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,-1]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,1.5]")]
+    [InlineData("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,null]")]
+    [InlineData("null")]
+    public void Malformed_trigger_tables_cannot_silently_change_trigger_behavior(string replacement)
+    {
+        string malformed = Tables.Replace("[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0]", replacement, StringComparison.Ordinal);
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => UuObjectTablesContent.Read(Encoding.UTF8.GetBytes(malformed), "object tables"));
+        Assert.Contains("triggerTypes", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Missing_trigger_table_names_the_required_reimport()
+    {
+        string oldPack = Tables.Replace("\"triggerTypes\": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],", "", StringComparison.Ordinal);
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(
+            () => UuObjectTablesContent.Read(Encoding.UTF8.GetBytes(oldPack), "object tables"));
+        Assert.Contains("regenerate the object-tables import", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

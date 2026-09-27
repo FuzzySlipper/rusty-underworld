@@ -111,6 +111,8 @@ public sealed class LevelPlacementsTests
         using JsonDocument document = JsonDocument.Parse(json);
         Assert.Equal(64, document.RootElement.GetProperty("critters").GetArrayLength());
         Assert.Equal(16, document.RootElement.GetProperty("containers").GetArrayLength());
+        Assert.Equal(ObjectsDatReader.Read(data).TriggerTypes,
+            document.RootElement.GetProperty("triggerTypes").EnumerateArray().Select(value => value.GetInt32()));
     }
 
     [Fact]
