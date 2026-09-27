@@ -1373,6 +1373,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
+        if (_items?.Find(placed.ItemId)?.CanPickUp != true)
+        {
+            _outcome = $"You cannot take the {Describe(placed.ItemId)}.";
+            return;
+        }
+
         // Taking leaves the floor: the level state records the removal, which is
         // what a save carries, and the object moves into the avatar's inventory.
         EntityId from = items.TryContainerOf(entity, out EntityId container) ? container : items.Floor(level);
@@ -1585,6 +1591,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             // Only what lies on the floor is in reach: a container's contents are
             // reached by using the container.
             if (tile.X < 0) continue;
+            if (Traps.UuTrapDispatch.IsTrap(obj.ItemId)) continue;
             AdmittedTile? on = _placements?.Tile(tile.X, tile.Y);
             if (on is null) continue;
             WorldPoint center = _placements!.TileCenter(on.X, on.Y, on.FloorHeight);
@@ -1602,7 +1609,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (found.Kind == UuReachKind.None && nearestObject is not null)
         {
             bool container = Content.UuObjectTablesContent.IsContainerItem(nearestObject.ItemId);
-            found = UuReachTarget.AtObject(nearestObject, nearest, container);
+            found = UuReachTarget.AtObject(nearestObject, nearest, container,
+                _items?.Find(nearestObject.ItemId)?.CanPickUp == true);
         }
 
         return found;

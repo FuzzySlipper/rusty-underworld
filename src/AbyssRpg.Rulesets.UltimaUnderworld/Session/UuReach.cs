@@ -67,8 +67,8 @@ public readonly record struct UuReachTarget(
             : new UuReachTarget(UuReachKind.Creature, distance, UuVerbs.Talk, Actor: actor);
 
     /// <summary>An object on the floor: a container is used, a loose thing is taken.</summary>
-    public static UuReachTarget AtObject(AdmittedObject obj, float distance, bool container) =>
+    public static UuReachTarget AtObject(AdmittedObject obj, float distance, bool container, bool canTake = true) =>
         container
             ? new UuReachTarget(UuReachKind.Container, distance, UuVerbs.Use | UuVerbs.Loot, Object: obj)
-            : new UuReachTarget(UuReachKind.Item, distance, UuVerbs.Take | UuVerbs.Use, Object: obj);
+            : new UuReachTarget(UuReachKind.Item, distance, UuVerbs.Use | (canTake ? UuVerbs.Take : UuVerbs.None), Object: obj);
 }

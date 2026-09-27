@@ -507,6 +507,20 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void Using_a_trigger_tile_preserves_its_wiring()
+    {
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        UseAt(product, spatial, 2,
+            (TestContent.TriggerLegTileX + 0.5f) * 8f,
+            (TestContent.TriggerLegTileY + 0.5f) * 8f);
+        Assert.True(session.State.Dungeon.Current.IsLive(TestContent.TriggerLegObjectIndex));
+        Assert.Contains(TestContent.TriggerLegObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+    }
+
+    [Fact]
     public void A_trap_with_an_owner_poisons_instead_of_wounding()
     {
         // The same trap kind with a non-zero owner poisons: it leaves a lasting
