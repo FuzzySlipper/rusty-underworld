@@ -101,14 +101,28 @@ public static class UuTrapDispatch
         Func<int, ChainNode> resolve, int head, Func<int, bool>? branch = null)
     {
         ArgumentNullException.ThrowIfNull(resolve);
-        var fired = new List<TrapKind>();
+        ArgumentNullException.ThrowIfNull(resolve);
+        return FireChainNodes(resolve, head, branch).Select(fired => fired.Kind).ToArray();
+    }
+
+    /// <summary>
+    /// The same walk, reporting each node rather than only its kind, so a caller
+    /// can apply an effect with the link of the node that carries it. A chain's
+    /// later nodes name their own targets, so the head's link is not the answer
+    /// for them.
+    /// </summary>
+    public static IReadOnlyList<(int Index, ChainNode Node, TrapKind Kind)> FireChainNodes(
+        Func<int, ChainNode> resolve, int head, Func<int, bool>? branch = null)
+    {
+        ArgumentNullException.ThrowIfNull(resolve);
+        var fired = new List<(int, ChainNode, TrapKind)>();
         var seen = new HashSet<int>();
         int current = head;
         while (current != 0 && seen.Add(current))
         {
             ChainNode node = resolve(current);
             if (node.Kind == TrapKind.Unknown) break;
-            fired.Add(node.Kind);
+            fired.Add((current, node, node.Kind));
             // Trigger legs run as triggers (their internal chaining is the
             // trigger's business); create/delete always stop.
             if (node.Kind is TrapKind.TriggerLeg or TrapKind.CreateObject or TrapKind.DeleteObject) break;

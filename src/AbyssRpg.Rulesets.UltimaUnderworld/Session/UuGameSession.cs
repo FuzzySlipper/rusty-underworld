@@ -745,29 +745,48 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// owner's; what each fired kind does is applied through the owner that already
     /// does it, so there is no second implementation of opening a door.
     /// </summary>
-    private void FireTrigger(AdmittedObject trigger, int tileX, int tileY)
+    private void FireTrigger(AdmittedObject trigger, int tileX, int tileY) =>
+        FireChainFrom(trigger.Index, tileX, tileY, 0);
+
+    /// <summary>
+    /// Runs one chain of a trigger's graph and applies what each node does, using
+    /// the link of the node that carries the effect rather than the head's: a
+    /// chain's later nodes name their own targets (donor: trap.FireChain and the
+    /// trigger legs it hands back to their caller).
+    /// </summary>
+    private void FireChainFrom(int head, int tileX, int tileY, int depth)
     {
+        // A trigger leg runs its own chain as a trigger; the data's chains are
+        // shallow, so anything deeper is a loop rather than a graph.
+        if (depth > 2) return;
         int level = _session.Dungeon.CurrentLevel;
-        IReadOnlyList<Traps.UuTrapDispatch.TrapKind> fired = Traps.UuTrapDispatch.FireChain(
-            index => _session.PlacedObjectAt(level, index, out (int X, int Y) tile) is { } linked
-                ? new Traps.UuTrapDispatch.ChainNode(
-                    Traps.UuTrapDispatch.ClassifyItem(linked.ItemId), linked.Link, linked.Next)
-                : new Traps.UuTrapDispatch.ChainNode(Traps.UuTrapDispatch.TrapKind.Unknown, 0, 0),
-            // The trigger's own record is the first node of its chain; its link names
-            // what the effect applies to.
-            trigger.Index);
-        foreach (Traps.UuTrapDispatch.TrapKind kind in fired)
+        IReadOnlyList<(int Index, Traps.UuTrapDispatch.ChainNode Node, Traps.UuTrapDispatch.TrapKind Kind)> fired =
+            Traps.UuTrapDispatch.FireChainNodes(
+                index => _session.PlacedObjectAt(level, index, out (int X, int Y) ignored) is { } linked
+                    ? new Traps.UuTrapDispatch.ChainNode(
+                        Traps.UuTrapDispatch.ClassifyItem(linked.ItemId), linked.Link, linked.Next)
+                    : new Traps.UuTrapDispatch.ChainNode(Traps.UuTrapDispatch.TrapKind.Unknown, 0, 0),
+                head);
+
+        foreach ((int index, Traps.UuTrapDispatch.ChainNode node, Traps.UuTrapDispatch.TrapKind kind) in fired)
         {
             switch (kind)
             {
                 case Traps.UuTrapDispatch.TrapKind.Door:
-                    ApplyDoorTrap(trigger);
+                    ApplyDoorTrap(index, node.Link);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Pit:
                     FallThroughPit(tileX, tileY);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Damage:
-                    ApplyDamageTrap(trigger);
+                    if (_session.PlacedObjectAt(level, index, out (int X, int Y) ignored) is { } struck)
+                    {
+                        ApplyDamageTrap(struck);
+                    }
+
+                    break;
+                case Traps.UuTrapDispatch.TrapKind.TriggerLeg:
+                    FireChainFrom(node.Link, tileX, tileY, depth + 1);
                     break;
             }
         }
@@ -852,12 +871,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     }
 
     /// <summary>A door trap opens, closes or toggles the door its own link names.</summary>
-    private void ApplyDoorTrap(AdmittedObject trigger)
+    private void ApplyDoorTrap(int trapIndex, int doorLink)
     {
         int level = _session.Dungeon.CurrentLevel;
-        Traps.UuTrapDispatch.DoorTrapAction action = Traps.UuTrapDispatch.DoorAction(trigger.Quality);
+        // The trap's own quality is the action; its link names the door.
+        if (_session.PlacedObjectAt(level, trapIndex, out (int X, int Y) ignored) is not { } trap) return;
+        Traps.UuTrapDispatch.DoorTrapAction action = Traps.UuTrapDispatch.DoorAction(trap.Quality);
         if (action == Traps.UuTrapDispatch.DoorTrapAction.None) return;
-        if (_session.PlacedObjectAt(level, trigger.Link, out (int X, int Y) doorTile) is not { } door) return;
+        if (_session.PlacedObjectAt(level, doorLink, out (int X, int Y) doorTile) is not { } door) return;
 
         if (doorTile.X < 0) return;
         UuLevelState state = _session.Dungeon.Current;

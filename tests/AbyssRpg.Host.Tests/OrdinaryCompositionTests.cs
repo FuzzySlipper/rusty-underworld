@@ -483,6 +483,30 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_trigger_leg_runs_the_chain_it_names()
+    {
+        // The shape the imported level actually uses: what the avatar stands on is a
+        // trigger leg, and its link names the chain of traps to run. The leg fires
+        // the door trap standing elsewhere, and that trap's own quality and link
+        // decide what happens -- not the leg's.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        (int doorX, int doorY) = TestContent.FirstLevelDoorTile;
+        Assert.DoesNotContain((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
+
+        spatial.StepTranslation = new System.Numerics.Vector3(
+            (TestContent.TriggerLegTileX + 0.5f) * 8f, 1f, (TestContent.TriggerLegTileY + 0.5f) * 8f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+
+        Assert.Contains((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
+        Assert.Contains(TestContent.TriggerLegObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+        Assert.Equal("A mechanism opens the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+    }
+
+    [Fact]
     public void A_trap_with_an_owner_poisons_instead_of_wounding()
     {
         // The same trap kind with a non-zero owner poisons: it leaves a lasting

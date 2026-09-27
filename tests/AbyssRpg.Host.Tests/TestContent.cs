@@ -51,6 +51,15 @@ internal static class TestContent
 
     public const int DamageTrapTileY = 0;
 
+    /// <summary>A trigger leg: majorclass 6, minor 2, whose link names the chain it runs.</summary>
+    public const int TriggerLegItemId = 416;
+
+    public const int TriggerLegObjectIndex = 516;
+
+    public const int TriggerLegTileX = 7;
+
+    public const int TriggerLegTileY = 0;
+
     /// <summary>A poisoning trap: the same kind, with a non-zero owner.</summary>
     public const int PoisonTrapObjectIndex = 515;
 
@@ -368,6 +377,7 @@ internal static class TestContent
                     (4, 0) => PitObjectIndex,
                     (5, 0) => DamageTrapObjectIndex,
                     (6, 0) => PoisonTrapObjectIndex,
+                    (7, 0) => TriggerLegObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -397,7 +407,7 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 10,
+          "liveObjects": 11,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
@@ -409,7 +419,8 @@ internal static class TestContent
             [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1],
             [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
             [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1],
-            [{{PoisonTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{PoisonTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1],
+            [{{TriggerLegObjectIndex}},0,{{TriggerLegItemId}},0,0,0,0,{{PlateObjectIndex}},-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """
