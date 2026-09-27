@@ -15,6 +15,11 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Creation;
 /// </summary>
 public static class UuAvatarFactory
 {
+    /// <summary>
+    /// Our pressure weight uses the catalog's adventurer body mass plus inventory.
+    /// This is product tuning, not the donor's player-object mass convention.
+    /// </summary>
+    public const int BodyItemId = 127;
     public static readonly CapacityMetricId WeightMetric = CapacityMetricId.Parse("abyss.classic-weight");
     public static readonly TrackId DefeatTrack = TrackId.Parse("abyss.defeat");
     public static readonly TrackId ManaTrack = TrackId.Parse("abyss.mana");

@@ -147,6 +147,16 @@ public sealed class UuPlacementContentTests
     }
 
     [Fact]
+    public void Placements_read_normalized_pressure_values()
+    {
+        UuLevelPlacements placements = UuLevelContent.ReadPlacements(
+            Encoding.UTF8.GetBytes(Placements("[500,0,421,0,3,0,0,501,-1,-1,0,0,7,5.5,84]")), "placements");
+        Assert.Equal(7, placements.Objects[0].Quantity);
+        Assert.Equal(5.5d, placements.Objects[0].Height);
+        Assert.Equal(84, placements.Objects[0].PressureThreshold);
+    }
+
+    [Fact]
     public void A_truncated_tile_grid_is_refused()
     {
         // One row short of a full grid: the runtime indexes tiles by position,

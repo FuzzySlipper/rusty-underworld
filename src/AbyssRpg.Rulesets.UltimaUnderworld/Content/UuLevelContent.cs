@@ -179,12 +179,17 @@ public static class UuLevelContent
             // A row written before the whoami byte existed carries eleven
             // columns; the creature simply holds no conversation of its own.
             int columns = row.GetArrayLength();
-            if (columns is not (11 or 12))
+            if (columns is not (11 or 12 or 15))
             {
                 throw new InvalidOperationException(
                     $"'{payloadLabel}' object rows must be "
-                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading, whoami].");
+                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading, whoami, quantity, height, pressureThreshold].");
             }
+
+            if (columns == 15 && (row[12].GetInt32() < 0
+                || !double.IsFinite(row[13].GetDouble()) || row[13].GetDouble() < 0
+                || row[14].GetInt32() < 0))
+                throw new InvalidOperationException($"'{payloadLabel}' has invalid quantity, height or pressure threshold.");
 
             objects[at++] = new AdmittedObject(
                 (int)row[0].GetDouble(),
@@ -197,7 +202,10 @@ public static class UuLevelContent
                 HomeTileX: (int)row[8].GetDouble(),
                 HomeTileY: (int)row[9].GetDouble(),
                 Heading: (int)row[10].GetDouble(),
-                WhoAmI: columns == 12 ? (int)row[11].GetDouble() : 0);
+                WhoAmI: columns >= 12 ? (int)row[11].GetDouble() : 0,
+                Quantity: columns == 15 ? row[12].GetInt32() : 1,
+                Height: columns == 15 ? row[13].GetDouble() : 0,
+                PressureThreshold: columns == 15 ? row[14].GetInt32() : 4);
         }
 
         return new UuLevelPlacements(unitsPerTile, heightUnitsPerStep, tiles, objects);

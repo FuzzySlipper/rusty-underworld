@@ -21,7 +21,8 @@ public static class LevelPlacements
     /// </summary>
     public sealed record PlacedObject(
         int Index, bool Mobile, int ItemId, int Flags, int Quality, int Next, int Owner, int Link,
-        int HomeTileX, int HomeTileY, int Heading, int WhoAmI);
+        int HomeTileX, int HomeTileY, int Heading, int WhoAmI,
+        int Quantity, double Height, int PressureThreshold);
 
     public sealed record Placements(
         int Level,
@@ -51,7 +52,8 @@ public static class LevelPlacements
                 (int homeX, int homeY) = HomeTile(obj);
                 return new PlacedObject(
                     obj.Index, obj.IsMobile, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
-                    homeX, homeY, Heading(obj), WhoAmI(obj));
+                    homeX, homeY, Heading(obj), WhoAmI(obj),
+                    Quantity(obj), Height(obj), PressureThreshold(obj));
             })
             .ToArray();
         return new Placements(
@@ -79,6 +81,18 @@ public static class LevelPlacements
         obj.IsMobile && obj.Raw.Length > MobileWhoAmIOffset ? obj.Raw[MobileWhoAmIOffset] : 0;
 
     private const int MobileWhoAmIOffset = 0x1A;
+
+    // UnderworldGodot src/World/uwobject.cs: ObjectQuantity treats links below
+    // 512 as counts only when is_quant is set. The height is in eighths of a
+    // floor step; normalize it here rather than exposing source bit fields.
+    private static int Quantity(LevArkReader.LevelObject obj) =>
+        (obj.Raw[1] & 0x80) != 0 && obj.Link < 512 ? obj.Link : 1;
+
+    private static double Height(LevArkReader.LevelObject obj) => (obj.Raw[2] & 0x7F) / 8d;
+
+    // trigger.cs RunPressureEnterExitTriggersInTile: ypos bit 2 chooses 4/84.
+    private static int PressureThreshold(LevArkReader.LevelObject obj) =>
+        (obj.Raw[3] & 0x10) != 0 ? 84 : 4;
 
     private static int Heading(LevArkReader.LevelObject obj)
     {
@@ -128,11 +142,13 @@ public static class LevelPlacements
             // next in the chain, owner (container), link (first content), the
             // mobile's own tile (-1 when the record holds none), the record's
             // facing in its own 32-step units, and the whoami byte that selects
-            // the conversation a creature holds.
+            // the conversation a creature holds, then normalized quantity, height
+            // in floor steps and pressure threshold in tenths of stones.
             objects = placements.Objects.Select(obj => new[]
             {
                 obj.Index, obj.Mobile ? 1 : 0, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
                 obj.HomeTileX, obj.HomeTileY, obj.Heading, obj.WhoAmI,
+                obj.Quantity, obj.Height, obj.PressureThreshold,
             }),
         };
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = false });

@@ -75,6 +75,26 @@ public sealed class LevelPlacementsTests
         Assert.Equal(-1, placements.Objects[1].HomeTileX);
     }
 
+    [Theory]
+    [InlineData(0, 7, 1, 4)]
+    [InlineData(128, 7, 7, 4)]
+    [InlineData(128, 512, 1, 84)]
+    public void Placement_normalizes_quantity_height_and_pressure_threshold(int flags, int link, int quantity, int threshold)
+    {
+        LevArkReader.LevelPack pack = Pack();
+        byte[] raw = new byte[LevArkReader.StaticRecordSize];
+        raw[1] = (byte)flags;
+        raw[2] = 44; // 5.5 floor steps
+        raw[3] = threshold == 84 ? (byte)16 : (byte)0;
+        LevArkReader.LevelObject[] objects = pack.Objects.ToArray();
+        objects[1] = objects[1] with { Raw = raw, Link = link };
+        pack = pack with { Objects = objects };
+        LevelPlacements.PlacedObject obj = LevelPlacements.Emit(pack).Objects[1];
+        Assert.Equal(quantity, obj.Quantity);
+        Assert.Equal(5.5d, obj.Height);
+        Assert.Equal(threshold, obj.PressureThreshold);
+    }
+
     [Fact]
     public void The_emitted_json_keeps_the_row_shape_the_runtime_reads()
     {
@@ -86,8 +106,8 @@ public sealed class LevelPlacementsTests
         Assert.Equal(1.0, root.GetProperty("heightUnitsPerStep").GetDouble());
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
-        // Twelve columns: the whoami byte that selects a creature's conversation.
-        Assert.Equal(12, root.GetProperty("objects")[0].GetArrayLength());
+        // Fifteen columns include conversation identity and normalized pressure values.
+        Assert.Equal(15, root.GetProperty("objects")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("objects")[0][11].GetInt32());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }

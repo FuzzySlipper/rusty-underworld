@@ -60,7 +60,10 @@ public sealed record UuLevelDeltaDto(
     MovedObjectDto[] MovedObjects,
     DoorDto[] OpenedDoors,
     DroppedDto[] Dropped,
-    LevelActorDto[]? Actors = null);
+    LevelActorDto[]? Actors = null)
+{
+    public int[] FiredTriggers { get; init; } = [];
+}
 
 /// <summary>One admitted creature's state inside a level's own delta.</summary>
 public sealed record LevelActorDto(

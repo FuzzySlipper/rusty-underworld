@@ -273,6 +273,7 @@ public sealed class UuSession : IDisposable
         dto.Dropped.Select(d => new DroppedPlacement(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray())
     {
         Actors = [.. (dto.Actors ?? []).Select(a => new UuLevelActor(a.Index, a.X, a.Y, a.Z, a.HeadingYawRadians, a.Health))],
+        FiredTriggers = dto.FiredTriggers.ToArray(),
     };
 
     private static UuLevelDeltaDto ToDeltaDto(UuLevelDelta delta) => new(
@@ -281,7 +282,10 @@ public sealed class UuSession : IDisposable
         delta.MovedObjects.Select(kv => new MovedObjectDto(kv.Key, kv.Value.TileX, kv.Value.TileY)).ToArray(),
         delta.OpenedDoors.Select(door => new DoorDto(door.X, door.Y)).ToArray(),
         delta.Dropped.Select(d => new DroppedDto(d.TileX, d.TileY, d.ItemId, d.Quality, d.Quantity, d.IdentityValue)).ToArray(),
-        [.. delta.Actors.Select(a => new LevelActorDto(a.Index, a.X, a.Y, a.Z, a.HeadingYawRadians, a.Health))]);
+        [.. delta.Actors.Select(a => new LevelActorDto(a.Index, a.X, a.Y, a.Z, a.HeadingYawRadians, a.Health))])
+    {
+        FiredTriggers = delta.FiredTriggers.ToArray(),
+    };
 
     /// <summary>
     /// Remembers which actor a placed object index became, so a save that says

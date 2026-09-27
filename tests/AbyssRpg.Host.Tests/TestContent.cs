@@ -98,7 +98,7 @@ internal static class TestContent
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
         bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter",
-        int creatureWhoAmI = 0)
+        int creatureWhoAmI = 0, Func<string, string>? edit = null)
     {
         List<ProductContentFile> files =
         [
@@ -191,7 +191,8 @@ internal static class TestContent
                     "__SECOND_LEVEL__",
                     withSecondLevel ? $",\n    {{ \"id\": \"abyssrpg.level-{SecondLevel}\" }}".Replace("\\n", "\n") : "",
                     StringComparison.Ordinal));
-        return new ProductContent(files.ToArray());
+        return new ProductContent(files.Select(file => edit is null ? file
+            : File(Encoding.UTF8.GetString(file.Path.Span), edit(Encoding.UTF8.GetString(file.Bytes.Span)))).ToArray());
     }
 
     /// <summary>The second level a travel fixture admits: its own import, its own critter.</summary>
@@ -330,6 +331,7 @@ internal static class TestContent
       "schemaVersion": 1,
       "source": { "commonObjects": { "SourceGame": "UW1" }, "strings": { "SourceGame": "UW1" } },
       "items": [
+        { "itemId": 127, "name": "adventurer", "massTenthStones": 70, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 3, "classIndex": 15 },
         { "itemId": 64, "name": "giant rat", "massTenthStones": 12, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 0 },
         { "itemId": 66, "name": "giant spider", "massTenthStones": 14, "height": 4, "radius": 2, "canPickUp": false, "class": 1, "minorClass": 0, "classIndex": 2 },
         { "itemId": 128, "name": "sack", "massTenthStones": 2, "height": 4, "radius": 2, "canPickUp": true, "class": 2, "minorClass": 0, "classIndex": 0 },
@@ -384,7 +386,7 @@ internal static class TestContent
                     (2, 0) => LitLightObjectIndex,
                     (1, 1) => DoorObjectIndex,
                     (3, 0) => PlateObjectIndex,
-                    (4, 0) => PitObjectIndex,
+                    (4, 0) when level != SecondLevel => PitObjectIndex,
                     (5, 0) => DamageTrapObjectIndex,
                     (6, 0) => PoisonTrapObjectIndex,
                     (7, 0) => TriggerLegObjectIndex,
@@ -426,13 +428,17 @@ internal static class TestContent
             [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
             [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
-            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,{{PlatedDoorObjectIndex}},0,0,-1,-1,-1,-1],
+            [{{PlateObjectIndex}},0,421,0,3,{{PlatedDoorObjectIndex}},0,519,-1,-1,-1,-1,1,0,4],
             [{{PlatedDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1],
-            [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
-            [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1],
-            [{{PoisonTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1],
-            [{{TriggerLegObjectIndex}},0,{{TriggerLegItemId}},0,0,{{LegDoorObjectIndex}},0,{{PlateObjectIndex}},-1,-1,-1,-1],
-            [{{LegDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{PitObjectIndex}},0,420,0,4,0,0,520,-1,-1,-1,-1],
+            [{{DamageTrapObjectIndex}},0,420,0,5,0,0,521,-1,-1,-1,-1],
+            [{{PoisonTrapObjectIndex}},0,420,0,6,0,0,522,-1,-1,-1,-1],
+            [{{TriggerLegObjectIndex}},0,{{TriggerLegItemId}},0,7,{{LegDoorObjectIndex}},0,519,-1,-1,-1,-1],
+            [{{LegDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1],
+            [519,0,{{PlateItemId}},0,1,0,0,0,-1,-1,-1,-1],
+            [520,0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
+            [521,0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1],
+            [522,0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

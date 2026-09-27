@@ -86,9 +86,9 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
-        // Nine of the level's records are drawn: the poisoning trap stands on the
-        // sixth tile, which is the outer edge of the avatar's light.
-        Assert.Equal(10, graphics.LastSnapshot.Count);
+        // Ten placed records are drawn; the linked trap effects have no tile
+        // and contribute no scene object.
+        Assert.Equal(11, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -304,7 +304,7 @@ public sealed class OrdinaryCompositionTests
     }
 
     /// <summary>A product whose bundle admits two imported levels, for travel.</summary>
-    private static AbyssProduct TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial)
+    private static AbyssProduct TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial, ProductContent? content = null)
     {
         ui = UiDouble.Create();
         graphics = new GraphicsDouble();
@@ -581,6 +581,117 @@ public sealed class OrdinaryCompositionTests
         // The level left behind keeps the firing: the pit is recorded as fired on
         // level 1, in that level's own stored delta.
         Assert.Contains(TestContent.PitObjectIndex, session.State.StoredDelta(1)?.FiredTriggers ?? []);
+    }
+
+    [Theory]
+    [InlineData(1, false)] // STEP_ON ignores departure
+    [InlineData(2, false)] // PICKUP is not tile movement
+    [InlineData(6, false)] // ENTER
+    [InlineData(14, true)] // EXIT
+    [InlineData(15, true)] // PRESSURE_RELEASE
+    [InlineData(12, false)] // UW2 scheduled type must never dispatch
+    public void Trigger_type_controls_entry_and_exit(int type, bool opensOnExit)
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0]", $"[0,2,4,5,1,{type},6,0,0,0,0,0,0,0,0,0]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(28f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(type is 1 or 6, session.State.Dungeon.Current.OpenedDoors.Contains((3, 0)));
+        session.State.Dungeon.Current.SetDoor(3, 0, false);
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(3));
+        Assert.Equal(opensOnExit, session.State.Dungeon.Current.OpenedDoors.Contains((3, 0)));
+    }
+
+    [Fact]
+    public void A_heavy_plate_counts_carried_items_and_survives_reload_without_refiring()
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("-1,-1,-1,-1,1,0,4]", "-1,-1,-1,-1,1,0,84]")
+            .Replace("\"massTenthStones\": 4,", "\"massTenthStones\": 20,"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(28f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.DoesNotContain((3, 0), session.State.Dungeon.Current.OpenedDoors); // body = 70
+        UseAt(product, spatial, 3, 4f, 12f); // carry the torch's 20
+        Assert.Single(session.CarriedItems.UniqueItems);
+        spatial.StepTranslation = new System.Numerics.Vector3(28f, 1f, 4f);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Contains((3, 0), session.State.Dungeon.Current.OpenedDoors);
+        session.State.Dungeon.Current.SetDoor(3, 0, false);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        product.Update(SixtyHzUpdate(6));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.DoesNotContain((3, 0), session.State.Dungeon.Current.OpenedDoors);
+        Assert.Contains(TestContent.PlateObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+    }
+
+    [Theory]
+    [InlineData(3, false)]
+    [InlineData(4, true)]
+    [InlineData(30, true)]
+    public void A_plate_counts_quantity_on_its_tile(int quantity, bool opens)
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("-1,-1,-1,-1,1,0,4]", "-1,-1,-1,-1,1,0,84]")
+            .Replace("[0,1,1,500,0,0]", "[0,1,1,0,0,0]")
+            .Replace("[517,0,320,0,0,0,0,0", "[517,0,320,0,0,500,0,0")
+            .Replace("[500,0,200,0,0,0,0,0,-1,-1,5]", $"[500,0,200,0,0,0,0,0,-1,-1,5,0,{quantity},0,4]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        spatial.StepTranslation = new System.Numerics.Vector3(28f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(opens, session.State.Dungeon.Current.OpenedDoors.Contains((3, 0)));
+        session.State.Dungeon.Current.SetDoor(3, 0, false);
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(3));
+        Assert.DoesNotContain((3, 0), session.State.Dungeon.Current.OpenedDoors);
+        // Heavy objects keep the plate held when the avatar leaves; no second firing.
+        Assert.Equal(quantity == 30, session.State.Dungeon.Current.FiredTriggers.Contains(TestContent.PlateObjectIndex));
+    }
+
+    [Fact]
+    public void Pausing_does_not_fire_a_trigger_at_the_debug_destination()
+    {
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int health = session.Status.Hp;
+        product.PauseCommand();
+        session.PlaceOnTile(5, 0);
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(health, session.Status.Hp);
+        product.PlayCommand();
+        product.Update(SixtyHzUpdate(3));
+        Assert.Equal(health - TestContent.DamageTrapQuality, session.Status.Hp);
+    }
+
+    [Fact]
+    public void A_trap_effect_on_a_tile_is_not_itself_a_movement_trigger()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[514,0,420,0,5,0,0,521", "[514,0,384,0,5,0,0,521"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int health = session.Status.Hp;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(health, session.Status.Hp);
+        Assert.DoesNotContain(TestContent.DamageTrapObjectIndex, session.State.Dungeon.Current.FiredTriggers);
     }
 
     [Fact]
@@ -966,7 +1077,7 @@ public sealed class OrdinaryCompositionTests
 
     /// <summary>The product fixture with the graphics and spatial doubles a scene test drives.</summary>
     private static AbyssProduct DrawProduct(
-        out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial)
+        out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial, ProductContent? content = null)
     {
         ui = UiDouble.Create();
         graphics = new GraphicsDouble();
@@ -979,7 +1090,7 @@ public sealed class OrdinaryCompositionTests
             cameraView: CameraViewDouble.Create().Service,
             graphics: graphics);
         return new AbyssProduct(
-            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+            engine, content ?? TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
     }
 
     /// <summary>The two-level fixture with a spatial double the test can drive.</summary>
