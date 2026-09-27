@@ -886,6 +886,20 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     if (_placements?.Object(index) is { } leg)
                         FireChainFrom(node.Link, leg.Quality, leg.Owner, visited);
                     break;
+                case Traps.UuTrapDispatch.TrapKind.Spell:
+                    if (_placements?.Object(index) is { } spellTrap)
+                    {
+                        Track health = _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack);
+                        var cast = _casting.CastTrap(spellTrap.Quality, spellTrap.Owner,
+                            (int)(health.MaximumValue - health.Current));
+                        if (cast.Supported)
+                        {
+                            health.Restore(cast.Healing);
+                            _outcome = $"A healing trap restores {cast.Healing} health.";
+                        }
+                        else _outcome = $"Trap spell {spellTrap.Quality}:{spellTrap.Owner} is not supported yet.";
+                    }
+                    break;
             }
             if (_session.Dungeon.CurrentLevel != level) return;
         }

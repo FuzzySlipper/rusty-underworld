@@ -5,6 +5,19 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Tests;
 
 public sealed class UuCastingHostingTests
 {
+    [Fact]
+    public void Trap_healing_needs_no_runes_and_respects_missing_health()
+    {
+        var casting = new UuCastingHosting(new Random(11));
+        Assert.Equal(37, casting.CastTrap(4, 15, 37).Healing);
+        Assert.Equal(0, casting.CastTrap(4, 15, 0).Healing);
+        Assert.InRange(casting.CastTrap(4, 2, 100).Healing, 2, 16);
+        Assert.Equal(1, casting.CastTrap(4, 2, 1).Healing);
+        Assert.False(casting.CastTrap(5, 2, 100).Supported);
+        Assert.Empty(casting.Panel().Shelf);
+        Assert.Empty(casting.Panel().Maintained);
+    }
+
     private static UuCastingHosting Shelf(params int[] runes)
     {
         var hosting = new UuCastingHosting(new Random(11));

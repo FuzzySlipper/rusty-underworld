@@ -521,6 +521,26 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_linked_spell_trap_heals_through_casting_without_spending_mana()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0", "[521,0,390,0,4,0,15,0"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var health = session.State.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack);
+        var mana = session.State.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.ManaTrack);
+        health.Current = 1;
+        double beforeMana = mana.Current;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(health.MaximumValue, health.Current);
+        Assert.Equal(beforeMana, mana.Current);
+        Assert.Contains(TestContent.DamageTrapObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+    }
+
+    [Fact]
     public void A_trap_with_an_owner_poisons_instead_of_wounding()
     {
         // The same trap kind with a non-zero owner poisons: it leaves a lasting
