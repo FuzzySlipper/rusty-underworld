@@ -42,6 +42,18 @@ internal static class TestContent
 
     public const int PlateTileY = 0;
 
+    /// <summary>A damage trap: majorclass 6, minor 0, classindex 0, quality = base damage.</summary>
+    public const int DamageTrapItemId = 384;
+
+    public const int DamageTrapObjectIndex = 514;
+
+    public const int DamageTrapTileX = 5;
+
+    public const int DamageTrapTileY = 0;
+
+    /// <summary>What the fixture's damage trap strikes for.</summary>
+    public const int DamageTrapQuality = 5;
+
     /// <summary>A pit trap: majorclass 6, minor 0, classindex 4, with no link.</summary>
     public const int PitItemId = 388;
 
@@ -347,6 +359,7 @@ internal static class TestContent
                     (1, 1) => DoorObjectIndex,
                     (3, 0) => PlateObjectIndex,
                     (4, 0) => PitObjectIndex,
+                    (5, 0) => DamageTrapObjectIndex,
                     _ => 0,
                 };
                 // One tile is a door, so the interaction verb has something to
@@ -376,7 +389,7 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 8,
+          "liveObjects": 9,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
@@ -386,7 +399,8 @@ internal static class TestContent
             [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
             [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1],
-            [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
+            [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

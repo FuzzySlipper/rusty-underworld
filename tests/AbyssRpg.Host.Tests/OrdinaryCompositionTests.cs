@@ -86,7 +86,7 @@ public sealed class OrdinaryCompositionTests
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
         // identity the save would use for the same record.
-        Assert.Equal(8, graphics.LastSnapshot.Count);
+        Assert.Equal(9, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -478,6 +478,31 @@ public sealed class OrdinaryCompositionTests
             // first-circle spell costs and this test arranges only the runes.
             TestContent.Build(withRunes: true, defaultClass: "druid"),
             BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+    }
+
+    [Fact]
+    public void A_damage_trap_strikes_the_avatar_for_what_its_record_says()
+    {
+        // The trap's quality is the base damage (donor: a_damagetrap.cs reads
+        // trapObj.quality), so the fixture's five-point trap must take exactly five
+        // off the defeat track when the avatar stands on it.
+        using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int before = session.Status.Hp;
+
+        spatial.StepTranslation = new System.Numerics.Vector3(
+            (TestContent.DamageTrapTileX + 0.5f) * 8f, 1f, (TestContent.DamageTrapTileY + 0.5f) * 8f);
+        product.Update(SixtyHzUpdate(2));
+        product.Update(SixtyHzUpdate(3));
+
+        Assert.Equal(before - TestContent.DamageTrapQuality, session.Status.Hp);
+        Assert.Equal("A trap strikes you for 5.", HudString(ui.LastProjection!.Value.Value, "outcome"));
+
+        // A trap fires once while the avatar stands on it, not once a tick.
+        product.Update(SixtyHzUpdate(4));
+        Assert.Equal(before - TestContent.DamageTrapQuality, session.Status.Hp);
     }
 
     [Fact]

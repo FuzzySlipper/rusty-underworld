@@ -766,8 +766,32 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 case Traps.UuTrapDispatch.TrapKind.Pit:
                     FallThroughPit(tileX, tileY);
                     break;
+                case Traps.UuTrapDispatch.TrapKind.Damage:
+                    ApplyDamageTrap(trigger);
+                    break;
             }
         }
+    }
+
+    /// <summary>
+    /// A damage trap strikes the avatar. Its own record carries what it does: the
+    /// trap's quality is the base damage and a non-zero owner means it poisons
+    /// rather than wounds (donor: UnderworldGodot
+    /// <c>src/traps/a_damagetrap.cs</c> Activate -> ApplyDamageTrap, which reads
+    /// <c>trapObj.quality</c> and <c>trapObj.owner != 0</c>).
+    /// </summary>
+    private void ApplyDamageTrap(AdmittedObject trap)
+    {
+        int damage = trap.Quality;
+        if (damage <= 0) return;
+        bool poison = trap.Owner != 0;
+        // Poison and wounds both come off the defeat track here: the ruleset's
+        // condition owner holds the lasting effect, and this is the harm itself.
+        ApplyDefeatDamage(
+            damage,
+            poison
+                ? $"A trap's poison burns you for {damage}."
+                : $"A trap strikes you for {damage}.");
     }
 
     /// <summary>
