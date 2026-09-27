@@ -79,6 +79,15 @@ internal static class TestContent
 
     public const int PitTileY = 0;
 
+    /// <summary>A static door as the donor defines it: majorclass 5, minorclass 0.</summary>
+    public const int PlatedDoorItemId = 320;
+
+    /// <summary>The door standing on the plate's own tile, which is how the donor finds it.</summary>
+    public const int PlatedDoorObjectIndex = 517;
+
+    /// <summary>The door standing on the trigger leg's own tile, for the chained case.</summary>
+    public const int LegDoorObjectIndex = 518;
+
     /// <summary>The door object the plate is wired to, standing on the door tile.</summary>
     public const int DoorObjectIndex = 512;
 
@@ -407,7 +416,7 @@ internal static class TestContent
           "level": {{level}},
           "unitsPerTile": 8.0,
           "heightUnitsPerStep": 1.0,
-          "liveObjects": 11,
+          "liveObjects": 13,
           "mobileObjects": 1,
           "tiles": [{{tiles}}],
           "objects": [
@@ -416,11 +425,13 @@ internal static class TestContent
             [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
             [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
-            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,0,0,{{DoorObjectIndex}},-1,-1,-1,-1],
+            [{{PlateObjectIndex}},0,{{PlateItemId}},0,1,{{PlatedDoorObjectIndex}},0,0,-1,-1,-1,-1],
+            [{{PlatedDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1],
             [{{PitObjectIndex}},0,{{PitItemId}},0,0,0,0,0,-1,-1,-1,-1],
             [{{DamageTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,0,0,-1,-1,-1,-1],
             [{{PoisonTrapObjectIndex}},0,{{DamageTrapItemId}},0,{{DamageTrapQuality}},0,1,0,-1,-1,-1,-1],
-            [{{TriggerLegObjectIndex}},0,{{TriggerLegItemId}},0,0,0,0,{{PlateObjectIndex}},-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
+            [{{TriggerLegObjectIndex}},0,{{TriggerLegItemId}},0,0,{{LegDoorObjectIndex}},0,{{PlateObjectIndex}},-1,-1,-1,-1],
+            [{{LegDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1]__RUNE_ROWS____CARRIED_ROW__
           ]
         }
         """

@@ -40,6 +40,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// <summary>A hand's reach: what the use channel can name from where the avatar stands.</summary>
     public const float InteractionReach = 2.5f;
 
+    /// <summary>A static door is majorclass 5 (donor: a_door_trap.cs searches for it).</summary>
+    private const int DoorMajorClass = 5;
+
+    /// <summary>A moving door is majorclass 7, minorclass 0, classindex 0xF, the donor's fallback.</summary>
+    private const int MovingDoorMajorClass = 7;
+
+    private const int MovingDoorClassIndex = 0xF;
+
     private const float EyeHeight = 1.6f;
 
     private readonly GameSessionContext _context;
@@ -602,7 +610,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     tile = (obj.HomeTileX, obj.HomeTileY);
                 }
                 AdmittedTile? placed = _placements?.Tile(tile.X, tile.Y);
-                bool door = placed?.Door == true;
+                bool door = placed?.Door == true || UuObjectShape.IsDoorItem(obj.ItemId);
                 bool openDoor = door && open.Contains((tile.X, tile.Y));
                 UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, door);
                 int band = _placements is not { } grid
@@ -773,7 +781,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             switch (kind)
             {
                 case Traps.UuTrapDispatch.TrapKind.Door:
-                    ApplyDoorTrap(index, node.Link);
+                    ApplyDoorTrap(index, tileX, tileY);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Pit:
                     FallThroughPit(tileX, tileY);
@@ -871,25 +879,56 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     }
 
     /// <summary>A door trap opens, closes or toggles the door its own link names.</summary>
-    private void ApplyDoorTrap(int trapIndex, int doorLink)
+    private void ApplyDoorTrap(int trapIndex, int tileX, int tileY)
     {
         int level = _session.Dungeon.CurrentLevel;
-        // The trap's own quality is the action; its link names the door.
+        UuLevelState state = _session.Dungeon.Current;
         if (_session.PlacedObjectAt(level, trapIndex, out (int X, int Y) ignored) is not { } trap) return;
+
+        // The trap's own quality is the action: 1 opens, 2 closes, 3 toggles.
         Traps.UuTrapDispatch.DoorTrapAction action = Traps.UuTrapDispatch.DoorAction(trap.Quality);
         if (action == Traps.UuTrapDispatch.DoorTrapAction.None) return;
-        if (_session.PlacedObjectAt(level, doorLink, out (int X, int Y) doorTile) is not { } door) return;
 
-        if (doorTile.X < 0) return;
-        UuLevelState state = _session.Dungeon.Current;
+        // A door trap does not name its door: it searches the object chain of the
+        // tile the trigger fired on for a door (donor: UnderworldGodot
+        // src/traps/a_door_trap.cs Activate, which looks up
+        // Tiles[triggerX, triggerY].indexObjectList for majorclass 5, or the moving
+        // door at majorclass 7 minorclass 0 classindex 0xF). That tile is the one
+        // the avatar is standing on, and the door stands in it.
+        if (!TileHasDoor(level, tileX, tileY)) return;
+
         bool open = action switch
         {
             Traps.UuTrapDispatch.DoorTrapAction.Open => true,
             Traps.UuTrapDispatch.DoorTrapAction.Close => false,
-            _ => !state.OpenedDoors.Contains((doorTile.X, doorTile.Y)),
+            _ => !state.OpenedDoors.Contains((tileX, tileY)),
         };
-        state.SetDoor(doorTile.X, doorTile.Y, open);
+        state.SetDoor(tileX, tileY, open);
         _outcome = open ? "A mechanism opens the door." : "A mechanism closes the door.";
+    }
+
+    /// <summary>
+    /// Whether a tile's own object chain carries a door: a static door is the
+    /// donor's majorclass 5 minorclass 0, and a moving door is majorclass 7,
+    /// minorclass 0, classindex 0xF.
+    /// </summary>
+    private bool TileHasDoor(int level, int tileX, int tileY)
+    {
+        if (_placements?.Tile(tileX, tileY) is not { } tile) return false;
+        int index = tile.ObjectHead;
+        var seen = new HashSet<int>();
+        while (index != 0 && seen.Add(index))
+        {
+            if (_session.PlacedObjectAt(level, index, out _) is not { } obj) return false;
+            int item = obj.ItemId;
+            int major = item >> 6;
+            int minor = (item & 0x30) >> 4;
+            if (major == DoorMajorClass && minor == 0) return true;
+            if (major == MovingDoorMajorClass && minor == 0 && (item & 0xF) == MovingDoorClassIndex) return true;
+            index = obj.Next;
+        }
+
+        return false;
     }
 
     /// <summary>Records what the avatar's light reaches on this level's map.</summary>

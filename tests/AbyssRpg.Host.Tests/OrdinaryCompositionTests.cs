@@ -88,7 +88,7 @@ public sealed class OrdinaryCompositionTests
         // identity the save would use for the same record.
         // Nine of the level's records are drawn: the poisoning trap stands on the
         // sixth tile, which is the outer edge of the avatar's light.
-        Assert.Equal(9, graphics.LastSnapshot.Count);
+        Assert.Equal(10, graphics.LastSnapshot.Count);
         Assert.All(graphics.LastSnapshot, fact =>
         {
             Assert.True(fact.Visible);
@@ -493,7 +493,7 @@ public sealed class OrdinaryCompositionTests
         product.Start();
         product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
-        (int doorX, int doorY) = TestContent.FirstLevelDoorTile;
+        (int doorX, int doorY) = (TestContent.TriggerLegTileX, TestContent.TriggerLegTileY);
         Assert.DoesNotContain((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
 
         spatial.StepTranslation = new System.Numerics.Vector3(
@@ -584,17 +584,18 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
-    public void A_pressure_plate_opens_the_door_it_is_wired_to()
+    public void A_pressure_plate_opens_the_door_standing_in_it()
     {
-        // The fixture places a door trap on tile (3,0) whose link names the door
-        // object standing on the door tile (1,1). Standing on the plate fires its
-        // chain, the door-trap action opens the door it names, and stepping off
-        // releases the plate so it can fire again -- all inside the admitted update.
+        // The fixture places a door trap on tile (3,0), and that tile's own object
+        // chain carries the door it acts on -- which is where the donor's door trap
+        // looks (majorclass 5 on the tile the trigger fired on), not at the trap's
+        // link. Standing on the plate opens that door; stepping off releases the
+        // plate so it can fire again.
         using AbyssProduct product = DrawProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial);
         product.Start();
         product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
-        (int doorX, int doorY) = TestContent.FirstLevelDoorTile;
+        (int doorX, int doorY) = (TestContent.PlateTileX, TestContent.PlateTileY);
         Assert.DoesNotContain((doorX, doorY), session.State.Dungeon.Current.OpenedDoors);
         Assert.Empty(session.State.Dungeon.Current.FiredTriggers);
 
@@ -623,7 +624,7 @@ public sealed class OrdinaryCompositionTests
 
         // And the door it opened is no longer standing in the doorway.
         ulong door = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
-            .LevelObjectIdentity(1, TestContent.DoorObjectIndex).Value;
+            .LevelObjectIdentity(1, TestContent.PlatedDoorObjectIndex).Value;
         Assert.False(Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == door).Visible);
     }
 
