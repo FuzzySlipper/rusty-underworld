@@ -760,21 +760,72 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         while (index != 0 && visited.Add(index) && _placements.Object(index) is { } obj)
         {
             index = obj.Next;
-            if (!state.IsLive(obj.Index) || Traps.UuTriggerPolicy.Type(_objectTables, obj.ItemId) is not { } type) continue;
+            if (!state.IsLive(obj.Index) || !obj.AvatarTriggerEnabled || Traps.UuTriggerPolicy.Type(_objectTables, obj.ItemId) is not { } type) continue;
             bool pressure = type is 7 or 15;
-            if (!entering && !pressure) state.Release(obj.Index);
+            if (!entering && !pressure && obj.RepeatsTrigger) state.Release(obj.Index);
             long weight = pressure ? TileWeight(tile, obj.Height, entering) : 0;
             if (!Traps.UuTriggerPolicy.Fires(type, entering, weight, obj.PressureThreshold))
             {
-                if (pressure) state.Release(obj.Index);
+                if (pressure && obj.RepeatsTrigger) state.Release(obj.Index);
                 continue;
             }
+            // Our one-shot state consumes this trigger, rather than deleting a
+            // potentially shared linked effect chain as the donor does.
             if (!state.Fire(obj.Index)) continue;
             FireTrigger(obj);
-            if (!entering && !pressure) state.Release(obj.Index);
+            if (!entering && !pressure && obj.RepeatsTrigger) state.Release(obj.Index);
             // A pit can replace the admitted level. Never continue its old chain
             // against the new level's records.
             if (_session.Dungeon.CurrentLevel != level || _player.Position != startingPosition) return;
+        }
+    }
+
+    private UuLevelPlacements? _pressurePlacements;
+    private (AdmittedObject Trigger, AdmittedTile Tile)[] _pressureTiles = [];
+    private readonly Dictionary<int, long> _pressureWeights = [];
+
+    // Weight changes caused by taking, dropping or moving an object are observed
+    // in the same admitted update as the ordinary interaction. No second clock.
+    private void EnsurePressureState()
+    {
+        if (_placements is null || _objectTables is null) return;
+        if (!ReferenceEquals(_pressurePlacements, _placements))
+        {
+            _pressurePlacements = _placements;
+            _pressureWeights.Clear();
+            var admission = _session.PlacedAdmission(_session.Dungeon.CurrentLevel);
+            _pressureTiles = _placements.Objects
+                .Where(o => o.AvatarTriggerEnabled && Traps.UuTriggerPolicy.Type(_objectTables, o.ItemId) is 7 or 15)
+                .Select(o => (Trigger: o, Tile: admission is not null && admission.Tiles.TryGetValue(o.Index, out var at)
+                    ? _placements.Tile(at.X, at.Y) : null))
+                .Where(pair => pair.Tile is not null)
+                .Select(pair => (pair.Trigger, pair.Tile!)).ToArray();
+            foreach (var (trigger, tile) in _pressureTiles)
+                _pressureWeights[trigger.Index] = TileWeight(tile, trigger.Height, AvatarTile == (tile.X, tile.Y));
+        }
+    }
+
+    private void TickPressureChanges()
+    {
+        EnsurePressureState();
+        if (_objectTables is null) return;
+        var state = _session.Dungeon.Current;
+        int level = state.LevelNumber;
+        foreach (var (trigger, tile) in _pressureTiles)
+        {
+            if (!state.IsLive(trigger.Index)) continue;
+            long weight = TileWeight(tile, trigger.Height, AvatarTile == (tile.X, tile.Y));
+            bool changed = _pressureWeights.TryGetValue(trigger.Index, out long previous) && previous != weight;
+            _pressureWeights[trigger.Index] = weight;
+            if (!changed) continue;
+            int type = Traps.UuTriggerPolicy.Type(_objectTables, trigger.ItemId)!.Value;
+            if (!Traps.UuTriggerPolicy.Fires(type, true, weight, trigger.PressureThreshold))
+            {
+                if (trigger.RepeatsTrigger) state.Release(trigger.Index);
+                continue;
+            }
+            if (state.Fire(trigger.Index)) FireTrigger(trigger);
+            if (_session.Dungeon.CurrentLevel != level) return;
         }
     }
 
@@ -853,14 +904,20 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// owner's; what each fired kind does is applied through the owner that already
     /// does it, so there is no second implementation of opening a door.
     /// </summary>
-    private void FireTrigger(AdmittedObject trigger)
+    private void FireTrigger(AdmittedObject trigger) =>
+        FireEffects(trigger.Link, trigger.Quality, trigger.Owner);
+
+    private void FireEffects(int head, int tileX, int tileY)
     {
         // RunTrapFromTrigger in the donor reads the destination tile from the
         // trigger's quality/owner, which need not be the tile holding the leg.
         AdmittedObject? teleport = null;
-        FireChainFrom(trigger.Link, trigger.Quality, trigger.Owner, [], trap => teleport = trap);
+        string? message = null;
+        FireChainFrom(head, tileX, tileY, [], trap => teleport = trap, text => message = text);
         // The donor queues teleportation until the source chain has finished.
         if (teleport is not null) ApplyTeleportTrap(teleport);
+        if (!string.IsNullOrEmpty(message))
+            _outcome = teleport is null ? message : $"{_outcome} {message}";
     }
 
     private void ApplyTeleportTrap(AdmittedObject trap)
@@ -891,7 +948,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// chain's later nodes name their own targets (donor: trap.FireChain and the
     /// trigger legs it hands back to their caller).
     /// </summary>
-    private void FireChainFrom(int head, int tileX, int tileY, HashSet<int> visited, Action<AdmittedObject> teleport)
+    private void FireChainFrom(int head, int tileX, int tileY, HashSet<int> visited, Action<AdmittedObject> teleport, Action<string> showText)
     {
         int level = _session.Dungeon.CurrentLevel;
         IReadOnlyList<(int Index, Traps.UuTrapDispatch.ChainNode Node, Traps.UuTrapDispatch.TrapKind Kind)> fired =
@@ -922,10 +979,15 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     break;
                 case Traps.UuTrapDispatch.TrapKind.TriggerLeg:
                     if (_placements?.Object(index) is { } leg)
-                        FireChainFrom(node.Link, leg.Quality, leg.Owner, visited, teleport);
+                        FireChainFrom(node.Link, leg.Quality, leg.Owner, visited, teleport, showText);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Teleport:
                     if (_placements?.Object(index) is { } destination) teleport(destination);
+                    break;
+                case Traps.UuTrapDispatch.TrapKind.TextString:
+                    // UW1 a_text_string_trap.cs: block 9, sixty-four entries per level.
+                    if (_placements?.Object(index) is { } textTrap)
+                        showText(_strings?.Text(9, 64 * (level - 1) + textTrap.Owner) ?? "");
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Spell:
                     if (_placements?.Object(index) is { } spellTrap)
@@ -947,6 +1009,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                         else _outcome = $"Trap spell {spellTrap.Quality}:{spellTrap.Owner} is not supported yet.";
                     }
                     break;
+                case Traps.UuTrapDispatch.TrapKind.Null:
+                    break;
+                default:
+                    showText($"Trap effect {kind} is not supported yet.");
+                    return;
             }
             if (_session.Dungeon.CurrentLevel != level) return;
         }
@@ -1277,6 +1344,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _tickCarry -= whole;
         if (whole > 0) _session.Clock.Advance(whole);
 
+        EnsurePressureState();
         UuLocomotionPolicy.UuPlayerStep step = _locomotion.BeginPlayerStep(
             _player, update.Input, (float)seconds, canMove: true, _session.Swimming, _session.Flying);
         StepLocomotion(step, update, seconds);
@@ -1284,6 +1352,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         TickProjectiles((float)seconds);
         TickAttack(step, (float)seconds);
         if (step.UsePressed && !_session.Flying) Interact();
+        if (step.LookPressed) Examine();
+        TickPressureChanges();
         _casting.Upkeep(_session.Clock.ElapsedTicks);
         TickSurvival(seconds);
         _camera.Update(_player);
@@ -1433,6 +1503,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 bool open = !_session.Dungeon.Current.OpenedDoors.Contains((door.X, door.Y));
                 _session.Dungeon.Current.SetDoor(door.X, door.Y, open);
                 _outcome = open ? "You open the door." : "You close the door.";
+                // UW1 door.cs dispatches OPEN (7); its CLOSE dispatch is UW2-only.
+                if (open)
+                {
+                    int doorIndex = door.ObjectHead;
+                    var seen = new HashSet<int>();
+                    while (doorIndex != 0 && seen.Add(doorIndex) && _placements.Object(doorIndex) is { } doorObject)
+                    {
+                        if (doorObject.ItemId is >= 320 and <= 335) RunObjectTriggers(doorObject, 7);
+                        doorIndex = doorObject.Next;
+                    }
+                }
                 return;
 
             case UuReachKind.Container or UuReachKind.Item when target.Object is { } placed:
@@ -1466,8 +1547,57 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// Engine keeps owning what is where, and a taken object leaves the level
     /// state the save carries.
     /// </summary>
+    private void Examine()
+    {
+        if (_player.Position is not { } position) return;
+        UuReachTarget target = InReach(position);
+        _outcome = target.Object is { } obj ? $"You examine the {Describe(obj.ItemId)}."
+            : target.Kind == UuReachKind.Door ? "You examine the door." : "There is nothing here to examine.";
+        if (target.Object is { } placed) RunObjectTriggers(placed, 5);
+    }
+
+    private bool RunObjectTriggers(AdmittedObject used, int type)
+    {
+        if (_placements is null || _objectTables is null || used.LinkIsQuantity) return false;
+        int level = _session.Dungeon.CurrentLevel;
+        var state = _session.Dungeon.Current;
+        var seen = new HashSet<int>();
+        int index = used.Link;
+        bool fired = false;
+        // trigger.cs TriggerObjectLink walks next links past locks/contents to
+        // matching trigger records; link is not an object reference for quantities.
+        while (index != 0 && seen.Add(index) && _placements.Object(index) is { } trigger)
+        {
+            index = trigger.Next;
+            if (!state.IsLive(trigger.Index)) continue;
+            if (type == 4 && trigger.Flags == 0 && trigger.ItemId is >= 384 and < 416
+                && Traps.UuTrapDispatch.ClassifyItem(trigger.ItemId) != Traps.UuTrapDispatch.TrapKind.Door)
+            {
+                if (!state.Fire(trigger.Index)) continue;
+                var at = _session.PlacedAdmission(level) is { } admission && admission.Tiles.TryGetValue(used.Index, out var tile)
+                    ? tile : AvatarTile;
+                FireEffects(trigger.Index, at.Item1, at.Item2);
+                return true;
+            }
+            if (!trigger.AvatarTriggerEnabled || Traps.UuTriggerPolicy.Type(_objectTables, trigger.ItemId) != type) continue;
+            if (type == 5 && trigger.SearchDifficulty > 0)
+            {
+                int search = (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{UuSkillCatalog.SearchIndex}")).Value;
+                if (Creation.UuSkillRolls.SkillCheck(search, trigger.SearchDifficulty, _rng) <= Creation.UuSkillRolls.CheckResult.Fail)
+                    continue;
+            }
+            if (trigger.RepeatsTrigger) state.Release(trigger.Index);
+            if (!state.Fire(trigger.Index)) continue;
+            FireTrigger(trigger);
+            fired = true;
+            if (_session.Dungeon.CurrentLevel != level) break;
+        }
+        return fired;
+    }
+
     private void Use(AdmittedObject placed)
     {
+        if (RunObjectTriggers(placed, 4)) return;
         if (_levelItems is not { } items)
         {
             _outcome = $"You see {Describe(placed.ItemId)} here.";
@@ -1509,10 +1639,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             CollectRune(rune);
             ShelfRune(rune);
             _outcome = $"You take the runestone and lay it on the shelf.";
+            RunObjectTriggers(placed, 2);
             return;
         }
 
         _outcome = $"You take the {Describe(placed.ItemId)}.";
+        RunObjectTriggers(placed, 2);
     }
 
     /// <summary>

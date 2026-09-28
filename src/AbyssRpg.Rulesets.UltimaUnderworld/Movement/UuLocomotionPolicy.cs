@@ -25,7 +25,7 @@ public sealed class UuLocomotionPolicy
 
     /// <summary>
     /// UW bindings: Standard WASD + mouse-look with Shift run, Space jump,
-    /// E use, and Q on the crouch channel for fly-descend.
+    /// E use, L examine, and Q on the crouch channel for fly-descend.
     /// </summary>
     public static FpsInputBindings UuBindings { get; } = FpsInputBindings.Standard with
     {
@@ -54,7 +54,8 @@ public sealed class UuLocomotionPolicy
         bool AttackHeld,
         bool AttackPressed,
         bool AttackReleased,
-        bool UsePressed);
+        bool UsePressed,
+        bool LookPressed);
 
     public (CharacterStepControls Controls, UuMoveIntent Intent) BeginStep(
         ReadOnlySpan<ProductInputEvent> inputs, float seconds, bool canMove, bool swimming, bool flying)
@@ -117,7 +118,8 @@ public sealed class UuLocomotionPolicy
             AttackReleased: _input.Physical.Released(PointerButton.Primary),
             // The use channel is the UW interaction verb: it opens a door the
             // avatar stands at, and doubles as fly-ascend while flying.
-            UsePressed: frame.UsePressed);
+            UsePressed: frame.UsePressed,
+            LookPressed: _input.Physical.Pressed(KeyboardControl.KeyL));
     }
 }
 

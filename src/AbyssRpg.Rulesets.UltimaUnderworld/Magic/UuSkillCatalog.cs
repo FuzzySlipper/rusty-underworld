@@ -14,6 +14,7 @@ public static class UuSkillCatalog
     ];
 
     public const int CastingIndex = 9;
+    public const int SearchIndex = 11;
     public const int MissileIndex = 6;
     public const int AttackIndex = 0;
     public const int DefenseIndex = 1;

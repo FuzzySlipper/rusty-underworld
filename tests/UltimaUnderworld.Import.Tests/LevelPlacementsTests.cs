@@ -91,7 +91,9 @@ public sealed class LevelPlacementsTests
         pack = pack with { Objects = objects };
         LevelPlacements.PlacedObject obj = LevelPlacements.Emit(pack).Objects[1];
         Assert.Equal(quantity, obj.Quantity);
+        Assert.Equal(flags == 128, obj.LinkIsQuantity);
         Assert.Equal(5.5d, obj.Height);
+        Assert.Equal(44, obj.SearchDifficulty);
         Assert.Equal(threshold, obj.PressureThreshold);
     }
 
@@ -123,7 +125,7 @@ public sealed class LevelPlacementsTests
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
         // Eighteen columns include normalized pressure, teleport and launch offsets.
-        Assert.Equal(18, root.GetProperty("objects")[0].GetArrayLength());
+        Assert.Equal(20, root.GetProperty("objects")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("objects")[0][11].GetInt32());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }

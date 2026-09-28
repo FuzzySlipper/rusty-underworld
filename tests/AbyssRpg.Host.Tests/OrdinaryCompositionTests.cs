@@ -506,6 +506,189 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal("A mechanism opens the door.", HudString(ui.LastProjection!.Value.Value, "outcome"));
     }
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(127, false)]
+    public void Look_uses_the_existing_search_check_before_consuming_a_trigger(int difficulty, bool fires)
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("[500,0,200,0,0,0,0,0,-1,-1,5]", "[500,0,200,0,0,0,0,514,-1,-1,5]")
+            .Replace("[514,0,420,6,5,0,0,521,-1,-1,-1,-1]",
+                $"[514,0,419,4,5,0,0,521,-1,-1,0,0,1,0,4,0,0.5,0.5,0,{difficulty}]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        session.State.Avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.skill.11")).BaseValue = 30;
+        int hp = session.Status.Hp;
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 12f);
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyL, InputEdge.Pressed)]));
+        Assert.Equal(hp - (fires ? TestContent.DamageTrapQuality : 0), session.Status.Hp);
+        Assert.Equal(fires, session.State.Dungeon.Current.FiredTriggers.Contains(514));
+    }
+
+    [Fact]
+    public void A_direct_use_trap_runs_once_across_save_and_load()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[500,0,200,0,0,0,0,0,-1,-1,5]", "[500,0,200,0,0,0,0,521,-1,-1,5]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int hp = session.Status.Hp;
+        UseAt(product, spatial, 2, 4f, 12f);
+        Assert.Equal(hp - TestContent.DamageTrapQuality, session.Status.Hp);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        UseAt(product, spatial, 4, 4f, 12f);
+        Assert.Equal(hp - TestContent.DamageTrapQuality, session.Status.Hp);
+    }
+
+    [Fact]
+    public void An_unimplemented_branch_reports_the_gap_instead_of_running_its_true_arm()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]", "[521,0,398,0,5,0,0,522,-1,-1,-1,-1]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(0, session.State.Survival.Poison);
+        Assert.Contains("CheckVariable is not supported", session.Status.Outcome);
+    }
+
+    [Theory]
+    [InlineData(417, false)]
+    [InlineData(418, false)]
+    [InlineData(419, false)]
+    [InlineData(417, true)]
+    [InlineData(418, true)]
+    [InlineData(419, true)]
+    public void Ordinary_object_actions_dispatch_matching_links_but_never_quantity_links(int triggerItem, bool quantity)
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("[500,0,200,0,0,0,0,0,-1,-1,5]",
+                $"[500,0,200,0,0,0,0,514,-1,-1,5,0,1,0,4,0,0.5,0.5,{(quantity ? 1 : 0)}]")
+            .Replace("[514,0,420,6,5,0,0,521", $"[514,0,{triggerItem},6,5,0,0,521"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int hp = session.Status.Hp;
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 12f);
+        product.Update(new ProductUpdate(Facts(2), [Key(triggerItem == 419 ? KeyboardControl.KeyL : KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Assert.Equal(hp - (quantity ? 0 : TestContent.DamageTrapQuality), session.Status.Hp);
+        Assert.Equal(triggerItem == 417 || (quantity && triggerItem != 419), !session.State.Dungeon.Current.IsLive(500));
+    }
+
+    [Fact]
+    public void Door_open_follows_lock_next_to_its_open_trigger()
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("[512,0,200,0,0,0,0,0,-1,-1,-1]", "[512,0,320,0,0,0,0,502,-1,-1,-1]")
+            .Replace("[502,0,128,0,0,0,0,503", "[502,0,271,0,0,514,0,503")
+            .Replace("[514,0,420,6,5,0,0,521", "[514,0,421,6,5,0,0,521"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int hp = session.Status.Hp;
+        UseAt(product, spatial, 2, 12f, 12f);
+        Assert.Equal(hp - TestContent.DamageTrapQuality, session.Status.Hp);
+        UseAt(product, spatial, 4, 12f, 12f);
+        Assert.Equal(hp - TestContent.DamageTrapQuality, session.Status.Hp);
+    }
+
+    [Fact]
+    public void Text_after_teleport_uses_source_level_strings_and_remains_visible()
+    {
+        ProductContent content = TestContent.Build(edit: json => json
+            .Replace("\"blocks\": {", "\"blocks\": { \"9\": [\"\",\"Words on the wall.\"],")
+            .Replace("[521,0,384,0,5,0,0,0,-1,-1,-1,-1]", "[521,0,385,0,1,0,0,522,-1,-1,-1,-1,1,0,4,0]")
+            .Replace("[522,0,384,0,5,0,1,0,-1,-1,-1,-1]", "[522,0,400,0,55,0,1,0,-1,-1,-1,-1]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(12f, session.PlayerPosition!.Value.X);
+        Assert.Contains("Words on the wall.", session.Status.Outcome);
+        Assert.Contains("teleport", session.Status.Outcome);
+    }
+
+    [Fact]
+    public void Removing_weight_fires_a_release_trigger_once_until_reloaded()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0]", "[0,2,4,5,1,15,6,0,0,0,0,0,0,0,0,0]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out _, content);
+        product.Start();
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var state = session.State.Dungeon.Current;
+        var weight = new AbyssRpg.Rulesets.UltimaUnderworld.Dungeon.DroppedPlacement(3, 0, 200, 0, 30, 9000);
+        state.Drop(weight);
+        product.Update(SixtyHzUpdate(1));
+        Assert.DoesNotContain((3, 0), state.OpenedDoors);
+        state.Lift(weight);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Contains((3, 0), state.OpenedDoors);
+        state.SetDoor(3, 0, false);
+        product.Update(SixtyHzUpdate(3));
+        Assert.DoesNotContain((3, 0), state.OpenedDoors);
+        state.Drop(weight);
+        product.Update(SixtyHzUpdate(4));
+        state.Lift(weight);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Contains((3, 0), state.OpenedDoors);
+    }
+
+    [Fact]
+    public void Dropped_weight_fires_and_releases_a_plate_without_avatar_movement()
+    {
+        using AbyssProduct product = DrawProduct(out _, out _, out _);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var state = session.State.Dungeon.Current;
+        var weight = new AbyssRpg.Rulesets.UltimaUnderworld.Dungeon.DroppedPlacement(3, 0, 200, 0, 30, 9000);
+        state.Drop(weight);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Contains((3, 0), state.OpenedDoors);
+        state.SetDoor(3, 0, false);
+        product.Update(SixtyHzUpdate(3));
+        Assert.DoesNotContain((3, 0), state.OpenedDoors);
+        state.Lift(weight);
+        product.Update(SixtyHzUpdate(4));
+        Assert.DoesNotContain(TestContent.PlateObjectIndex, state.FiredTriggers);
+        state.Drop(weight);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Contains((3, 0), state.OpenedDoors);
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(2, 0)]
+    [InlineData(4, 1)]
+    [InlineData(6, 2)]
+    public void Avatar_enable_and_repeat_flags_survive_reentry_and_load(int flags, int strikes)
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[514,0,420,6,5,0,0,521", $"[514,0,420,{flags},5,0,0,521"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int health = session.Status.Hp;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        product.Update(SixtyHzUpdate(3));
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(4));
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Equal(health - strikes * TestContent.DamageTrapQuality, session.Status.Hp);
+    }
+
     [Fact]
     public void A_light_trap_changes_visibility_survives_load_and_expires_in_casting_owner()
     {
@@ -870,7 +1053,7 @@ public sealed class OrdinaryCompositionTests
     public void A_trap_effect_on_a_tile_is_not_itself_a_movement_trigger()
     {
         ProductContent content = TestContent.Build(edit: json => json.Replace(
-            "[514,0,420,0,5,0,0,521", "[514,0,384,0,5,0,0,521"));
+            "[514,0,420,6,5,0,0,521", "[514,0,384,0,5,0,0,521"));
         using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
         product.Start();
         product.Update(SixtyHzUpdate(1));

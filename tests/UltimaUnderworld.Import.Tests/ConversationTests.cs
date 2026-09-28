@@ -33,6 +33,8 @@ public sealed class ConversationTests
         // the ones the scripts name, plus the name and message blocks.
         Assert.Contains(ConversationPack.NameBlock, blocks.Blocks.Keys);
         Assert.Contains(ConversationPack.MessageBlock, blocks.Blocks.Keys);
+        Assert.Equal(StringsPakReader.Decode(strings).Blocks[9].ToArray(), blocks.Blocks[9].ToArray());
+        Assert.False(string.IsNullOrWhiteSpace(blocks.Blocks[9][64])); // level 2 text trap 591
         foreach (ConversationPack.Conversation conversation in catalog.Conversations.Where(c => c.StringBlock > 0))
             Assert.Contains(conversation.StringBlock, blocks.Blocks.Keys);
     }

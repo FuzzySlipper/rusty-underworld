@@ -22,7 +22,7 @@ public static class LevelPlacements
     public sealed record PlacedObject(
         int Index, bool Mobile, int ItemId, int Flags, int Quality, int Next, int Owner, int Link,
         int HomeTileX, int HomeTileY, int Heading, int WhoAmI,
-        int Quantity, double Height, int PressureThreshold, int DestinationLevel, double TileOffsetX, double TileOffsetY);
+        int Quantity, double Height, int PressureThreshold, int DestinationLevel, double TileOffsetX, double TileOffsetY, bool LinkIsQuantity, int SearchDifficulty);
 
     public sealed record Placements(
         int Level,
@@ -54,7 +54,7 @@ public static class LevelPlacements
                     obj.Index, obj.IsMobile, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
                     homeX, homeY, Heading(obj), WhoAmI(obj),
                     Quantity(obj), Height(obj), PressureThreshold(obj),
-                    DestinationLevel(obj), (obj.Raw[3] >> 5) / 8d, ((obj.Raw[3] >> 2) & 7) / 8d);
+                    DestinationLevel(obj), (obj.Raw[3] >> 5) / 8d, ((obj.Raw[3] >> 2) & 7) / 8d, (obj.Raw[1] & 0x80) != 0, obj.Raw[2] & 0x7F);
             })
             .ToArray();
         return new Placements(
@@ -153,7 +153,7 @@ public static class LevelPlacements
             {
                 obj.Index, obj.Mobile ? 1 : 0, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
                 obj.HomeTileX, obj.HomeTileY, obj.Heading, obj.WhoAmI,
-                obj.Quantity, obj.Height, obj.PressureThreshold, obj.DestinationLevel, obj.TileOffsetX, obj.TileOffsetY,
+                obj.Quantity, obj.Height, obj.PressureThreshold, obj.DestinationLevel, obj.TileOffsetX, obj.TileOffsetY, obj.LinkIsQuantity ? 1 : 0, obj.SearchDifficulty,
             }),
         };
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = false });

@@ -29,6 +29,14 @@ public sealed record AdmittedObject(
     int PressureThreshold = 4,
     int DestinationLevel = 0,
     double TileOffsetX = 0.5,
-    double TileOffsetY = 0.5);
+    double TileOffsetY = 0.5,
+    int Flags = 6,
+    bool LinkIsQuantity = false,
+    int SearchDifficulty = 0)
+{
+    // UW1 trigger.cs: avatar enable and repeat are ruleset meanings of pack flags.
+    public bool AvatarTriggerEnabled => (Flags & 4) != 0;
+    public bool RepeatsTrigger => (Flags & 2) != 0;
+}
 
 public sealed record AdmittedLevel(int LevelNumber, AdmittedTile[] Tiles, AdmittedObject[] Objects);

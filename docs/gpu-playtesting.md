@@ -1,5 +1,12 @@
 # Crew GPU playtesting
 
+## Interaction controls
+
+`E` uses the current in-reach target (take, container, door, or linked Use trigger).
+`L` examines that same target and dispatches its linked Look triggers. Pickup
+triggers run after a successful take. Door-open triggers use the UW1 open event;
+closing does not dispatch the donor's UW2-only close event.
+
 ## Start the product
 
 Install the pinned Engine pair with `scripts/install-engine-pair.sh` if needed,

@@ -54,7 +54,8 @@ public static class ConversationPack
     /// The blocks the conversations reference, plus the two the game's own name
     /// and message text live in: block 7 holds creature names and conversation
     /// prompts, block 1 the stock messages (donor: src/utility/StringLoader.cs
-    /// and src/conversation/conversationinitialisation.cs).
+    /// and src/conversation/conversationinitialisation.cs). Block 9 holds UW1
+    /// text-trap messages (src/traps/a_text_string_trap.cs).
     /// </summary>
     public static Strings EmitStrings(
         Catalog catalog,
@@ -65,7 +66,7 @@ public static class ConversationPack
         ArgumentNullException.ThrowIfNull(decoded);
         ArgumentNullException.ThrowIfNull(provenance);
 
-        var wanted = new SortedSet<int> { NameBlock, MessageBlock };
+        var wanted = new SortedSet<int> { NameBlock, MessageBlock, 9 };
         foreach (Conversation conversation in catalog.Conversations)
         {
             if (conversation.StringBlock > 0) wanted.Add(conversation.StringBlock);
