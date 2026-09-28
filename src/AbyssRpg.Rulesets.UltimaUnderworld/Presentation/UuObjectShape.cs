@@ -33,6 +33,7 @@ public readonly record struct UuObjectShape(
 /// <summary>The few shapes an admitted record is currently drawn as.</summary>
 public enum UuObjectShapeKind
 {
+    Projectile,
     Item,
     Container,
     Creature,

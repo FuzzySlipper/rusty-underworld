@@ -101,10 +101,13 @@ public sealed class LevelPlacementsTests
         LevArkReader.LevelPack pack = Pack();
         byte[] raw = new byte[LevArkReader.StaticRecordSize];
         raw[2] = 2;
+        raw[3] = (byte)((6 << 5) | (3 << 2));
         var objects = pack.Objects.ToArray();
         objects[1] = objects[1] with { ItemId = 385, Raw = raw };
         var obj = LevelPlacements.Emit(pack with { Objects = objects }).Objects[1];
         Assert.Equal(2, obj.DestinationLevel);
+        Assert.Equal(0.75d, obj.TileOffsetX);
+        Assert.Equal(0.375d, obj.TileOffsetY);
         Assert.Equal(0.25d, obj.Height);
     }
 
@@ -119,8 +122,8 @@ public sealed class LevelPlacementsTests
         Assert.Equal(1.0, root.GetProperty("heightUnitsPerStep").GetDouble());
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
-        // Sixteen columns include normalized pressure values and teleport destination.
-        Assert.Equal(16, root.GetProperty("objects")[0].GetArrayLength());
+        // Eighteen columns include normalized pressure, teleport and launch offsets.
+        Assert.Equal(18, root.GetProperty("objects")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("objects")[0][11].GetInt32());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }

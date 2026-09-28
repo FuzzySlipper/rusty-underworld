@@ -42,6 +42,11 @@ public sealed class UuCombatHosting
         if (roll is UuStrikeResolution.StrikeResult.Fail or UuStrikeResolution.StrikeResult.CritFail)
             return new StrikeOutcome(false, 0, false);
         int damage = UuStrikeResolution.ScaleByCharge(UuStrikeResolution.RollDamage(damageSides, rng), charge);
+        return ApplyImpact(target, damage);
+    }
+
+    public static StrikeOutcome ApplyImpact(StatsComponent target, int damage)
+    {
         Track targetHp = target.GetTrack(UuAvatarFactory.DefeatTrack);
         targetHp.Current = Math.Max(0, targetHp.Current - damage);
         return new StrikeOutcome(true, damage, targetHp.Current <= 0);

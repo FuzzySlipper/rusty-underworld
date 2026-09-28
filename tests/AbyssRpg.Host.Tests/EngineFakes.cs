@@ -200,6 +200,13 @@ internal class EngineSpatialDouble : DispatchProxy
 
     /// <summary>Sessions the Engine was asked to create; nothing else proves work was reached.</summary>
     internal int SessionsCreated { get; private set; }
+    internal List<SpatialRaycastRequest> RayRequests { get; } = [];
+    internal Func<SpatialRaycastRequest, SpatialHit>? RayHit { get; set; }
+    private SpatialHit CastRay(SpatialRaycastRequest request)
+    {
+        RayRequests.Add(request);
+        return RayHit?.Invoke(request) ?? default;
+    }
 
     /// <summary>Content artifact replacements the product asked for, in order.</summary>
     internal List<SpatialContentArtifactReplaceRequest> ContentReplacements { get; } = [];
@@ -227,6 +234,7 @@ internal class EngineSpatialDouble : DispatchProxy
 
     protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
     {
+        nameof(ISpatialService.CastRay) => CastRay((SpatialRaycastRequest)arguments![0]!),
         nameof(ISpatialService.DefaultCharacterControllerConfig) => RepresentativeConfig(),
         nameof(ISpatialService.ValidateCharacterControllerConfig) => null,
         nameof(ISpatialService.CreateSession) => Created(),

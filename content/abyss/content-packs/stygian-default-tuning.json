@@ -2,5 +2,7 @@
   "id": "abyssrpg.stygian-default",
   "provenance": "authored",
   "clockTicksPerSecond": 255,
-  "movement": "default"
+  "movement": "default",
+  "projectileSpeed": 24,
+  "projectileLifetimeSeconds": 8
 }

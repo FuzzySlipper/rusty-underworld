@@ -12,6 +12,10 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Content;
 /// </summary>
 public sealed record UuTuningProfile(double ClockTicksPerSecond, UuMovementTuning Movement)
 {
+    // Ours: travel speed and lifetime are product tuning, not donor physics units.
+    public float ProjectileSpeed { get; init; } = 24f;
+    public float ProjectileLifetimeSeconds { get; init; } = 8f;
+
     public const string DefaultMovement = "default";
 
     public static UuTuningProfile Read(ReadOnlyMemory<byte> payload, string payloadLabel)
@@ -50,7 +54,12 @@ public sealed record UuTuningProfile(double ClockTicksPerSecond, UuMovementTunin
                     $"'{payloadLabel}' selects movement '{movement}'; this ruleset has only '{DefaultMovement}'.");
             }
 
-            return new UuTuningProfile(clockTicks, UuMovementTuning.Default.Validate());
+            float speed = root.TryGetProperty("projectileSpeed", out var speedValue) ? speedValue.GetSingle() : 24f;
+            float lifetime = root.TryGetProperty("projectileLifetimeSeconds", out var lifetimeValue) ? lifetimeValue.GetSingle() : 8f;
+            if (!float.IsFinite(speed) || speed <= 0 || !float.IsFinite(lifetime) || lifetime <= 0)
+                throw new InvalidOperationException($"'{payloadLabel}' projectile speed and lifetime must be positive.");
+            return new UuTuningProfile(clockTicks, UuMovementTuning.Default.Validate())
+                { ProjectileSpeed = speed, ProjectileLifetimeSeconds = lifetime };
         }
     }
 }

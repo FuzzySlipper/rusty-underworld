@@ -33,6 +33,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 {
     /// <summary>Skill index the melee check rolls against (UW1 skill 0 is Attack).</summary>
     public const int AttackSkill = 0;
+    private readonly ProjectileFlights _projectiles = new();
+    public IReadOnlyList<ProjectileFlight> Projectiles => _projectiles.Active;
 
     /// <summary>Melee reach in Engine units; a swing resolves against an opponent inside it.</summary>
     public const float MeleeReach = 6f;
@@ -671,6 +673,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             }
         }
 
+        foreach (ProjectileFlight flight in _projectiles.Active)
+        {
+            var shape = new UuObjectShape(UuObjectShapeKind.Projectile, .35f, .35f, .35f, new Color(1f, .4f, .05f, 1f));
+            // Transient flight identities occupy a separate JSON-safe presentation range.
+            facts.Add(new AppearanceFact((1UL << 40) + flight.Id, false, 0,
+                new Transform(flight.Position, Quaternion.Identity, new Vector3(.35f)),
+                ObjectAppearance(shape, 0), true, RenderLayer.Scene));
+        }
         _context.Engine.Graphics.PublishSnapshot(CollectionsMarshal.AsSpan(facts));
         // Removals are what play does to the level, so the drawn set is signed by
         // how many records are still live rather than by the admission-time count.
@@ -923,7 +933,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                         Track health = _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack);
                         var cast = _casting.CastTrap(spellTrap.Quality, spellTrap.Owner,
                             (int)(health.MaximumValue - health.Current));
-                        if (cast.Supported)
+                        if (cast.ProjectileItem != 0)
+                        {
+                            LaunchTrapProjectile(spellTrap, cast.ProjectileItem, tileX, tileY);
+                        }
+                        else if (cast.Supported)
                         {
                             health.Restore(cast.Healing);
                             _outcome = $"A healing trap restores {cast.Healing} health.";
@@ -1265,6 +1279,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _player, update.Input, (float)seconds, canMove: true, _session.Swimming, _session.Flying);
         StepLocomotion(step, update, seconds);
         TickTriggers();
+        TickProjectiles((float)seconds);
         TickAttack(step, (float)seconds);
         if (step.UsePressed && !_session.Flying) Interact();
         _casting.Upkeep(_session.Clock.ElapsedTicks);
@@ -1291,6 +1306,64 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (fallDamage > 0f) ApplyDefeatDamage(fallDamage, "The fall hurts.");
         _session.Avatar.Actor.Get<ActorBody>().Pose =
             new ActorPose(WorldPoint.From(confirmed.Transform.Translation), _player.YawRadians);
+    }
+
+    private void LaunchProjectile(int item, ulong source, Vector3 position, Vector3 direction)
+    {
+        if (_objectTables is null) return;
+        int damage = UuStrikeResolution.RollDamage(
+            UuMissilePolicy.ProjectileMaximum(_objectTables.ProjectileDamage[item - 16]), _rng);
+        _projectiles.Launch(source, item, damage, position,
+            Vector3.Normalize(direction) * _tuning.ProjectileSpeed, _tuning.ProjectileLifetimeSeconds);
+    }
+
+    private void LaunchTrapProjectile(AdmittedObject trap, int item, int targetX, int targetY)
+    {
+        if (_placements is null) return;
+        // Static caster coordinates come from its tile chain and normalized local
+        // offsets (donor motion_projectile.cs PrepareProjectileObject).
+        int x = targetX, y = targetY;
+        if (_session.PlacedAdmission(_session.Dungeon.CurrentLevel) is { } admission
+            && admission.Tiles.TryGetValue(trap.Index, out var tile)) (x, y) = tile;
+        Vector3 position = new((float)((x + trap.TileOffsetX) * _placements.UnitsPerTile),
+            (float)(trap.Height * _placements.HeightUnitsPerStep),
+            (float)((y + trap.TileOffsetY) * _placements.UnitsPerTile));
+        float heading = trap.Heading * MathF.Tau / 8f;
+        LaunchProjectile(item, 0, position, new Vector3(MathF.Sin(heading), 0, MathF.Cos(heading)));
+        _outcome = "A trap releases a spell.";
+    }
+
+    private void TickProjectiles(float seconds)
+    {
+        bool hadFlights = _projectiles.Active.Count > 0;
+        if (!hadFlights) return;
+        var colliders = new List<SpatialEntityCollider>
+        {
+            _movement.ProjectCharacterCollider(_player, (ulong)_session.Avatar.DurableId),
+        };
+        foreach (ActorState actor in PlacedCritters.Values)
+        {
+            if (actor.IsDefeated) continue;
+            Vector3 at = actor.Position.ToVector();
+            UuObjectShape shape = UuObjectShape.Of(0, true, false);
+            colliders.Add(new SpatialEntityCollider((ulong)actor.DurableId,
+                at - new Vector3(shape.Width / 2, 0, shape.Depth / 2),
+                at + new Vector3(shape.Width / 2, shape.Height, shape.Depth / 2),
+                0, 0, true, false, false));
+        }
+        _projectiles.Step(seconds, _movement, colliders, (flight, hit) =>
+        {
+            if (hit.Entity == (ulong)_session.Avatar.DurableId)
+                ApplyDefeatDamage(flight.Damage, $"A spell strikes you for {flight.Damage}.");
+            else if (PlacedCritters.Values.FirstOrDefault(a => (ulong)a.DurableId == hit.Entity) is { } target)
+            {
+                UuCombatHosting.StrikeOutcome strike = UuCombatHosting.ApplyImpact(target.Stats, flight.Damage);
+                if (strike.TargetDefeated) RecordDefeat(target);
+                _outcome = $"The spell strikes for {flight.Damage}.";
+            }
+            else _outcome = "The spell strikes the dungeon.";
+        });
+        if (_appearance is not null) PublishScene(_appearance);
     }
 
     private void TickAttack(UuLocomotionPolicy.UuPlayerStep step, float seconds)
@@ -1770,6 +1843,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         // The level left behind keeps what happened on it, in the session's own
         // stored deltas, and its actors leave the world with it.
+        _projectiles.Clear(); // Flights cannot cross an unloaded level. Saves retain live flights.
         _session.TravelTo(admitted, costTicks);
         AbandonActors(from);
 
@@ -1903,6 +1977,19 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return outcome;
         }
 
+        if (outcome.Gate == UuCastGates.GateResult.Cast && outcome.PrimedForAim)
+        {
+            string runes = UuRuneCatalog.SpellLetters(_casting.Panel().Shelf);
+            int item = runes switch { "OJ" => 23, "OG" => 21, "PF" => 20, _ => 0 };
+            if (item != 0 && _player.Position is { } position)
+            {
+                float yaw = _player.YawRadians, pitch = _player.PitchRadians;
+                Vector3 direction = new(MathF.Sin(yaw) * MathF.Cos(pitch), -MathF.Sin(pitch), -MathF.Cos(yaw) * MathF.Cos(pitch));
+                LaunchProjectile(item, (ulong)_session.Avatar.DurableId, position.ToVector(), direction);
+                _outcome = "You release the spell.";
+                return outcome with { PrimedForAim = false };
+            }
+        }
         _outcome = outcome.Gate == UuCastGates.GateResult.Cast
             ? outcome.PrimedForAim ? "The spell waits for a target." : "The spell takes hold."
             : $"The cast fails ({outcome.Gate}).";
@@ -1941,6 +2028,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             new AvatarPoseDto(position.X, position.Y, position.Z, _player.YawRadians)) with
         {
             Holdings = CaptureHoldings(),
+            Projectiles = _projectiles.Active.ToArray(),
         };
         return new RulesetSavePayload(UuGameRuleset.RulesetIdentity, UuSessionSnapshotCodec.Encode(snapshot));
     }
@@ -2031,6 +2119,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// </summary>
     private void RestoreWorld(UuSessionSnapshot snapshot)
     {
+        _projectiles.Restore(snapshot.Projectiles ?? []);
         if (_levelItems is null) return;
         // Held until each level is admitted: a save names owners on levels the
         // restored session has not stood in yet, and their contents are applied

@@ -16,7 +16,8 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Content;
 public sealed record UuObjectTables(
     IReadOnlyDictionary<int, UuCritterFactory.CritterDefinition> Critters,
     IReadOnlyDictionary<int, UuContainerDefinition> Containers,
-    IReadOnlyList<int> TriggerTypes);
+    IReadOnlyList<int> TriggerTypes,
+    IReadOnlyList<int> ProjectileDamage);
 
 /// <summary>One container item id's source capacity and mask, with its class index.</summary>
 public sealed record UuContainerDefinition(
@@ -109,7 +110,13 @@ public static class UuObjectTablesContent
             triggerTypes[triggerIndex++] = type;
         }
 
-        return new UuObjectTables(critters, containers, triggerTypes);
+        if (!root.TryGetProperty("projectileDamage", out JsonElement damageRows)
+            || damageRows.ValueKind != JsonValueKind.Array || damageRows.GetArrayLength() != 16)
+            throw new InvalidOperationException($"'{payloadLabel}' must define 16 projectileDamage values; regenerate the object-tables import.");
+        int[] damage = damageRows.EnumerateArray().Select(row => row.GetInt32()).ToArray();
+        if (damage.Any(value => value < 0 || value > byte.MaxValue))
+            throw new InvalidOperationException($"'{payloadLabel}' projectileDamage must contain byte values.");
+        return new UuObjectTables(critters, containers, triggerTypes, damage);
     }
 
     private static JsonDocument Parse(ReadOnlyMemory<byte> payload, string label)

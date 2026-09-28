@@ -507,6 +507,96 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_runic_projectile_uses_the_same_flight_owner()
+    {
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial,
+            TestContent.Build(defaultClass: "druid"));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        foreach (char letter in "OJ")
+        {
+            int rune = Enumerable.Range(0, 24).Single(i => AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuRuneCatalog.Letter(i) == letter);
+            session.CollectRune(rune); session.ShelfRune(rune);
+        }
+        var mana = session.State.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.ManaTrack);
+        mana.Maximum.BaseValue = 30; mana.Current = 30;
+        session.State.Avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.skill.8")).BaseValue = 30;
+        var result = session.AttemptCast(1);
+        Assert.False(result.PrimedForAim);
+        Assert.Equal(27, mana.Current);
+        var flight = Assert.Single(session.Projectiles);
+        Assert.Equal(23, flight.Kind);
+        Assert.Equal((ulong)session.State.Avatar.DurableId, flight.Source);
+        product.Update(SixtyHzUpdate(2));
+        Assert.NotEqual(flight.Position, Assert.Single(session.Projectiles).Position);
+        Assert.Single(spatial.RayRequests);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Spell_projectile_travels_then_Engine_hit_resolves_once(bool avatarHit)
+    {
+        ProductContent content = TestContent.Build(withSecondLevel: true, edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
+            "[521,0,390,0,5,0,3,0,-1,-1,0,-1,1,1,4,0,0.5,0.5]"));
+        using AbyssProduct product = DrawProduct(out _, out GraphicsDouble graphics, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        var flight = Assert.Single(session.Projectiles);
+        Assert.Equal(20, flight.Kind);
+        Assert.InRange(flight.Damage, 1, 12);
+        Assert.True(flight.Z > 4f);
+        Assert.Single(spatial.RayRequests);
+        Assert.Contains(graphics.LastSnapshot, f => f.ObjectId == ((1UL << 40) + flight.Id));
+        // Engine render-projection accepts only JSON-safe integer identities.
+        Assert.All(graphics.LastSnapshot, fact => Assert.InRange(fact.ObjectId, 1UL, 9_007_199_254_740_991UL));
+        product.PauseCommand();
+        product.Update(SixtyHzUpdate(3));
+        Assert.Equal(flight, Assert.Single(session.Projectiles));
+        product.PlayCommand();
+        spatial.RayHit = _ => default(SpatialHit) with { Present = true,
+            Entity = avatarHit ? (ulong)session.State.Avatar.DurableId : 0 };
+        int hp = session.Status.Hp;
+        product.Update(SixtyHzUpdate(4));
+        Assert.Empty(session.Projectiles);
+        Assert.Equal(avatarHit ? hp - flight.Damage : hp, session.Status.Hp);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Empty(session.Projectiles);
+    }
+
+    [Fact]
+    public void Projectiles_survive_json_save_and_expire_or_leave_with_the_level()
+    {
+        ProductContent content = TestContent.Build(withSecondLevel: true, edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
+            "[521,0,390,0,5,0,3,0,-1,-1,0,-1,1,1,4,0,0.5,0.5]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        var saved = AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionSnapshotCodec.Decode(session.CaptureSave().Bytes.ToArray());
+        Assert.Equal(Assert.Single(session.Projectiles), Assert.Single(saved.Projectiles!));
+        string flightSave = product.Quicksave();
+        Assert.True(product.LoadSlot(flightSave));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(Assert.Single(saved.Projectiles!), Assert.Single(session.Projectiles));
+        for (int frame = 3; frame < 500; frame++) product.Update(SixtyHzUpdate((ulong)frame));
+        Assert.Empty(session.Projectiles);
+        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+        product.Update(SixtyHzUpdate(501));
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(502));
+        Assert.Single(session.Projectiles);
+        session.TravelToLevel(2, 0);
+        Assert.Empty(session.Projectiles);
+    }
+
+    [Fact]
     public void Using_a_trigger_tile_preserves_its_wiring()
     {
         using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial);

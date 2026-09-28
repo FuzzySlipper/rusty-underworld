@@ -73,13 +73,15 @@ try
 
     // A chain the runtime cannot walk would silently drop the objects behind
     // the break, so the tool refuses to emit a level whose placements are
-    // malformed (out-of-range index, cycle, or a spawn inside lava).
+    // malformed (out-of-range index or cycle). Lava placements occur in the
+    // shipped lower levels; report the hazard without changing source content.
     IReadOnlyList<LevArkReader.PlacementIssue> issues = LevArkReader.ValidatePlacement(pack, terrain);
-    if (issues.Count > 0)
+    foreach (LevArkReader.PlacementIssue issue in issues.Take(10))
+        Console.Error.WriteLine($"placement {(issue.Kind == "spawn-on-lava" ? "warning" : "issue")}: {issue.Kind} at tile ({issue.TileX},{issue.TileY}) object {issue.ObjectIndex}");
+    int malformed = issues.Count(issue => issue.Kind != "spawn-on-lava");
+    if (malformed > 0)
     {
-        foreach (LevArkReader.PlacementIssue issue in issues.Take(10))
-            Console.Error.WriteLine($"placement issue: {issue.Kind} at tile ({issue.TileX},{issue.TileY}) object {issue.ObjectIndex}");
-        throw new InvalidDataException($"Level {level} has {issues.Count} placement issue(s); refusing to emit it.");
+        throw new InvalidDataException($"Level {level} has {malformed} malformed placement chain(s); refusing to emit it.");
     }
 
     LevelPlacements.Placements placements = LevelPlacements.Emit(pack, options);

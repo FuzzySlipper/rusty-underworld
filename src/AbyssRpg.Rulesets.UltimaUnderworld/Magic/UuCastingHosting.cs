@@ -38,7 +38,7 @@ public sealed class UuCastingHosting
 
     public void ClearShelf() => _shelf.Clear();
 
-    public sealed record TrapCastOutcome(bool Supported, int Healing);
+    public sealed record TrapCastOutcome(bool Supported, int Healing, int ProjectileItem = 0);
 
     /// <summary>
     /// A trap supplies its spell class directly, without runes, mana or a casting
@@ -48,6 +48,8 @@ public sealed class UuCastingHosting
     /// </summary>
     public TrapCastOutcome CastTrap(int major, int minor, int missingHealth)
     {
+        if (major == 5 && minor is >= 1 and <= 4)
+            return new(true, 0, minor switch { 1 => 23, 2 => 21, 3 => 20, _ => 22 });
         if (major != 4 || minor < 0 || minor > 63) return new(false, 0);
         int healing = 0;
         if (minor == 15) healing = missingHealth;

@@ -33,6 +33,7 @@ public static class ObjectTablePack
         IReadOnlyList<CritterRow> Critters,
         IReadOnlyList<ContainerRow> Containers,
         IReadOnlyList<int> TriggerTypes,
+        IReadOnlyList<int> ProjectileDamage,
         UwTableProvenance Provenance);
 
     public static Tables Emit(ObjectsDatReader.ObjectTables tables, UwTableProvenance provenance)
@@ -56,7 +57,7 @@ public static class ObjectTablePack
 
         // UnderworldGodot src/objectdata/triggerobjectdat.cs reads these bytes
         // from the same OBJECTS.DAT buffer (src/loaders/objectdatloader.cs).
-        return new Tables(critters, containers, tables.TriggerTypes.ToArray(), provenance);
+        return new Tables(critters, containers, tables.TriggerTypes.ToArray(), tables.Ranged.Select(row => row.Damage).ToArray(), provenance);
     }
 
     public static string ToJson(Tables tables)
@@ -67,6 +68,7 @@ public static class ObjectTablePack
             schemaVersion = SchemaVersion,
             source = tables.Provenance,
             triggerTypes = tables.TriggerTypes,
+            projectileDamage = tables.ProjectileDamage,
             critters = tables.Critters.Select(critter => new
             {
                 itemId = critter.ItemId,

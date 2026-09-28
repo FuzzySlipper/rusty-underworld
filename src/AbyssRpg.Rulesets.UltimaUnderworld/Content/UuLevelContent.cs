@@ -179,11 +179,11 @@ public static class UuLevelContent
             // A row written before the whoami byte existed carries eleven
             // columns; the creature simply holds no conversation of its own.
             int columns = row.GetArrayLength();
-            if (columns is not (11 or 12 or 15 or 16))
+            if (columns is not (11 or 12 or 15 or 16 or 18))
             {
                 throw new InvalidOperationException(
                     $"'{payloadLabel}' object rows must be "
-                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading, whoami, quantity, height, pressureThreshold, destinationLevel].");
+                    + "[index, mobile, itemId, flags, quality, next, owner, link, homeX, homeY, heading, whoami, quantity, height, pressureThreshold, destinationLevel, tileOffsetX, tileOffsetY].");
             }
 
             if (columns >= 15 && (row[12].GetInt32() < 0
@@ -191,8 +191,12 @@ public static class UuLevelContent
                 || row[14].GetInt32() < 0))
                 throw new InvalidOperationException($"'{payloadLabel}' has invalid quantity, height or pressure threshold.");
 
-            if (columns == 16 && row[15].GetInt32() < 0)
+            if (columns >= 16 && row[15].GetInt32() < 0)
                 throw new InvalidOperationException($"'{payloadLabel}' has a negative teleport destination level.");
+
+            if (columns == 18 && (!double.IsFinite(row[16].GetDouble()) || !double.IsFinite(row[17].GetDouble())
+                || row[16].GetDouble() < 0 || row[16].GetDouble() >= 1 || row[17].GetDouble() < 0 || row[17].GetDouble() >= 1))
+                throw new InvalidOperationException($"'{payloadLabel}' has an invalid tile offset.");
 
             objects[at++] = new AdmittedObject(
                 (int)row[0].GetDouble(),
@@ -209,7 +213,9 @@ public static class UuLevelContent
                 Quantity: columns >= 15 ? row[12].GetInt32() : 1,
                 Height: columns >= 15 ? row[13].GetDouble() : 0,
                 PressureThreshold: columns >= 15 ? row[14].GetInt32() : 4,
-                DestinationLevel: columns == 16 ? row[15].GetInt32() : 0);
+                DestinationLevel: columns >= 16 ? row[15].GetInt32() : 0,
+                TileOffsetX: columns == 18 ? row[16].GetDouble() : 0.5,
+                TileOffsetY: columns == 18 ? row[17].GetDouble() : 0.5);
         }
 
         return new UuLevelPlacements(unitsPerTile, heightUnitsPerStep, tiles, objects);

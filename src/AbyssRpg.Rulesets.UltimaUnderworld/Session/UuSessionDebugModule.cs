@@ -40,6 +40,16 @@ public sealed class UuSessionDebugModule : IDebugCommandModule
             $"carried={held.UniqueItems.Count} items=[{string.Join(",", held.UniqueItems.Select(item => item.Definition.Value))}]");
     }
 
+    [DebugCommand("abyss.projectiles", Description = "Active flight positions, velocities and remaining lifetimes; read-only.")]
+    public string Projectiles()
+    {
+        if (Live is not { } session) return "no live session";
+        return session.Projectiles.Count == 0 ? "no active projectiles"
+            : string.Join("; ", session.Projectiles.Select(flight => string.Create(CultureInfo.InvariantCulture,
+                $"id={flight.Id} kind={flight.Kind} x={flight.X:F3} y={flight.Y:F3} z={flight.Z:F3} "
+                + $"vx={flight.VelocityX:F3} vy={flight.VelocityY:F3} vz={flight.VelocityZ:F3} remaining={flight.RemainingSeconds:F3}")));
+    }
+
     [DebugCommand("abyss.where", Description = "Avatar position and heading in Engine units and radians.")]
     public string Where()
     {

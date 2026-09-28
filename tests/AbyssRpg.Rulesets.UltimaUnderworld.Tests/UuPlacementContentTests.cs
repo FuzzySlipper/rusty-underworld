@@ -19,6 +19,7 @@ public sealed class UuPlacementContentTests
         { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 },
         { "itemId": 127, "level": 5, "avgHp": 30, "strength": 20, "dexterity": 8, "intelligence": 4, "speed": 6, "corpseIndex": 5, "swimmer": true, "flier": false, "faction": 1 }
       ],
+      "projectileDamage": [1,2,3,4,12,8,6,4,1,1,1,1,1,1,1,1],
       "triggerTypes": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 },

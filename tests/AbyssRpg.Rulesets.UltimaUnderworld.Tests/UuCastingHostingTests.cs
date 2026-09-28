@@ -13,7 +13,8 @@ public sealed class UuCastingHostingTests
         Assert.Equal(0, casting.CastTrap(4, 15, 0).Healing);
         Assert.InRange(casting.CastTrap(4, 2, 100).Healing, 2, 16);
         Assert.Equal(1, casting.CastTrap(4, 2, 1).Healing);
-        Assert.False(casting.CastTrap(5, 2, 100).Supported);
+        Assert.Equal(21, casting.CastTrap(5, 2, 100).ProjectileItem);
+        Assert.False(casting.CastTrap(5, 5, 100).Supported);
         Assert.Empty(casting.Panel().Shelf);
         Assert.Empty(casting.Panel().Maintained);
     }
