@@ -932,11 +932,13 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     {
                         Track health = _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack);
                         var cast = _casting.CastTrap(spellTrap.Quality, spellTrap.Owner,
-                            (int)(health.MaximumValue - health.Current));
+                            (int)(health.MaximumValue - health.Current), _session.Clock.ElapsedTicks, _tuning.ClockTicksPerSecond);
                         if (cast.ProjectileItem != 0)
                         {
                             LaunchTrapProjectile(spellTrap, cast.ProjectileItem, tileX, tileY);
                         }
+                        else if (cast.MaintainedRunes is not null)
+                            _outcome = "A trap lights your surroundings.";
                         else if (cast.Supported)
                         {
                             health.Restore(cast.Healing);
@@ -2029,6 +2031,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             Holdings = CaptureHoldings(),
             Projectiles = _projectiles.Active.ToArray(),
+            Casting = _casting.Capture(),
         };
         return new RulesetSavePayload(UuGameRuleset.RulesetIdentity, UuSessionSnapshotCodec.Encode(snapshot));
     }
@@ -2120,6 +2123,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private void RestoreWorld(UuSessionSnapshot snapshot)
     {
         _projectiles.Restore(snapshot.Projectiles ?? []);
+        if (snapshot.Casting is not null) _casting.Restore(snapshot.Casting);
         if (_levelItems is null) return;
         // Held until each level is admitted: a save names owners on levels the
         // restored session has not stood in yet, and their contents are applied

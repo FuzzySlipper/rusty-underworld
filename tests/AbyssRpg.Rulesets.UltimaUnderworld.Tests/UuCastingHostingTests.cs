@@ -19,6 +19,25 @@ public sealed class UuCastingHostingTests
         Assert.Empty(casting.Panel().Maintained);
     }
 
+    [Theory]
+    [InlineData(3, "IL")]
+    [InlineData(5, "QL")]
+    [InlineData(6, "VIL")]
+    public void Trap_light_uses_shared_admission_and_recast_replaces_old_deadline(int minor, string runes)
+    {
+        var casting = new UuCastingHosting(new Random(11));
+        Assert.Equal(runes, casting.CastTrap(0, minor, 0, 100, 60).MaintainedRunes);
+        ulong firstEnd = Assert.Single(casting.Panel().Maintained).ExpiresAtTicks;
+        casting.CastTrap(0, minor, 0, firstEnd - 1, 60);
+        var recast = Assert.Single(casting.Panel().Maintained);
+        Assert.Single(casting.Panel().Effects);
+        casting.Upkeep(firstEnd);
+        Assert.True(casting.MaintainsFamily(UuSpellCatalog.Family.Light));
+        casting.Upkeep(recast.ExpiresAtTicks);
+        Assert.False(casting.MaintainsFamily(UuSpellCatalog.Family.Light));
+        Assert.False(casting.CastTrap(1, 1, 0).Supported);
+    }
+
     private static UuCastingHosting Shelf(params int[] runes)
     {
         var hosting = new UuCastingHosting(new Random(11));

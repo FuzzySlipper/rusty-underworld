@@ -507,6 +507,31 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_light_trap_changes_visibility_survives_load_and_expires_in_casting_owner()
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
+            "[521,0,390,0,0,0,3,0,-1,-1,-1,-1]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int dark = session.LightRadius;
+        double mana = session.Status.Mana;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(dark + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus, session.LightRadius);
+        Assert.Equal(mana, session.Status.Mana);
+        var held = Assert.Single(session.Casting.Panel().Maintained);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(held, Assert.Single(session.Casting.Panel().Maintained));
+        Assert.Equal(dark + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus, session.LightRadius);
+        session.Casting.Upkeep(held.ExpiresAtTicks);
+        Assert.Equal(dark, session.LightRadius);
+    }
+
+    [Fact]
     public void A_runic_projectile_uses_the_same_flight_owner()
     {
         using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial,

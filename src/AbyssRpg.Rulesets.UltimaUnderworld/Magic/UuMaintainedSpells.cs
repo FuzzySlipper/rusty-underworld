@@ -32,15 +32,22 @@ public sealed class UuMaintainedSpells
 
     public IReadOnlyList<MaintainedSpell> Spells => _spells;
 
+    public void Restore(IEnumerable<MaintainedSpell> spells)
+    {
+        _spells.Clear();
+        _spells.AddRange(spells);
+        if (_spells.Count > MaxMaintained || _spells.Any(s => UuSpellCatalog.FindByRunes(s.Runes) is not { Icon: >= 0 }))
+            throw new InvalidOperationException("Saved maintained spells are not in the spell catalog or exceed the admission limit.");
+    }
+
     /// <summary>Admit a maintained spell; returns the evicted spell, if any.</summary>
     public MaintainedSpell? Admit(int spellId, string runes, int cost, ulong expiresAtTicks = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runes);
         MaintainedSpell? evicted = null;
 
-        if (_spells.Count == MaxMaintained)
         {
-            int same = _spells.FindIndex(s => s.SpellId == spellId);
+            int same = _spells.FindIndex(s => s.SpellId == spellId || s.Runes == runes);
             if (same >= 0)
             {
                 evicted = _spells[same];

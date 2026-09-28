@@ -38,7 +38,7 @@ public sealed class UuCastingHosting
 
     public void ClearShelf() => _shelf.Clear();
 
-    public sealed record TrapCastOutcome(bool Supported, int Healing, int ProjectileItem = 0);
+    public sealed record TrapCastOutcome(bool Supported, int Healing, int ProjectileItem = 0, string? MaintainedRunes = null);
 
     /// <summary>
     /// A trap supplies its spell class directly, without runes, mana or a casting
@@ -46,8 +46,16 @@ public sealed class UuCastingHosting
     /// Healing is variant d8, except variant 15 restores all missing health.
     /// Other classes need their actual effect owners before they can be accepted.
     /// </summary>
-    public TrapCastOutcome CastTrap(int major, int minor, int missingHealth)
+    public TrapCastOutcome CastTrap(int major, int minor, int missingHealth, ulong nowTicks = 0, double ticksPerSecond = 1)
     {
+        // UW1 runicmagic.cs maps these class-0 variants to the existing light
+        // family. Use our runic duration/admission policy, not donor status rounds.
+        string? light = major == 0 ? minor switch { 3 => "IL", 5 => "QL", 6 => "VIL", _ => null } : null;
+        if (light is not null)
+        {
+            Admit(UuSpellCatalog.FindByRunes(light)!, -minor, nowTicks, ticksPerSecond);
+            return new(true, 0, MaintainedRunes: light);
+        }
         if (major == 5 && minor is >= 1 and <= 4)
             return new(true, 0, minor switch { 1 => 23, 2 => 21, 3 => 20, _ => 22 });
         if (major != 4 || minor < 0 || minor > 63) return new(false, 0);
@@ -103,24 +111,35 @@ public sealed class UuCastingHosting
         if (spell.NeedsAim)
             return new CastOutcome(UuCastGates.GateResult.Cast, false, 0, spell.Cost, true, null, null);
 
-        UuMaintainedSpells.MaintainedSpell? evicted = null;
-        UuCastingWorkflow.SpellEffectInstance? effect = null;
-        if (spell.Icon >= 0)
-        {
-            // Duration-0 maintained (Curse) holds until dismissed: its effect never
-            // expires, and the held spell carries no deadline of its own. Anything else
-            // ends at its table duration with the game's spread.
-            bool held = spell.Duration > 0;
-            ulong expires = held
-                ? nowTicks + UuCastingWorkflow.DurationTicks(spell.Duration, ticksPerSecond, _rng)
-                : ulong.MaxValue;
-            evicted = UuSpellEffects.AdmitMaintained(_maintained, spell, spellId, held ? expires : 0);
-            (_, effect) = UuCastingWorkflow.Apply(
-                false, spellId, expires,
-                stability: 1 /* stable class; per-spell classes ride with UuSpellStability */);
-            if (effect is not null) _effects.Add(effect);
-        }
+        var (effect, evicted) = Admit(spell, spellId, nowTicks, ticksPerSecond);
 
         return new CastOutcome(UuCastGates.GateResult.Cast, false, 0, spell.Cost, false, effect, evicted);
     }
+    private (UuCastingWorkflow.SpellEffectInstance? Effect, UuMaintainedSpells.MaintainedSpell? Evicted)
+        Admit(UuSpellCatalog.SpellEntry spell, int spellId, ulong nowTicks, double ticksPerSecond)
+    {
+        if (spell.Icon < 0) return (null, null);
+        ulong expires = spell.Duration > 0
+            ? nowTicks + UuCastingWorkflow.DurationTicks(spell.Duration, ticksPerSecond, _rng)
+            : ulong.MaxValue;
+        var evicted = UuSpellEffects.AdmitMaintained(_maintained, spell, spellId,
+            spell.Duration > 0 ? expires : 0);
+        if (evicted is not null) _effects.RemoveAll(e => e.SpellId == evicted.SpellId);
+        var effect = new UuCastingWorkflow.SpellEffectInstance(spellId, expires, 1);
+        _effects.Add(effect);
+        return (effect, evicted);
+    }
+
+    public sealed record SavedState(UuMaintainedSpells.MaintainedSpell[] Maintained,
+        UuCastingWorkflow.SpellEffectInstance[] Effects);
+
+    public SavedState Capture() => new(_maintained.Spells.ToArray(), _effects.ToArray());
+
+    public void Restore(SavedState state)
+    {
+        _maintained.Restore(state.Maintained);
+        _effects.Clear();
+        _effects.AddRange(state.Effects);
+    }
+
 }

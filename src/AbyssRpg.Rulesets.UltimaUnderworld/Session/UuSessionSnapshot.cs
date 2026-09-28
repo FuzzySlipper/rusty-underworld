@@ -34,7 +34,8 @@ public sealed record UuSessionSnapshot(
     AbyssRpg.Kit.World.KindAllocatorState[] ActorIdentities,
     AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities,
     UuHoldingDto[]? Holdings = null,
-    AbyssRpg.Kit.Actors.ProjectileFlight[]? Projectiles = null);
+    AbyssRpg.Kit.Actors.ProjectileFlight[]? Projectiles = null,
+    Magic.UuCastingHosting.SavedState? Casting = null);
 
 /// <summary>
 /// What one owner holds. The level and owner index locate the owner, which a
