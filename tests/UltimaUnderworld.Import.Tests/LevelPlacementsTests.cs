@@ -96,6 +96,19 @@ public sealed class LevelPlacementsTests
     }
 
     [Fact]
+    public void Teleport_level_is_normalized_separately_from_physical_height()
+    {
+        LevArkReader.LevelPack pack = Pack();
+        byte[] raw = new byte[LevArkReader.StaticRecordSize];
+        raw[2] = 2;
+        var objects = pack.Objects.ToArray();
+        objects[1] = objects[1] with { ItemId = 385, Raw = raw };
+        var obj = LevelPlacements.Emit(pack with { Objects = objects }).Objects[1];
+        Assert.Equal(2, obj.DestinationLevel);
+        Assert.Equal(0.25d, obj.Height);
+    }
+
+    [Fact]
     public void The_emitted_json_keeps_the_row_shape_the_runtime_reads()
     {
         string json = LevelPlacements.ToJson(LevelPlacements.Emit(Pack()));
@@ -106,8 +119,8 @@ public sealed class LevelPlacementsTests
         Assert.Equal(1.0, root.GetProperty("heightUnitsPerStep").GetDouble());
         Assert.Equal(6, root.GetProperty("tiles")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("tiles")[0][5].GetInt32());
-        // Fifteen columns include conversation identity and normalized pressure values.
-        Assert.Equal(15, root.GetProperty("objects")[0].GetArrayLength());
+        // Sixteen columns include normalized pressure values and teleport destination.
+        Assert.Equal(16, root.GetProperty("objects")[0].GetArrayLength());
         Assert.Equal(0, root.GetProperty("objects")[0][11].GetInt32());
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }

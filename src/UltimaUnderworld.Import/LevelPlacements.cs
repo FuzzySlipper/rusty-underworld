@@ -22,7 +22,7 @@ public static class LevelPlacements
     public sealed record PlacedObject(
         int Index, bool Mobile, int ItemId, int Flags, int Quality, int Next, int Owner, int Link,
         int HomeTileX, int HomeTileY, int Heading, int WhoAmI,
-        int Quantity, double Height, int PressureThreshold);
+        int Quantity, double Height, int PressureThreshold, int DestinationLevel);
 
     public sealed record Placements(
         int Level,
@@ -53,7 +53,8 @@ public static class LevelPlacements
                 return new PlacedObject(
                     obj.Index, obj.IsMobile, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
                     homeX, homeY, Heading(obj), WhoAmI(obj),
-                    Quantity(obj), Height(obj), PressureThreshold(obj));
+                    Quantity(obj), Height(obj), PressureThreshold(obj),
+                    DestinationLevel(obj));
             })
             .ToArray();
         return new Placements(
@@ -87,6 +88,10 @@ public static class LevelPlacements
     // floor step; normalize it here rather than exposing source bit fields.
     private static int Quantity(LevArkReader.LevelObject obj) =>
         (obj.Raw[1] & 0x80) != 0 && obj.Link < 512 ? obj.Link : 1;
+
+    // a_teleport_trap.cs: zpos is a one-based destination level, zero stays here.
+    private static int DestinationLevel(LevArkReader.LevelObject obj) =>
+        obj.ItemId == 385 ? obj.Raw[2] & 0x7F : 0;
 
     private static double Height(LevArkReader.LevelObject obj) => (obj.Raw[2] & 0x7F) / 8d;
 
@@ -148,7 +153,7 @@ public static class LevelPlacements
             {
                 obj.Index, obj.Mobile ? 1 : 0, obj.ItemId, obj.Flags, obj.Quality, obj.Next, obj.Owner, obj.Link,
                 obj.HomeTileX, obj.HomeTileY, obj.Heading, obj.WhoAmI,
-                obj.Quantity, obj.Height, obj.PressureThreshold,
+                obj.Quantity, obj.Height, obj.PressureThreshold, obj.DestinationLevel,
             }),
         };
         return JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = false });

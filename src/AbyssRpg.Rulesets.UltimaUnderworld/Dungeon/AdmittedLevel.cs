@@ -26,6 +26,7 @@ public sealed record AdmittedObject(
     int WhoAmI = 0,
     int Quantity = 1,
     double Height = 0,
-    int PressureThreshold = 4);
+    int PressureThreshold = 4,
+    int DestinationLevel = 0);
 
 public sealed record AdmittedLevel(int LevelNumber, AdmittedTile[] Tiles, AdmittedObject[] Objects);

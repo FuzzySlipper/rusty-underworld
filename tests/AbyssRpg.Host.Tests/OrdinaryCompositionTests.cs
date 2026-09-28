@@ -520,6 +520,45 @@ public sealed class OrdinaryCompositionTests
         Assert.Contains(TestContent.TriggerLegObjectIndex, session.State.Dungeon.Current.FiredTriggers);
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    public void A_teleport_finishes_the_source_chain_then_moves_to_its_own_destination(int destination, int expectedLevel)
+    {
+        ProductContent content = TestContent.Build(withSecondLevel: true, edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
+            $"[521,0,385,0,1,0,0,522,-1,-1,-1,-1,1,0,4,{destination}]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(expectedLevel, session.Status.Level);
+        Assert.Equal(12f, session.PlayerPosition!.Value.X);
+        Assert.Equal(4f, session.PlayerPosition!.Value.Z);
+        Assert.Equal(TestContent.DamageTrapQuality, session.State.Survival.Poison);
+    }
+
+    [Theory]
+    [InlineData(99, 1)]
+    [InlineData(0, 64)]
+    public void An_unavailable_teleport_destination_preserves_the_avatar(int destination, int x)
+    {
+        ProductContent content = TestContent.Build(edit: json => json.Replace(
+            "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
+            $"[521,0,385,0,{x},0,0,0,-1,-1,-1,-1,1,0,4,{destination}]"));
+        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(1, session.Status.Level);
+        Assert.Equal(44f, session.PlayerPosition!.Value.X);
+    }
+
     [Fact]
     public void A_linked_spell_trap_heals_through_casting_without_spending_mana()
     {

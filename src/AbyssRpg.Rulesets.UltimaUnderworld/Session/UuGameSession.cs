@@ -735,7 +735,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _triggerTile = current;
         if (previous is { } left && left.Level == level && _placements.Tile(left.X, left.Y) is { } oldTile)
             RunTileTriggers(oldTile, entering: false);
-        if (_session.Dungeon.CurrentLevel == level)
+        if (_session.Dungeon.CurrentLevel == level && _player.Position == position)
             RunTileTriggers(here, entering: true);
     }
 
@@ -744,6 +744,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_placements is null || _objectTables is null) return;
         int level = _session.Dungeon.CurrentLevel;
         UuLevelState state = _session.Dungeon.Current;
+        WorldPoint? startingPosition = _player.Position;
         int index = tile.ObjectHead;
         var visited = new HashSet<int>();
         while (index != 0 && visited.Add(index) && _placements.Object(index) is { } obj)
@@ -763,7 +764,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (!entering && !pressure) state.Release(obj.Index);
             // A pit can replace the admitted level. Never continue its old chain
             // against the new level's records.
-            if (_session.Dungeon.CurrentLevel != level) return;
+            if (_session.Dungeon.CurrentLevel != level || _player.Position != startingPosition) return;
         }
     }
 
@@ -842,10 +843,37 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// owner's; what each fired kind does is applied through the owner that already
     /// does it, so there is no second implementation of opening a door.
     /// </summary>
-    private void FireTrigger(AdmittedObject trigger) =>
+    private void FireTrigger(AdmittedObject trigger)
+    {
         // RunTrapFromTrigger in the donor reads the destination tile from the
         // trigger's quality/owner, which need not be the tile holding the leg.
-        FireChainFrom(trigger.Link, trigger.Quality, trigger.Owner, []);
+        AdmittedObject? teleport = null;
+        FireChainFrom(trigger.Link, trigger.Quality, trigger.Owner, [], trap => teleport = trap);
+        // The donor queues teleportation until the source chain has finished.
+        if (teleport is not null) ApplyTeleportTrap(teleport);
+    }
+
+    private void ApplyTeleportTrap(AdmittedObject trap)
+    {
+        // a_teleport_trap.cs and teleportation.cs TeleportUW1: zero means current
+        // level, otherwise the one-based level number; quality/owner are the tile.
+        int level = trap.DestinationLevel == 0 ? _session.Dungeon.CurrentLevel : trap.DestinationLevel;
+        UuLevelPlacements? destination;
+        try { destination = _catalog?.Placements(level); }
+        catch (InvalidOperationException)
+        {
+            _outcome = $"The teleport destination level {level} is not in this bundle.";
+            return;
+        }
+        if (destination?.Tile(trap.Quality, trap.Owner) is not { } tile || !UuTileKind.IsOpen(tile))
+        {
+            _outcome = $"The teleport destination ({trap.Quality},{trap.Owner}) on level {level} is not open.";
+            return;
+        }
+        if (level != _session.Dungeon.CurrentLevel) TravelToLevel(level, 0);
+        PlaceOnTile(trap.Quality, trap.Owner);
+        _outcome = $"You teleport to ({trap.Quality},{trap.Owner}) on level {level}.";
+    }
 
     /// <summary>
     /// Runs one chain of a trigger's graph and applies what each node does, using
@@ -853,7 +881,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// chain's later nodes name their own targets (donor: trap.FireChain and the
     /// trigger legs it hands back to their caller).
     /// </summary>
-    private void FireChainFrom(int head, int tileX, int tileY, HashSet<int> visited)
+    private void FireChainFrom(int head, int tileX, int tileY, HashSet<int> visited, Action<AdmittedObject> teleport)
     {
         int level = _session.Dungeon.CurrentLevel;
         IReadOnlyList<(int Index, Traps.UuTrapDispatch.ChainNode Node, Traps.UuTrapDispatch.TrapKind Kind)> fired =
@@ -884,7 +912,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     break;
                 case Traps.UuTrapDispatch.TrapKind.TriggerLeg:
                     if (_placements?.Object(index) is { } leg)
-                        FireChainFrom(node.Link, leg.Quality, leg.Owner, visited);
+                        FireChainFrom(node.Link, leg.Quality, leg.Owner, visited, teleport);
+                    break;
+                case Traps.UuTrapDispatch.TrapKind.Teleport:
+                    if (_placements?.Object(index) is { } destination) teleport(destination);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Spell:
                     if (_placements?.Object(index) is { } spellTrap)
