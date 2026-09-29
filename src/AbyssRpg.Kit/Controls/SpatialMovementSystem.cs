@@ -188,8 +188,9 @@ public sealed class SpatialMovementSystem : IDisposable
         // The Engine admits a step of at most a fifteenth of a second and at
         // least a millisecond. A long frame -- a hitch, a world still being
         // composed, a debugging pause -- is subdivided across proposals instead
-        // of being handed over whole, because a rejected proposal taints the
-        // runtime; a frame shorter than the Engine's floor proposes nothing.
+        // of being handed over whole, because the Engine refuses it and the
+        // refusal faults the product; a frame shorter than the Engine's floor
+        // proposes nothing.
         float remaining = update.DeltaSeconds;
         CharacterStepReceipt? latest = null;
         for (int substep = 0; substep < MaxSubsteps && remaining >= MinimumStepSeconds; substep++)

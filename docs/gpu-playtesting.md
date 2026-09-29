@@ -107,8 +107,8 @@ failures the browser would otherwise swallow.
 
 The slice imports a level's collision, visible geometry, spawn, object
 placements and the object tables. The tile probe refuses a tile the level does not admit as open, because a
-capsule inside solid geometry makes the Engine refuse the next step and taints
-the runtime. `abyss.travel` moves without a clock cost: the gameplay caller that
+capsule inside solid geometry makes the Engine refuse the next step, which
+faults and pauses the product. `abyss.travel` moves without a clock cost: the gameplay caller that
 owns a transition decides what it costs, and nothing in play walks one yet.
 
 Judge-side pointer input did not reliably reach the product's DOM below roughly

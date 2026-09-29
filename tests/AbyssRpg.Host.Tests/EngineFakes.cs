@@ -323,6 +323,8 @@ internal sealed class GraphicsDouble : IGraphicsService
     }
 
     public RenderResourceInfo OpenResource(RenderResourceRequest arg0) => throw new NotSupportedException("OpenResource");
+    public TextureResourceInfo ReadTextureInfo(RenderResource arg0) => throw new NotSupportedException("ReadTextureInfo");
+    public void PublishChanges(AppearanceChangesRequest arg0) => throw new NotSupportedException("PublishChanges");
     public RenderResourceInfo OpenResourceFromContent(RenderResourceContentRequest arg0) => throw new NotSupportedException("OpenResourceFromContent");
     public Appearance CreateStaticMeshFromContentReference(StaticMeshContentReferenceRequest arg0) => throw new NotSupportedException("CreateStaticMeshFromContentReference");
     public void UpdateMaterial(MaterialUpdateRequest arg0) => throw new NotSupportedException("UpdateMaterial");
@@ -354,7 +356,7 @@ internal sealed class GraphicsDouble : IGraphicsService
     public SpritePlayback CreateSpritePlayback(SpritePlaybackCreateRequest arg0) => throw new NotSupportedException("CreateSpritePlayback");
     public SpritePlaybackReadout ControlSpritePlayback(SpritePlaybackControlRequest arg0) => throw new NotSupportedException("ControlSpritePlayback");
     public SpritePlaybackReadout SelectSpritePlaybackFrame(SpritePlaybackFrameSelectionRequest arg0) => throw new NotSupportedException("SelectSpritePlaybackFrame");
-    public SpritePlaybackAdvanceLeaseReceipt AdvanceSpritePlayback(SpritePlaybackAdvanceRequest arg0) => throw new NotSupportedException("AdvanceSpritePlayback");
+    public SpritePlaybackAdvanceResult AdvanceSpritePlayback(SpritePlaybackAdvanceRequest arg0) => throw new NotSupportedException("AdvanceSpritePlayback");
     public SpritePlaybackSample SampleSpritePlayback(SpritePlaybackSampleRequest arg0) => throw new NotSupportedException("SampleSpritePlayback");
     public SpritePlaybackReadout ReadSpritePlayback(SpritePlayback arg0) => throw new NotSupportedException("ReadSpritePlayback");
     public Light CreateLight(LightRequest arg0) => throw new NotSupportedException("CreateLight");

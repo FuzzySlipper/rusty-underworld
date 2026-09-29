@@ -113,12 +113,6 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         Publish();
     }
 
-    public void Attach()
-    {
-        // Renderer attachment reads committed Engine state; the session publishes
-        // its scene and camera when it starts, so there is nothing to attach.
-    }
-
     public void Pause()
     {
         ThrowIfShutdown();

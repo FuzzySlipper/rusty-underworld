@@ -178,7 +178,7 @@ public sealed class MechanicsInventoryContainerCoordinator
         List<DurableIdentityReference> created = [];
         try
         {
-            using InventoryEdit candidate = _store.Prepare(worldRevisionBefore);
+            using InventoryEdit candidate = _store.Prepare();
             foreach (InventoryContainerSeed seed in values)
             {
                 ItemDefinition definition = RequireDefinition(seed.Item);
@@ -210,11 +210,11 @@ public sealed class MechanicsInventoryContainerCoordinator
     /// Moves all directly contained items from one registered owner to another
     /// through one detached candidate and one Engine publication.
     /// </summary>
-    public InventoryContainerTransferReceipt TransferAll(EntityId source, EntityId destination, ulong? expectedWorldRevision = null) =>
-        TransferCore(source, destination, null, expectedWorldRevision);
+    public InventoryContainerTransferReceipt TransferAll(EntityId source, EntityId destination) =>
+        TransferCore(source, destination, null);
 
-    /// <summary>Transfers a selected amount through the same Engine candidate and revision guard.</summary>
-    public InventoryContainerTransferReceipt Transfer(EntityId source, EntityId destination, InventoryContainerSelection selection, ulong expectedWorldRevision)
+    /// <summary>Transfers a selected amount through the same inventory edit.</summary>
+    public InventoryContainerTransferReceipt Transfer(EntityId source, EntityId destination, InventoryContainerSelection selection)
     {
         ArgumentNullException.ThrowIfNull(selection);
         ArgumentOutOfRangeException.ThrowIfZero(selection.Quantity);
@@ -224,10 +224,10 @@ public sealed class MechanicsInventoryContainerCoordinator
             throw new ArgumentException("A unique transfer does not carry a fungible stack identity.", nameof(selection));
         if (selection.UniqueEntityId is null && selection.Stack is null)
             throw new ArgumentException("A fungible transfer requires its selected source stack identity.", nameof(selection));
-        return TransferCore(source, destination, selection, expectedWorldRevision);
+        return TransferCore(source, destination, selection);
     }
 
-    private InventoryContainerTransferReceipt TransferCore(EntityId source, EntityId destination, InventoryContainerSelection? selection, ulong? expectedWorldRevision)
+    private InventoryContainerTransferReceipt TransferCore(EntityId source, EntityId destination, InventoryContainerSelection? selection)
     {
         RequireRegistered(source, nameof(source));
         RequireRegistered(destination, nameof(destination));
@@ -245,7 +245,7 @@ public sealed class MechanicsInventoryContainerCoordinator
             .OrderBy(item => item.Entity.Value)
             .ToArray();
         ulong worldRevisionBefore = _store.Revision;
-        InventoryEdit candidate = _store.Prepare(expectedWorldRevision ?? worldRevisionBefore);
+        InventoryEdit candidate = _store.Prepare();
         if (selection is not null)
         {
             ItemDefinition definition = RequireDefinition(selection.Item);

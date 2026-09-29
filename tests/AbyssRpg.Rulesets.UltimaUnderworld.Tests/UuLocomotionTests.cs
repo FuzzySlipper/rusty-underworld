@@ -105,7 +105,8 @@ public sealed class UuLocomotionTests
         FallOriginY: peakY, PeakY: peakY, LastCommandSequence: 0, CollisionWorldHash: 0);
 
     private static Rusty.Engine.CharacterStepReceipt Receipt(bool grounded, float y, float dx) => new(
-        Generation: 0, RevisionBefore: 0, RevisionAfter: 0, Entity: 0, CommandSequence: 0,
+        Movement: default, Tether: default,
+        Generation: 0, Entity: 0, CommandSequence: 0,
         TransformBefore: new Rusty.Engine.Transform(new System.Numerics.Vector3(0, 10, 0), System.Numerics.Quaternion.Identity, System.Numerics.Vector3.One),
         Transform: new Rusty.Engine.Transform(new System.Numerics.Vector3(dx, y, 0), System.Numerics.Quaternion.Identity, System.Numerics.Vector3.One),
         Motion: Motion(grounded, y),
@@ -113,7 +114,7 @@ public sealed class UuLocomotionTests
         Displacement: new System.Numerics.Vector3(dx, 0, 0),
         Contact: default, Ground: default, FloorProbe: default, Stance: default,
         Step: default, Platform: default, BlockFlags: default,
-        ContactCount: 0, DynamicImpulseCount: 0, CastCount: 0, RecoveryPasses: 0, RecoveryDistance: 0f);
+        ContactCount: 0, CastCount: 0, RecoveryPasses: 0, RecoveryDistance: 0f);
 
     [Fact]
     public void Hazards_follow_documented_structure()

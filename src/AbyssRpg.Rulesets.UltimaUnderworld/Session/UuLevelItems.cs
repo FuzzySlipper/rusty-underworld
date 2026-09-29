@@ -126,8 +126,7 @@ public sealed class UuLevelItems
             from,
             destination,
             new InventoryContainerSelection(
-                new InventoryItemId(match.Definition.Value), 1, UniqueEntityId: item.Value),
-            _coordinator.Read(from).StoreRevision);
+                new InventoryItemId(match.Definition.Value), 1, UniqueEntityId: item.Value));
     }
 
     /// <summary>
@@ -161,8 +160,7 @@ public sealed class UuLevelItems
             holder,
             owner,
             new InventoryContainerSelection(
-                new InventoryItemId(match.Definition.Value), 1, UniqueEntityId: item.Value),
-            _coordinator.Read(holder).StoreRevision).UniqueItems.Count == 1;
+                new InventoryItemId(match.Definition.Value), 1, UniqueEntityId: item.Value)).UniqueItems.Count == 1;
     }
 
     /// <summary>Where an item currently lies, when the store knows it.</summary>

@@ -1931,8 +1931,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// Engine spatial step owns ordinary movement; this places the avatar for
     /// probing a level position without walking there. Only a tile the level
     /// admits as open is accepted: a capsule placed inside solid geometry makes
-    /// the Engine refuse the next character step, which taints the runtime and
-    /// costs the live session.
+    /// the Engine refuse the next character step, which faults and pauses the
+    /// live session.
     /// </summary>
     public void PlaceOnTile(int tileX, int tileY)
     {

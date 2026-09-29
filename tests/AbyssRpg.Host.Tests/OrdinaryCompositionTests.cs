@@ -1877,8 +1877,8 @@ public sealed class OrdinaryCompositionTests
     public void The_operator_tile_probe_refuses_a_tile_the_avatar_cannot_stand_on()
     {
         // A capsule placed inside solid geometry makes the Engine refuse the
-        // next character step, which taints the runtime and costs the session,
-        // so the probe refuses the tile instead of standing there.
+        // next character step, which faults and pauses the session, so the
+        // probe refuses the tile instead of standing there.
         UiDouble ui = UiDouble.Create();
         IEngineContext engine = EngineContextFake.Create(
             persistence: new InMemoryPersistenceService(),
@@ -2012,8 +2012,8 @@ public sealed class OrdinaryCompositionTests
     public void A_long_frame_is_subdivided_into_steps_the_engine_admits()
     {
         // The Engine admits a spatial proposal of at most a fifteenth of a
-        // second; a longer frame handed over whole is rejected and taints the
-        // runtime, so a hitch must not be able to do that.
+        // second; a longer frame handed over whole is rejected and faults the
+        // product, so a hitch must not be able to do that.
         UiDouble ui = UiDouble.Create();
         EngineSpatialDouble spatial = EngineSpatialDouble.Create();
         IEngineContext engine = EngineContextFake.Create(
