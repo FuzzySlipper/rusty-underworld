@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { mountProductUi } from '../../src/ui/generated/main.js';
 
 /**
@@ -347,11 +351,20 @@ test('a missing Engine debug panel degrades to a stated message', async (t) => {
 /**
  * The injected loader above asserts the mounting contract; this test closes the
  * other half by loading the packaged Engine module the runtime pack actually
- * serves. The pack is installed by `scripts/verify.sh`, so in the ordinary loop
- * this runs; without it the check reports a skip rather than passing silently.
+ * serves. `scripts/verify.sh` installs the pinned pair into the shared rusty
+ * cache, so in the ordinary loop this runs; without it the check reports a skip
+ * rather than passing silently.
  */
+function pinnedRuntimePack() {
+  const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8');
+  const version = /<RustyEnginePackageVersion>([^<]+)</.exec(props)[1];
+  const cache = process.env.RUSTY_ENGINE_CACHE
+    || join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'rusty-engine');
+  return join(cache, 'pairs', version, 'runtime-pack');
+}
+
 test('the packaged Engine live-debug module exports and mounts', async (t) => {
-  const pack = new URL('../../.runtime/runtime-pack/share/live-debug-panel/index.js', import.meta.url);
+  const pack = pathToFileURL(join(pinnedRuntimePack(), 'share/live-debug-panel/index.js'));
   let module;
   try {
     module = await import(pack.href);

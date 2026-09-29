@@ -9,7 +9,7 @@ closing does not dispatch the donor's UW2-only close event.
 
 ## Start the product
 
-Install the pinned Engine pair with `scripts/install-engine-pair.sh` if needed,
+Install the pinned Engine pair with `rusty install` if needed,
 then run from the repository root:
 
 ```bash
