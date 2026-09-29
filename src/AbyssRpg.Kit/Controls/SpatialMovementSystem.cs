@@ -122,24 +122,12 @@ public sealed class SpatialMovementSystem : IDisposable
         catch { session.Dispose(); throw; }
     }
 
-    /// <summary>The longest step the Engine admits in one proposal.</summary>
-    public const float MaximumStepSeconds = 1f / 15f;
-
-    /// <summary>The shortest step worth proposing; below it the Engine refuses.</summary>
-    public const float MinimumStepSeconds = 0.001f;
-
-    /// <summary>How many proposals one admitted frame is subdivided into at most.</summary>
-    public const int MaxSubsteps = 8;
-
     /// <summary>
     /// Submits the current control state to the Engine and applies its receipt
-    /// in the admitted update order: one admitted frame's motion, proposed and
-    /// continued. The frame is subdivided into proposals inside
-    /// the Engine's admitted window, and the caller's own motion and one-shot
-    /// presses ride with the first proposal. A frame longer than
-    /// <see cref="MaxSubsteps"/> windows is proposed up to the cap and the
-    /// remainder is dropped, which bounds one frame's work after a hitch; a
-    /// frame shorter than <see cref="MinimumStepSeconds"/> proposes nothing.
+    /// in the admitted update order: one admitted fixed step's motion, proposed
+    /// and continued. The Engine solves a step longer than its solver interval
+    /// as sub-steps, so the whole step is one proposal carrying the caller's
+    /// motion and one-shot presses.
     /// </summary>
     public CharacterStepReceipt? Step(PlayerControlState player, ProductUpdateState update, CharacterStepEnvironment? environment = null, CharacterStepControls? controls = null)
     {
@@ -185,52 +173,34 @@ public sealed class SpatialMovementSystem : IDisposable
             };
         }
 
-        // The Engine admits a step of at most a fifteenth of a second and at
-        // least a millisecond. A long frame -- a hitch, a world still being
-        // composed, a debugging pause -- is subdivided across proposals instead
-        // of being handed over whole, because the Engine refuses it and the
-        // refusal faults the product; a frame shorter than the Engine's floor
-        // proposes nothing.
-        float remaining = update.DeltaSeconds;
-        CharacterStepReceipt? latest = null;
-        for (int substep = 0; substep < MaxSubsteps && remaining >= MinimumStepSeconds; substep++)
-        {
-            // A press, and the motion the caller selected, belong to the frame:
-            // the first proposal carries them, and the later slices carry the
-            // continuation the Engine confirmed.
-            bool first = substep == 0;
-            float slice = Math.Min(remaining, MaximumStepSeconds);
-            remaining -= slice;
-            ulong stepSequence = checked(player.Motion.LastCommandSequence + 1);
-            CharacterControllerCommand command = new(
-                selected.PlanarIntent ?? update.PlanarIntent,
-                player.YawRadians,
-                first && !verticalDriveSelected && selected.JumpPressed,
-                first && !verticalDriveSelected && selected.JumpHeld,
-                first && selected.CrouchRequested,
-                ExternalVelocity: Vector3.Zero,
-                ExternalImpulse: Vector3.Zero,
-                slice,
-                stepSequence);
-            CharacterStepRequest request = new(
-                _session,
-                (player.Position ?? position).ToVector(),
-                first ? motion : player.Motion,
-                stepEnvironment.Support,
-                stepEnvironment.Obstacles,
-                stepEnvironment.MeshInstances,
-                config,
-                command);
-            CharacterStepReceipt receipt = _spatial.ProposeCharacterStep(request);
-            _latestGeneration = receipt.Generation;
-            _restoredCheckpoint = null;
-            player.Apply(receipt);
-            latest = receipt;
-        }
+        ulong stepSequence = checked(player.Motion.LastCommandSequence + 1);
+        CharacterControllerCommand command = new(
+            selected.PlanarIntent ?? update.PlanarIntent,
+            player.YawRadians,
+            !verticalDriveSelected && selected.JumpPressed,
+            !verticalDriveSelected && selected.JumpHeld,
+            selected.CrouchRequested,
+            ExternalVelocity: Vector3.Zero,
+            ExternalImpulse: Vector3.Zero,
+            update.DeltaSeconds,
+            stepSequence);
+        CharacterStepRequest request = new(
+            _session,
+            position.ToVector(),
+            motion,
+            stepEnvironment.Support,
+            stepEnvironment.Obstacles,
+            stepEnvironment.MeshInstances,
+            config,
+            command);
+        CharacterStepReceipt receipt = _spatial.ProposeCharacterStep(request);
+        _latestGeneration = receipt.Generation;
+        _restoredCheckpoint = null;
+        player.Apply(receipt);
 
         if (verticalDriveReleased) _controller = _baseController;
         _verticalDriven = verticalDriveSelected;
-        return latest;
+        return receipt;
     }
 
     /// <summary>

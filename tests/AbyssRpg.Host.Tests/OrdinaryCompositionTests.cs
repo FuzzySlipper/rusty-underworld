@@ -2009,62 +2009,11 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
-    public void A_long_frame_is_subdivided_into_steps_the_engine_admits()
+    public void A_frame_is_one_proposal_carrying_its_motion_and_press()
     {
-        // The Engine admits a spatial proposal of at most a fifteenth of a
-        // second; a longer frame handed over whole is rejected and faults the
-        // product, so a hitch must not be able to do that.
-        UiDouble ui = UiDouble.Create();
-        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
-        IEngineContext engine = EngineContextFake.Create(
-            persistence: new InMemoryPersistenceService(),
-            spatial: spatial.Service,
-            content: SpatialContentDouble.Create().Service,
-            ui: ui.Service,
-            cameraView: CameraViewDouble.Create().Service,
-            graphics: new GraphicsDouble());
-        using var product = new AbyssProduct(
-            engine, TestContent.Build(), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
-        product.Start();
-
-        product.Update(new ProductUpdate(Facts(1, seconds: 1d / 60d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
-        Assert.Single(spatial.StepSeconds);
-        Assert.Equal(1f / 60f, spatial.StepSeconds[0], 4);
-
-        spatial.StepSeconds.Clear();
-        product.Update(new ProductUpdate(Facts(2, seconds: 0.25d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
-        Assert.NotEmpty(spatial.StepSeconds);
-        Assert.All(spatial.StepSeconds, seconds => Assert.InRange(
-            seconds, SpatialMovementSystem.MinimumStepSeconds, SpatialMovementSystem.MaximumStepSeconds));
-        // The whole frame is proposed across the substeps it was divided into.
-        Assert.Equal(0.25f, spatial.StepSeconds.Sum(), 3);
-
-        // A frame shorter than the Engine's floor proposes nothing at all.
-        spatial.StepSeconds.Clear();
-        product.Update(new ProductUpdate(Facts(3, seconds: 0.0005d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
-        Assert.Empty(spatial.StepSeconds);
-        Assert.True(HudBoolean(ui.LastProjection!.Value.Value, "ready"));
-
-        // The substep cap bounds one frame's work: a frame longer than the cap
-        // times the Engine's window proposes the cap and no more.
-        spatial.StepSeconds.Clear();
-        product.Update(new ProductUpdate(Facts(4, seconds: 4d), [Key(KeyboardControl.KeyW, InputEdge.Pressed)]));
-        Assert.Equal(
-            SpatialMovementSystem.MaxSubsteps,
-            spatial.StepSeconds.Count);
-        Assert.Equal(
-            SpatialMovementSystem.MaxSubsteps * SpatialMovementSystem.MaximumStepSeconds,
-            spatial.StepSeconds.Sum(),
-            3);
-    }
-
-    [Fact]
-    public void A_driven_vertical_velocity_rides_the_first_proposal_of_a_long_frame()
-    {
-        // Flying drives the capsule's vertical velocity through the step's own
-        // controls, and the subdivision must not drop that override: the first
-        // proposal of the frame carries it, and the later slices carry the
-        // continuation the Engine confirmed.
+        // The Engine solves a step longer than its solver interval as
+        // sub-steps, so a long frame is proposed whole, with the caller's
+        // driven vertical velocity and the frame's one press.
         EngineSpatialDouble spatial = EngineSpatialDouble.Create();
         using SpatialMovementSystem movement = new(
             spatial.Service,
@@ -2072,25 +2021,18 @@ public sealed class OrdinaryCompositionTests
             new SpatialContentArtifact("abyss/imports/level-1/test-collision.json", default, NavigationGridId: 0),
             new SpatialTuning(0.5d, 8, 8, 1));
         var player = new PlayerControlState(new WorldPoint(0f, 0f, 0f), 0f, 0f);
-        var update = new ProductUpdateState(0.25f);
-        var controls = new CharacterStepControls(JumpPressed: true, VerticalVelocity: 3f);
 
-        CharacterStepReceipt? receipt = movement.Step(player, update, environment: null, controls);
+        CharacterStepReceipt? receipt = movement.Step(
+            player, new ProductUpdateState(0.25f), environment: null, new CharacterStepControls(JumpPressed: true, VerticalVelocity: 3f));
 
         Assert.NotNull(receipt);
-        Assert.True(spatial.StepMotions.Count > 1, "the long frame is proposed in slices");
-        // The override rides the first proposal; without it the frame would be
-        // simulated with the stale vertical velocity the player already held.
+        Assert.Equal([0.25f], spatial.StepSeconds);
         Assert.Equal(3f, spatial.StepMotions[0].ControlledVelocity.Y, 3);
-        // A press is one frame's edge, not one per slice: a jump must not read
-        // as a fresh press in every proposal of a long frame. (A driven
-        // vertical velocity owns jump for the frame, so it is suppressed here.)
-        Assert.DoesNotContain(true, spatial.StepJumpPressed);
+        // A driven vertical velocity owns jump for the frame.
+        Assert.Equal([false], spatial.StepJumpPressed);
 
-        spatial.StepJumpPressed.Clear();
         movement.Step(player, new ProductUpdateState(0.25f), environment: null, new CharacterStepControls(JumpPressed: true));
-        Assert.True(spatial.StepJumpPressed[0], "the first proposal carries the press");
-        Assert.DoesNotContain(true, spatial.StepJumpPressed.Skip(1));
+        Assert.Equal([false, true], spatial.StepJumpPressed);
     }
 
     [Fact]
