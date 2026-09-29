@@ -34,6 +34,7 @@ public sealed class UuLocomotionTests
         Assert.False(intent.JumpRequested);
         Assert.Equal(0f, intent.Ascend);
         Assert.False(controls.JumpPressed);
+        Assert.Equal(System.Numerics.Vector2.Zero, controls.PlanarIntent);
         Assert.Null(controls.VerticalVelocity);
         Assert.Throws<ArgumentOutOfRangeException>(() => policy.BeginStep([], 0f, true, false, false));
     }
@@ -47,6 +48,11 @@ public sealed class UuLocomotionTests
             [Key(KeyboardControl.ShiftLeft), Key(KeyboardControl.KeyW)], 0.016f, canMove: true, swimming: false, flying: false);
         Assert.True(run.Running);
         Assert.Equal(UuMovementTuning.Default.RunSpeed, runControls.ForwardSpeed);
+        // The held keys reach the step as its planar intent: forward is +Y.
+        Assert.Equal(new System.Numerics.Vector2(0f, 1f), runControls.PlanarIntent);
+        var (held, _) = policy.BeginStep(
+            [Key(KeyboardControl.KeyW)], 0.016f, canMove: false, swimming: false, flying: false);
+        Assert.Equal(System.Numerics.Vector2.Zero, held.PlanarIntent);
 
         var (swimControls, swim) = policy.BeginStep(
             [Key(KeyboardControl.KeyW)], 0.016f, canMove: true, swimming: true, flying: false);

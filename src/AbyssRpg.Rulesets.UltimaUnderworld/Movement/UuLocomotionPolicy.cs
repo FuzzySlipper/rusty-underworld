@@ -109,6 +109,7 @@ public sealed class UuLocomotionPolicy
             BackwardSpeed: planar,
             StrafeSpeed: swimming ? _tuning.SwimSpeed : _tuning.StrafeSpeed,
             JumpSpeed: _tuning.JumpSpeed,
+            PlanarIntent: canMove ? frame.Movement : System.Numerics.Vector2.Zero,
             VerticalVelocity: flying && canMove ? ascend : null);
         var intent = new UuMoveIntent(running, swimming, flying, jump, ascend);
         return new UuPlayerStep(
