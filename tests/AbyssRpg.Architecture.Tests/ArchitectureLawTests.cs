@@ -130,7 +130,7 @@ public sealed class ArchitectureLawTests
             ((string?)reference.Attribute("Include"))?.Contains("rusty-engine", StringComparison.OrdinalIgnoreCase) == true);
 
         Assert.Equal(
-            "$(RustyEnginePackageVersion)",
+            "[$(RustyEnginePackageVersion)]",
             document.Descendants("PackageReference")
                 .Single(reference => (string?)reference.Attribute("Include") == expected)
                 .Attribute("Version")?.Value);
