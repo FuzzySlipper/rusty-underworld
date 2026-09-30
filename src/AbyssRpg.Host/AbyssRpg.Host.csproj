@@ -12,11 +12,15 @@
     <RustyEngineProductId>abyssrpg.product</RustyEngineProductId>
     <RustyEngineProductTitle>AbyssRpg: The Stygian Abyss</RustyEngineProductTitle>
     <RustyEngineProductUiRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui/generated'))</RustyEngineProductUiRoot>
+    <!-- The DOM companion is compiled TypeScript. The SDK runs this command only
+         when a UI input is newer than its last build, and `rusty dev` reloads
+         the UI alone when only UI sources change. -->
+    <RustyEngineProductUiSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))</RustyEngineProductUiSourceRoot>
+    <RustyEngineProductUiBuildCommand>npm --prefix &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))&quot; exec -- tsc -p &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))&quot;</RustyEngineProductUiBuildCommand>
     <RustyEngineProductContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineProductContentRoot>
     <RustyEngineProductUiEntry>main.js</RustyEngineProductUiEntry>
     <RustyEngineProductUiProjectionStream>abyss.hud</RustyEngineProductUiProjectionStream>
     <RustyEngineProductUiProjectionContract>abyss.ui.snapshot.v1</RustyEngineProductUiProjectionContract>
-    <RustyEngineWatchPaths>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'));$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineWatchPaths>
     <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
     <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz>
     <RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
@@ -66,8 +70,8 @@
     <RustyEngineProductInputMapping Include="abyss.action.journey-onward.chord" Intent="abyss.action.journey-onward" Trigger="key:key-l:pressed:chord=alt-left" />
   </ItemGroup>
 
-  <Target Name="BuildAbyssProductUi" BeforeTargets="GenerateRustyEngineProductComposition">
-    <Delete Files="$(RustyEngineProductUiRoot)/main.js.map;$(RustyEngineProductUiRoot)/main.d.ts" />
-    <Exec Command="npm --prefix &quot;$(MSBuildThisFileDirectory)../..&quot; exec -- tsc -p &quot;$(MSBuildThisFileDirectory)../ui&quot;" />
-  </Target>
+  <!-- UI build inputs outside the UI source root: the compiler and its lockfile. -->
+  <ItemGroup>
+    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../package-lock.json" />
+  </ItemGroup>
 </Project>
