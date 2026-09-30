@@ -27,9 +27,10 @@ public sealed class UuCastingHosting
     private readonly List<UuCastingWorkflow.SpellEffectInstance> _effects = [];
     private readonly Random _rng;
 
-    public UuCastingHosting(Random? rng = null)
+    public UuCastingHosting(Random rng)
     {
-        _rng = rng ?? Random.Shared;
+        ArgumentNullException.ThrowIfNull(rng);
+        _rng = rng;
     }
 
     public void CollectRune(int index) => _shelf.AddRunestone(index);

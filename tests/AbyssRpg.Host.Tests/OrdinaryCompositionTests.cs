@@ -1600,8 +1600,9 @@ public sealed class OrdinaryCompositionTests
             .LevelObjectIdentity(1, TestContent.LitLightObjectIndex).Value;
         Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == lit);
 
-        // Far enough that the avatar's own light cannot reach the light's tile.
-        spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 60f);
+        // Far enough along the open row that the avatar's own light cannot reach
+        // the light's tile, while nothing stands between them.
+        spatial.StepTranslation = new System.Numerics.Vector3(76f, 1f, 4f);
         product.Update(SixtyHzUpdate(2));
         product.Update(SixtyHzUpdate(3));
         // Seven tiles away, against a radius of six: the light is out of the
@@ -2049,6 +2050,127 @@ public sealed class OrdinaryCompositionTests
 
         product.Update(new ProductUpdate(Facts(3), [Mapped("abyss.action.quicksave", InputEdge.Pressed)]));
         Assert.Contains(product.Slots(), slot => slot.Key == "quicksave/0");
+    }
+
+    [Fact]
+    public void A_load_rebuilds_the_saved_avatar_rather_than_rolling_one()
+    {
+        // A save opened by another process has only its bytes. The avatar is
+        // edited in them to one no roll produces, so a load that re-rolled would
+        // be seen here even though this process would roll the same seed again.
+        using AbyssProduct product = Product(out _, out _, out _, out InMemoryPersistenceService persistence);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var original = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var snapshot = AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionSnapshotCodec.Decode(
+            original.CaptureSave().Bytes.ToArray());
+        Assert.Equal(original.State.WorldSeed, snapshot.WorldSeed);
+        Assert.Equal(original.State.Creation.Skills, snapshot.Avatar.Skills);
+
+        int[] skills = [.. snapshot.Avatar.Skills.Select(value => value + 3)];
+        var edited = snapshot with
+        {
+            Avatar = snapshot.Avatar with { Attributes = [29, 28, 27], Skills = skills, Name = "Shamino" },
+            Hp = 5,
+        };
+        Seed(persistence).Save("quicksave/0", new AbyssSaveEnvelope(
+            BuiltInRulesets.UltimaUnderworld.Value,
+            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuSessionSnapshotCodec.Encode(edited)));
+        Assert.True(product.LoadSlot("quicksave/0"));
+
+        var loaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        AbyssRpg.Kit.Actors.PlayerActorState avatar = loaded.State.Avatar;
+        Assert.Equal(29, avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.strength")).Value);
+        Assert.Equal(28, avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.dexterity")).Value);
+        Assert.Equal(27, avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.intelligence")).Value);
+        for (int skill = 0; skill < skills.Length; skill++)
+            Assert.Equal(skills[skill], avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse($"abyss.skill.{skill}")).Value);
+        Assert.Equal("Shamino", ((ISessionStatusSource)loaded).Status.AvatarName);
+        Assert.Equal(snapshot.WorldSeed, loaded.State.WorldSeed);
+        // Maximum health follows the saved avatar's strength, not a new roll's,
+        // and the saved health sits under it.
+        var vitals = AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuVitalsPolicy.Recalculate(29, 1, skills[8], 27);
+        Assert.Equal(vitals.MaxHp, ((ISessionStatusSource)loaded).Status.MaxHp);
+        Assert.Equal(5, ((ISessionStatusSource)loaded).Status.Hp);
+    }
+
+    [Fact]
+    public void Loading_a_slot_does_not_rewrite_that_levels_autosave()
+    {
+        using AbyssProduct product = Product(out _, out _, out _, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        AbyssSlotSummary written = Assert.Single(product.Slots(), slot => slot.Key == "autosave/level-1");
+        product.Quicksave();
+
+        Assert.True(product.LoadSlot("autosave/level-1"));
+        for (ulong step = 2; step <= 5; step++) product.Update(SixtyHzUpdate(step));
+        Assert.Equal(written.SavedAtUtc, Assert.Single(product.Slots(), slot => slot.Key == "autosave/level-1").SavedAtUtc);
+
+        // The quicksave is still the newest slot, so Journey Onward is not
+        // redirected to a copy the load itself wrote.
+        Assert.True(product.LoadSlot("quicksave/0"));
+        product.Update(SixtyHzUpdate(6));
+        Assert.Equal("quicksave/0", product.Slots()[0].Key);
+        Assert.Equal(written.SavedAtUtc, Assert.Single(product.Slots(), slot => slot.Key == "autosave/level-1").SavedAtUtc);
+    }
+
+    [Fact]
+    public void An_engine_pause_keeps_the_mode_play_was_in()
+    {
+        using AbyssProduct product = Product(out UiDouble ui, out _, out _, out _);
+        product.Start();
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+
+        // Menu-paused, then the Engine pauses and resumes: still menu-paused.
+        product.PausePlay();
+        product.Pause();
+        product.Resume();
+        Assert.Equal(ProductMode.Paused, product.Mode);
+        product.ResumePlay();
+        Assert.Equal(ProductMode.Playing, product.Mode);
+
+        // Dead, then the Engine pauses and resumes: still dead, and a resume
+        // intent does not stand a zero-health avatar back up.
+        session.ApplyDefeatDamage(((ISessionStatusSource)session).Status.Hp, "slain");
+        product.Update(SixtyHzUpdate(1));
+        Assert.Equal(ProductMode.Dead, product.Mode);
+        product.Pause();
+        product.Resume();
+        Assert.Equal(ProductMode.Dead, product.Mode);
+        product.Update(new ProductUpdate(Facts(2), [Intent("abyss.lifecycle.resume")]));
+        Assert.Equal(ProductMode.Dead, product.Mode);
+        Assert.Equal(AbyssModes.Dead, HudString(ui.LastProjection!.Value.Value, "mode"));
+        Assert.Contains("avatar is down", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+
+        // Even a mode forced back to playing is asked back to dead by the session.
+        product.Update(new ProductUpdate(Facts(3), [Intent("abyss.action.respawn")]));
+        Assert.Equal(ProductMode.Playing, product.Mode);
+        session.ApplyDefeatDamage(((ISessionStatusSource)session).Status.Hp, "slain again");
+        product.Update(SixtyHzUpdate(4));
+        Assert.Equal(ProductMode.Dead, product.Mode);
+    }
+
+    [Fact]
+    public void A_session_that_fails_to_release_still_releases_the_hosts_own_resources()
+    {
+        using AbyssProduct product = Product(out UiDouble ui, out GraphicsDouble graphics, out _, out InMemoryPersistenceService persistence);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+
+        // A failed release on a load is reported, and play continues on the new world.
+        graphics.FailEmptySnapshot = true;
+        product.Quicksave();
+        Assert.True(product.LoadSlot("quicksave/0"));
+        Assert.NotNull(product.Session);
+        Assert.Contains("did not release cleanly", HudString(ui.LastProjection!.Value.Value, "outcome"), StringComparison.Ordinal);
+
+        // At shutdown the failure still reaches the Engine, after the store and
+        // the projection stream are closed.
+        Assert.ThrowsAny<Exception>(product.Shutdown);
+        Assert.Equal(1, ui.CloseCalls);
+        Assert.Equal(1, persistence.StoresClosed);
+        Assert.Null(product.Session);
     }
 
     [Fact]

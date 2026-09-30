@@ -29,8 +29,10 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     private IGameSession? _session;
     private AbyssLifecycleMode _lifecycle = AbyssLifecycleMode.Stopped;
     private ProductMode _mode = ProductMode.Playing;
+    private ProductMode _modeBeforeEnginePause = ProductMode.Playing;
     private int _lastAutosaveLevel = -1;
     private string _hostOutcome = "";
+    private string _releaseFailure = "";
     private IReadOnlyList<AbyssSlotSummary> _slotCache = [];
     private bool _slotsDirty = true;
     private bool _shutdown;
@@ -63,13 +65,23 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         _ruleset = BuiltInRulesets.CreateRuleset(selection.Ruleset);
         _store = new AbyssSaveStore(context, "abyssrpg.saves");
         _slots = new AbyssSaveSlots(_store);
-        _projection = new AbyssUiProjection(context, AbyssProductEntry.Default);
         try
         {
-            _session = CreateSession(null);
+            _projection = new AbyssUiProjection(context, AbyssProductEntry.Default);
         }
         catch
         {
+            _store.Dispose();
+            throw;
+        }
+
+        try
+        {
+            AdoptSession(CreateSession(null), loaded: false);
+        }
+        catch
+        {
+            _projection.Dispose();
             _store.Dispose();
             throw;
         }
@@ -107,9 +119,9 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             throw new InvalidOperationException($"Cannot start from {_lifecycle}.");
         _lifecycle = AbyssLifecycleMode.Running;
         _mode = ProductMode.Playing;
-        _session ??= CreateSession(null);
+        if (_session is null) AdoptSession(CreateSession(null), loaded: false);
         ApplyMode();
-        _session.PublishInitial();
+        _session!.PublishInitial();
         Publish();
     }
 
@@ -119,6 +131,9 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_lifecycle != AbyssLifecycleMode.Running)
             throw new InvalidOperationException($"Cannot pause from {_lifecycle}.");
         _lifecycle = AbyssLifecycleMode.Paused;
+        // The Engine pause suspends admission over whatever mode play was in; a
+        // dead, modal or menu-paused product is still that when admission returns.
+        _modeBeforeEnginePause = _mode;
         _mode = ProductMode.Paused;
         ApplyMode();
         Publish();
@@ -130,7 +145,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_lifecycle != AbyssLifecycleMode.Paused)
             throw new InvalidOperationException($"Cannot resume from {_lifecycle}.");
         _lifecycle = AbyssLifecycleMode.Running;
-        _mode = ProductMode.Playing;
+        _mode = _modeBeforeEnginePause;
         ApplyMode();
         Publish();
     }
@@ -161,8 +176,13 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         ThrowIfShutdown();
         if (_session is null)
         {
-            _session = CreateSession(null);
-            _session.PublishInitial();
+            AdoptSession(CreateSession(null), loaded: false);
+            _session!.PublishInitial();
+        }
+        else if (Defeated)
+        {
+            RefuseResumeWhileDefeated();
+            return;
         }
 
         _mode = ProductMode.Playing;
@@ -175,8 +195,29 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     {
         ThrowIfShutdown();
         if (_mode == ProductMode.Playing) return;
+        if (Defeated)
+        {
+            RefuseResumeWhileDefeated();
+            return;
+        }
+
         _mode = ProductMode.Playing;
         ApplyMode();
+        Publish();
+    }
+
+    /// <summary>Whether the live avatar is down: play resumes only through a respawn or a load.</summary>
+    private bool Defeated => (_session as ISessionStatusSource)?.Status.Defeated ?? false;
+
+    /// <summary>
+    /// A resume while the avatar is down would let a zero-health avatar play on,
+    /// so the product stays in the dead mode and says what does continue.
+    /// </summary>
+    private void RefuseResumeWhileDefeated()
+    {
+        _mode = ProductMode.Dead;
+        ApplyMode();
+        _hostOutcome = "The avatar is down; return to the anchor or load a save.";
         Publish();
     }
 
@@ -194,12 +235,43 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         Publish();
     }
 
+    /// <summary>
+    /// Releases the live session. The product forgets it before disposing it, so a
+    /// failed release never leaves a disposed session in place; what it could not
+    /// free is reported rather than faulting the admitted update, because play
+    /// continues on the next session either way.
+    /// </summary>
     private void ReleaseSession()
     {
-        _session?.Dispose();
+        IGameSession? released = _session;
         _session = null;
         _lastAutosaveLevel = -1;
+        _releaseFailure = "";
         MarkSlotsDirty();
+        if (released is null) return;
+        try
+        {
+            released.Dispose();
+        }
+        catch (Exception error)
+        {
+            _releaseFailure = $"The previous session did not release cleanly: {error.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Makes a session the live one. A new game has entered its first level, which
+    /// the level-start autosave records (donor: OpenUnderground autosaves on first
+    /// entering each level, docs/research/openunderground-survey.md). A loaded
+    /// session is already what a slot says, so its level is not autosaved again
+    /// until the avatar reaches another one: a load rewriting that level's
+    /// autosave would replace the older save with a newer copy and redirect
+    /// Journey Onward to it.
+    /// </summary>
+    private void AdoptSession(IGameSession session, bool loaded)
+    {
+        _session = session;
+        _lastAutosaveLevel = loaded ? (session as ISessionStatusSource)?.Status.Level ?? -1 : -1;
     }
 
     public void Restart()
@@ -216,10 +288,25 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     {
         if (_shutdown) return;
         _shutdown = true;
-        _session?.Dispose();
+        IGameSession? session = _session;
         _session = null;
-        _projection.Dispose();
-        _store.Dispose();
+        // A session that fails to release still lets the Host release what it
+        // owns; the failure then reaches the Engine's shutdown.
+        try
+        {
+            session?.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                _projection.Dispose();
+            }
+            finally
+            {
+                _store.Dispose();
+            }
+        }
     }
 
     public ProductUpdateResult Update(ProductUpdate update)
@@ -405,11 +492,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         ThrowIfShutdown();
         // A save written by another ruleset would only fail after the live world
         // was gone, so the choice is made over this product's own saves.
-        string? key = AbyssSaveUx.JourneyOnward(
-            Slots()
-                .Where(slot => string.Equals(slot.Ruleset, _composition.Identity.Ruleset.Value, StringComparison.Ordinal))
-                .Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label))
-                .ToArray());
+        string? key = JourneyOnwardKey();
         if (key is null)
         {
             _hostOutcome = "No save to journey onward from.";
@@ -419,6 +502,14 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
 
         return LoadKey(key);
     }
+
+    /// <summary>The slot Journey Onward resumes: the newest of this ruleset's own saves.</summary>
+    private string? JourneyOnwardKey() =>
+        AbyssSaveUx.JourneyOnward(
+            Slots()
+                .Where(slot => string.Equals(slot.Ruleset, _composition.Identity.Ruleset.Value, StringComparison.Ordinal))
+                .Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label))
+                .ToArray());
 
     /// <summary>
     /// Loads one save slot by key. Journey Onward resolves which slot that is for
@@ -512,7 +603,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     {
         ReleaseSession();
         _hostOutcome = "";
-        _session = CreateSession(saved);
+        AdoptSession(CreateSession(saved), loaded: saved is not null);
     }
 
     /// <summary>The slots this product owns, newest first: what Journey Onward resolves over.</summary>
@@ -567,10 +658,10 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         };
         bool defeated = status?.Defeated ?? false;
         IReadOnlyList<AbyssSlotSummary> slots = Slots();
-        string journey = AbyssSaveUx.JourneyOnward(
-            slots.Select(slot => new AbyssSaveUx.SlotDescription(slot.Key, slot.SavedAtUtc, slot.Label)).ToArray()) ?? "";
+        string journey = JourneyOnwardKey() ?? "";
         AbyssMenuState menu = AbyssMenuState.From(mode, defeated, _session is not null, journey, slots, _options);
         string outcome = _hostOutcome.Length > 0 ? _hostOutcome : status?.Outcome ?? "";
+        if (_releaseFailure.Length > 0) outcome = $"{outcome} {_releaseFailure}".Trim();
         _projection.Publish(new AbyssUiSnapshot(
             Ready: status is not null,
             Mode: mode,

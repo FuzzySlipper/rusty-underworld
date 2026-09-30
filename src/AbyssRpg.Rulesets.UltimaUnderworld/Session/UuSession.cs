@@ -22,6 +22,7 @@ public sealed class UuSession : IDisposable
 {
     private readonly Dictionary<int, UuLevelDelta> _storedDeltas = [];
     private readonly Dictionary<int, UuEntityAdmission.Admission> _admissions = [];
+    /// <summary>The actor each placement index of the live level became.</summary>
     private readonly Dictionary<int, DurableIdentityReference> _placedActors = [];
     private bool _disposed;
 
@@ -42,6 +43,12 @@ public sealed class UuSession : IDisposable
     public UuLocomotionPolicy Locomotion { get; }
     public UuMovementTuning MovementTuning { get; }
     public PlayerActorState Avatar { get; }
+
+    /// <summary>
+    /// What creation decided about the avatar. The save carries it, so a load in
+    /// another process rebuilds the same avatar rather than rolling a new one.
+    /// </summary>
+    public UuCreationFlow.CreationResult Creation { get; }
 
     /// <summary>Survival accumulators ticked by updates.</summary>
     public Survival.UuSurvivalState Survival { get; } = new();
@@ -102,6 +109,7 @@ public sealed class UuSession : IDisposable
         UuLocomotionPolicy locomotion,
         UuMovementTuning movementTuning,
         PlayerActorState avatar,
+        UuCreationFlow.CreationResult creation,
         long worldSeed,
         UuRespawnAnchor anchor)
     {
@@ -114,6 +122,7 @@ public sealed class UuSession : IDisposable
         Locomotion = locomotion;
         MovementTuning = movementTuning;
         Avatar = avatar;
+        Creation = creation;
         WorldSeed = worldSeed;
         Anchor = anchor;
     }
@@ -146,6 +155,7 @@ public sealed class UuSession : IDisposable
             new UuLocomotionPolicy(movementTuning),
             movementTuning,
             avatar,
+            choices,
             worldSeed,
             UuRespawnAnchor.FromPose(firstLevel.LevelNumber, spawnPose, worldSeed));
         session._admissions[firstLevel.LevelNumber] =
@@ -163,6 +173,9 @@ public sealed class UuSession : IDisposable
         // The level's creatures are still standing here: what they became is part
         // of the level's state, captured before they leave with it.
         _storedDeltas[from] = Dungeon.Unload(from) with { Actors = CaptureActors(from) };
+        // Placements are indexed within their own level, and only the live level
+        // has actors: the next level's admission registers its own.
+        _placedActors.Clear();
         if (_admissions.Remove(from, out var admission))
             UuEntityAdmission.AbandonLevel(Directory, admission, HeldItems);
 
@@ -188,8 +201,8 @@ public sealed class UuSession : IDisposable
         return new UuSessionSnapshot(
             Clock.ElapsedTicks,
             Dungeon.CurrentLevel,
-            Avatar.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current,
-            Avatar.Stats.GetTrack(Creation.UuAvatarFactory.ManaTrack).Current,
+            Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current,
+            Avatar.Stats.GetTrack(UuAvatarFactory.ManaTrack).Current,
             Survival.Hunger,
             Survival.Fatigue,
             Survival.Poison,
@@ -206,7 +219,8 @@ public sealed class UuSession : IDisposable
                 .ToArray(),
             pose,
             ActorIdentities.CaptureState().Kinds,
-            ItemIdentities.CaptureState().Kinds);
+            ItemIdentities.CaptureState().Kinds,
+            Creation);
     }
 
     public void RestoreSnapshot(UuSessionSnapshot snapshot)
@@ -214,8 +228,8 @@ public sealed class UuSession : IDisposable
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(snapshot);
         Clock.Restore(new GameClockSnapshot(snapshot.ClockTicks));
-        Avatar.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current = snapshot.Hp;
-        Avatar.Stats.GetTrack(Creation.UuAvatarFactory.ManaTrack).Current = snapshot.Mana;
+        Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = snapshot.Hp;
+        Avatar.Stats.GetTrack(UuAvatarFactory.ManaTrack).Current = snapshot.Mana;
         Survival.Hunger = snapshot.Hunger;
         Survival.Fatigue = snapshot.Fatigue;
         Survival.Poison = snapshot.Poison;
@@ -314,7 +328,7 @@ public sealed class UuSession : IDisposable
                 actor.Position.Y,
                 actor.Position.Z,
                 actor.HeadingYawRadians,
-                actor.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current));
+                actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current));
         }
 
         return actors.ToArray();
@@ -330,7 +344,7 @@ public sealed class UuSession : IDisposable
             actor.ApplyPose(new AbyssRpg.Kit.Actors.ActorPose(
                 new AbyssRpg.Kit.Controls.WorldPoint(state.X, state.Y, state.Z),
                 state.HeadingYawRadians));
-            actor.Stats.GetTrack(Creation.UuAvatarFactory.DefeatTrack).Current = state.Health;
+            actor.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = state.Health;
         }
     }
 

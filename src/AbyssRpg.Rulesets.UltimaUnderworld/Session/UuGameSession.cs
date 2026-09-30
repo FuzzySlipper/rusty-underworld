@@ -72,7 +72,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly List<(Appearance? Appearance, MeshResource? Mesh, Material? Material)> _retiredLevelResources = [];
     private ProductMode _mode = ProductMode.Playing;
     private ProductMode? _pendingMode;
-    private bool _defeatRequested;
     private double _tickCarry;
     private bool _scenePublished;
     private bool _disposed;
@@ -277,7 +276,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuConversationCatalog? Conversations,
         UuStrings? Strings,
         UuSessionSnapshot? Snapshot,
-        int WorldSeed,
+        long WorldSeed,
         string DefaultAvatarName);
 
     private static Prepared Prepare(GameSessionContext context, RulesetSavePayload? saved)
@@ -305,9 +304,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuCreationCatalog.Catalog creation = UuCreationCatalog.Read(
             avatarPack.Payload, classPack.Payload,
             $"content pack '{avatarPack.Id.Value}'", $"content pack '{classPack.Id.Value}'");
-        int worldSeed = composition.Identity.Bundle.Value.GetHashCode(StringComparison.Ordinal);
-        var rng = new Random(unchecked(worldSeed));
-        UuCreationFlow.CreationResult choices = UuCreationCatalog.RollDefault(creation, rng);
+        // A new game plants its seed once and the save carries it, together with
+        // the avatar creation produced: a load rebuilds that avatar and that seed
+        // rather than rolling either again, so a save opened by another process
+        // is the same character with the same maximum health.
+        long worldSeed = savedSnapshot?.WorldSeed ?? Random.Shared.NextInt64();
+        UuCreationFlow.CreationResult choices = savedSnapshot?.Avatar is { } savedAvatar
+            ? RequireSavedAvatar(savedAvatar, creation)
+            : UuCreationCatalog.RollDefault(creation, SeededRandom(worldSeed));
         UuVitalsPolicy.Vitals vitals = UuVitalsPolicy.Recalculate(
             choices.Attributes[0], 1, choices.Skills[SkillIndexForVitals],
             choices.Attributes[2]);
@@ -364,7 +368,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         UuCreationFlow.CreationResult choices = prepared.Choices;
         UuVitalsPolicy.Vitals vitals = prepared.Vitals;
-        var rng = new Random(unchecked(prepared.WorldSeed));
+        Random rng = SeededRandom(prepared.WorldSeed);
         UuSession session = UuSession.NewGame(
             choices, vitals, prepared.FirstLevel, level.Spawn, tuning.Movement,
             worldSeed: prepared.WorldSeed);
@@ -466,6 +470,24 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         }
 
         return gameSession;
+    }
+
+    /// <summary>The session's one random source, from the seed the save carries.</summary>
+    private static Random SeededRandom(long seed) => new(unchecked((int)(seed ^ (seed >>> 32))));
+
+    /// <summary>
+    /// The avatar a save carries, refused when its shape does not fit the
+    /// creation catalog: a truncated attribute or skill row would otherwise
+    /// surface as an index overrun deep inside the avatar factory.
+    /// </summary>
+    private static UuCreationFlow.CreationResult RequireSavedAvatar(
+        UuCreationFlow.CreationResult avatar, UuCreationCatalog.Catalog creation)
+    {
+        if (avatar.Attributes is not { Length: 3 } || avatar.Skills?.Length != UuSkillRolls.SkillCount)
+            throw new InvalidOperationException("The save's avatar does not carry three attributes and every skill.");
+        if (avatar.ClassIndex < 0 || avatar.ClassIndex >= creation.Tables.Classes.Count)
+            throw new InvalidOperationException($"The save's avatar class {avatar.ClassIndex} is not in the class pack.");
+        return avatar with { Name = avatar.Name ?? "" };
     }
 
     // The vitals policy reads the mana skill index; UW1 skill 8 governs casting.
@@ -682,15 +704,60 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 ObjectAppearance(shape, 0), true, RenderLayer.Scene));
         }
         _context.Engine.Graphics.PublishSnapshot(CollectionsMarshal.AsSpan(facts));
-        // Removals are what play does to the level, so the drawn set is signed by
-        // how many records are still live rather than by the admission-time count.
-        _publishedScene = (
+        _publishedScene = SceneInputs();
+    }
+
+    /// <summary>
+    /// Everything the published scene is drawn from. Removals are what play does
+    /// to the level, so it is signed by how many records are still live rather
+    /// than by the admission-time count; where things stand, where the avatar
+    /// stands and how far its light reaches decide what is drawn and in which band,
+    /// so they sign it too.
+    /// </summary>
+    private readonly record struct SceneSignature(
+        int Level,
+        int Objects,
+        int Doors,
+        int Carried,
+        int Creatures,
+        int Fallen,
+        int Placement,
+        int AvatarTileX,
+        int AvatarTileY,
+        int Light);
+
+    private SceneSignature SceneInputs()
+    {
+        int level = _session.Dungeon.CurrentLevel;
+        UuLevelState state = _session.Dungeon.Current;
+        var placement = new HashCode();
+        foreach (KeyValuePair<int, (int TileX, int TileY)> moved in state.MovedObjects.OrderBy(entry => entry.Key))
+            placement.Add(moved);
+        foreach (DroppedPlacement dropped in state.Dropped) placement.Add(dropped);
+        if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures))
+        {
+            // Quantized to a tenth of a unit: a creature that moves is redrawn,
+            // one that stands still is not redrawn by floating-point noise.
+            foreach ((int index, ActorState creature) in creatures.OrderBy(entry => entry.Key))
+            {
+                placement.Add(index);
+                placement.Add((int)MathF.Round(creature.Position.X * 10f));
+                placement.Add((int)MathF.Round(creature.Position.Z * 10f));
+            }
+        }
+
+        (int avatarX, int avatarY) = AvatarTile;
+        return new SceneSignature(
             level,
             LiveObjectCount(level),
-            _session.Dungeon.Current.OpenedDoors.Count,
+            state.OpenedDoors.Count,
             CarriedItems.UniqueItems.Count,
             StandingCreatureCount(level),
-            FallenCreatureCount(level));
+            FallenCreatureCount(level),
+            placement.ToHashCode(),
+            avatarX,
+            avatarY,
+            LightRadius);
     }
 
 
@@ -703,7 +770,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         get
         {
-            _ = _disposed;
             int radius = BaseLightRadius;
             // A light spell widens it while it holds; the maintained-spell owner
             // answers that, not a second timer here.
@@ -1293,8 +1359,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly Dictionary<(UuObjectShapeKind Class, int Band), Appearance> _objectAppearances = [];
 
     /// <summary>What the published scene was drawn from, so it is redrawn only when it changes.</summary>
-    private (int Level, int Objects, int Doors, int Carried, int Creatures, int Fallen) _publishedScene
-        = (-1, -1, -1, -1, -1, -1);
+    private SceneSignature? _publishedScene;
 
     /// <summary>Keeps the generation being replaced until the session releases it.</summary>
     private void RetireLevelResources()
@@ -1312,22 +1377,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public ProductUpdateResult Update(ProductUpdate update)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        // What stands on the level changes when play takes, opens or strikes: the
-        // scene is one description, so it is republished when its inputs differ.
-        if (_scenePublished && _appearance is not null
-            && _session.PlacedAdmission(_session.Dungeon.CurrentLevel) is { } live
-            && _publishedScene != (
-                _session.Dungeon.CurrentLevel,
-                LiveObjectCount(_session.Dungeon.CurrentLevel),
-                _session.Dungeon.Current.OpenedDoors.Count,
-                CarriedItems.UniqueItems.Count,
-                StandingCreatureCount(_session.Dungeon.CurrentLevel),
-                FallenCreatureCount(_session.Dungeon.CurrentLevel)))
-        {
-            PublishScene(_appearance);
-        }
-
-        RevealAroundAvatar();
         double seconds = update.Facts.FixedDeltaSeconds;
         if (!double.IsFinite(seconds) || seconds <= 0d)
             throw new ArgumentOutOfRangeException(nameof(update));
@@ -1357,12 +1406,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _casting.Upkeep(_session.Clock.ElapsedTicks);
         TickSurvival(seconds);
         _camera.Update(_player);
+        RevealAroundAvatar();
+        // What stands on the level changes when play takes, opens, strikes or
+        // walks: the scene is one description, so it is republished once, after
+        // this step's changes, whenever its inputs differ.
+        if (_scenePublished && _appearance is not null && _publishedScene != SceneInputs())
+            PublishScene(_appearance);
 
-        if (_session.Avatar.IsDefeated && !_defeatRequested)
-        {
-            _defeatRequested = true;
-            _pendingMode = ProductMode.Dead;
-        }
+        // A defeated avatar asks for the dead mode on every step it is still
+        // played: a mode the Engine lifecycle restored over it is asked again.
+        if (_session.Avatar.IsDefeated) _pendingMode = ProductMode.Dead;
 
         return ProductUpdateResult.None;
     }
@@ -1678,6 +1731,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             script,
             _strings?.Provider ?? ((_, _) => ""),
             npc,
+            _rng,
             tray: Tray(talker),
             avatar: new UuConversationHosting.AvatarPresence(
                 CharmSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.15")).Value,
@@ -1982,9 +2036,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         AbandonActors(from);
 
         // The Engine stands the avatar in the new level's collision before any
-        // step is proposed, then the new level's geometry is drawn.
+        // step is proposed. The new level is drawn last, once its placements,
+        // inhabitants and the avatar's pose are the ones the scene reads.
         _movement.ReplaceContent(definition.Collision);
-        PublishLevel(scene);
         _level = definition;
         _placements = placements;
 
@@ -2004,7 +2058,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         WorldPoint anchor = AnchorPositionOf(definition);
         _player.Restore(anchor, DetachedMotion(anchor.Y));
-        _camera.Update(_player);
+        PublishLevel(scene);
         _outcome = $"You descend to level {level}.";
     }
 
@@ -2357,7 +2411,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _player.YawRadians = _level.Spawn.HeadingYawRadians;
         _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current =
             _session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Maximum.Value;
-        _defeatRequested = false;
         _pendingMode = ProductMode.Playing;
         _outcome = "You wake at the anchor.";
     }

@@ -17,10 +17,13 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
 
     internal void Put(string scope, string key, byte[] payload) => _values[(scope, key)] = new(1, payload.ToArray());
 
+    /// <summary>How many opened stores the product has released.</summary>
+    internal int StoresClosed { get; private set; }
+
     public PersistenceStore OpenStore(PersistenceOpenRequest request)
     {
         _scope = request.Scope;
-        return new(new PersistenceStoreHandle(1), static () => { });
+        return new(new PersistenceStoreHandle(1), () => StoresClosed++);
     }
 
     public PersistenceSaveReceipt Save(PersistenceSaveRequest request)
@@ -316,8 +319,12 @@ internal sealed class GraphicsDouble : IGraphicsService
         return new Appearance(new AppearanceHandle(1), static () => { });
     }
 
+    /// <summary>Fails the release-time empty publish, the way a lost renderer would.</summary>
+    internal bool FailEmptySnapshot { get; set; }
+
     public void PublishSnapshot(ReadOnlySpan<AppearanceFact> values)
     {
+        if (FailEmptySnapshot && values.IsEmpty) throw new InvalidOperationException("renderer lost");
         SnapshotCalls++;
         LastSnapshot = values.ToArray();
     }
@@ -372,6 +379,7 @@ internal class UiDouble : DispatchProxy
     internal IUiService Service { get; private set; } = null!;
     internal UiProjection? LastProjection { get; private set; }
     internal int OpenCalls { get; private set; }
+    internal int CloseCalls { get; private set; }
 
     internal static UiDouble Create()
     {
@@ -391,7 +399,7 @@ internal class UiDouble : DispatchProxy
     private UiStream Open()
     {
         OpenCalls++;
-        return new UiStream(new UiStreamHandle(1), static () => { });
+        return new UiStream(new UiStreamHandle(1), () => CloseCalls++);
     }
 
     private object? Publish(UiProjection projection)

@@ -33,10 +33,11 @@ public sealed class UuConversationHosting : IUuConversationImports
     private int _patience;
     private string? _lastTrade;
 
-    public UuConversationHosting(Session.UuSession session, Random? rng = null)
+    public UuConversationHosting(Session.UuSession session, Random rng)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
-        _rng = rng ?? Random.Shared;
+        ArgumentNullException.ThrowIfNull(rng);
+        _rng = rng;
     }
 
     public void SetAvatar(AvatarPresence avatar)
@@ -76,7 +77,7 @@ public sealed class UuConversationHosting : IUuConversationImports
     /// </summary>
     public static TalkResult Talk(
         Session.UuSession session, UuConversationVm.ConversationScript script,
-        Func<int, int, string> strings, string npc, Random? rng = null,
+        Func<int, int, string> strings, string npc, Random rng,
         BarterTray? tray = null, AvatarPresence? avatar = null, NpcRecord? talker = null)
     {
         ArgumentNullException.ThrowIfNull(session);

@@ -11,8 +11,8 @@ public sealed record UuRespawnAnchor(int Level, float X, float Y, float Z, float
 }
 
 /// <summary>
-/// Slice snapshot DTO: avatar vitals, survival, clock, level + deltas,
-/// knowledge, seed, and anchor — one current schema, no versions. The Host
+/// Slice snapshot DTO: the avatar as created, its vitals, survival, clock,
+/// level + deltas, knowledge, seed, and anchor — one current schema, no versions. The Host
 /// stores the serialized bytes; meaning stays ruleset-owned.
 /// </summary>
 public sealed record UuSessionSnapshot(
@@ -33,6 +33,7 @@ public sealed record UuSessionSnapshot(
     AvatarPoseDto AvatarPose,
     AbyssRpg.Kit.World.KindAllocatorState[] ActorIdentities,
     AbyssRpg.Kit.World.KindAllocatorState[] ItemIdentities,
+    Creation.UuCreationFlow.CreationResult Avatar,
     UuHoldingDto[]? Holdings = null,
     AbyssRpg.Kit.Actors.ProjectileFlight[]? Projectiles = null,
     Magic.UuCastingHosting.SavedState? Casting = null);
