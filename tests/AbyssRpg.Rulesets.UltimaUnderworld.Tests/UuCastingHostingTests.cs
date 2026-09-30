@@ -102,15 +102,12 @@ public sealed class UuCastingHostingTests
     public void A_maintained_light_spell_is_what_the_light_radius_asks_about()
     {
         // The runes are found the way the other casting tests find them rather than
-        // hardcoded, and the cast roll is retried until one lands.
+        // hardcoded.
         UuCastingHosting hosting = Shelf(FindRune('I'), FindRune('L'));
         Assert.False(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
 
-        for (int attempt = 0; attempt < 50
-            && hosting.AttemptCast(10, 30, 30, false, 0, 255, 1).Gate != UuCastGates.GateResult.Cast; attempt++)
-        {
-            hosting = Shelf(FindRune('I'), FindRune('L'));
-        }
+        // The shelf's random source is seeded, so this cast lands deterministically.
+        Assert.Equal(UuCastGates.GateResult.Cast, hosting.AttemptCast(10, 30, 30, false, 0, 255, 1).Gate);
 
         Assert.True(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
         Assert.False(hosting.MaintainsFamily(UuSpellCatalog.Family.Damage));
@@ -123,11 +120,8 @@ public sealed class UuCastingHostingTests
         // the effect carrying it expires: the light a player cast does not burn
         // forever, and nothing else has to time it.
         UuCastingHosting hosting = Shelf(FindRune('I'), FindRune('L'));
-        for (int attempt = 0; attempt < 50
-            && hosting.AttemptCast(10, 30, 30, false, 0, 255, 1).Gate != UuCastGates.GateResult.Cast; attempt++)
-        {
-            hosting = Shelf(FindRune('I'), FindRune('L'));
-        }
+        // The shelf's random source is seeded, so this cast lands deterministically.
+        Assert.Equal(UuCastGates.GateResult.Cast, hosting.AttemptCast(10, 30, 30, false, 0, 255, 1).Gate);
 
         Assert.True(hosting.MaintainsFamily(UuSpellCatalog.Family.Light));
         UuSpellCatalog.SpellEntry light = UuSpellCatalog.FindByRunes("IL")!;

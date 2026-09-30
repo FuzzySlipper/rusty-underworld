@@ -76,12 +76,16 @@ public sealed class OrdinaryCompositionTests
         // The level mesh crossed into the Engine with the imported geometry.
         Assert.Equal(1, graphics.MaterialCalls);
         Assert.Equal(1, graphics.AppearanceCalls);
+        // What crossed is the imported scene itself, read here the way the
+        // ruleset reads it, not a count copied out of the fixture.
         MeshResourceCreateRequest mesh = graphics.MeshRequest ?? throw new InvalidOperationException("no mesh");
-        Assert.Equal(8, mesh.Positions.Length);
-        Assert.Equal(12, mesh.Indices.Length);
+        var imported = AbyssRpg.Rulesets.UltimaUnderworld.Content.UuLevelSceneContent.Read(
+            TestContent.Build().ReadBytes(TestContent.RenderPath), TestContent.RenderPath);
+        Assert.Equal(imported.Positions, mesh.Positions.ToArray());
+        Assert.Equal(imported.Indices, mesh.Indices.ToArray());
         Assert.Equal(1, mesh.Groups.Length);
         Assert.Equal(1, mesh.Bindings.Length);
-        Assert.Equal((uint)12, mesh.Groups.Span[0].Count);
+        Assert.Equal((uint)imported.Indices.Length, mesh.Groups.Span[0].Count);
 
         // One description of the admitted world is live in the scene layer: the
         // level, then a fact per thing standing on it, keyed by the durable
@@ -160,13 +164,25 @@ public sealed class OrdinaryCompositionTests
     [Fact]
     public void Physics_and_look_move_the_avatar_through_the_engine_step()
     {
-        using AbyssProduct product = Product(out _, out _, out CameraViewDouble cameraView, out _);
+        EngineSpatialDouble spatial = EngineSpatialDouble.Create();
+        CameraViewDouble cameraView = CameraViewDouble.Create();
+        using var product = new AbyssProduct(
+            EngineContextFake.Create(
+                persistence: new InMemoryPersistenceService(),
+                spatial: spatial.Service,
+                content: SpatialContentDouble.Create().Service,
+                ui: UiDouble.Create().Service,
+                cameraView: cameraView.Service,
+                graphics: new GraphicsDouble()),
+            TestContent.Build(),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
         product.Start();
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
-        AbyssRpg.Kit.Controls.WorldPoint start = session.PlayerPosition!.Value;
 
-        // Hold W and drag the pointer: the Engine step receipt lands the avatar
-        // at the double's transform, and look integrates into the held heading.
+        // Hold W and drag the pointer. The product's half of a step is what it
+        // proposes: W is forward intent in the Engine command. The Engine's half
+        // is where the solver lands the avatar, and the product adopts that pose.
+        spatial.StepTranslation = new System.Numerics.Vector3(5f, 1f, 7f);
         product.Update(new ProductUpdate(
             Facts(1),
             [
@@ -174,8 +190,13 @@ public sealed class OrdinaryCompositionTests
                 PointerDelta(10f, 4f),
             ]));
 
-        Assert.NotEqual(start, session.PlayerPosition!.Value);
+        Assert.Equal(new System.Numerics.Vector2(0f, 1f), Assert.Single(spatial.StepIntents));
+        Assert.Equal(new AbyssRpg.Kit.Controls.WorldPoint(5f, 1f, 7f), session.PlayerPosition!.Value);
         Assert.NotEqual(0f, session.PlayerYawRadians);
+
+        // Released, the next proposal carries no intent.
+        product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyW, InputEdge.Released)]));
+        Assert.Equal(System.Numerics.Vector2.Zero, spatial.StepIntents[^1]);
         Assert.NotNull(cameraView.LastDescriptor);
         Assert.NotEqual(0d, cameraView.LastDescriptor!.Value.Pose.YawDegrees);
     }
@@ -298,13 +319,13 @@ public sealed class OrdinaryCompositionTests
         product.Update(new ProductUpdate(Facts(7), [Intent("abyss.action.quicksave")]));
         Assert.Contains(product.Slots(), slot => slot.Key == "quicksave/0");
 
-        // Nothing in reach: the verb says so instead of toggling anything.
-        var empty = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
-        Assert.Equal(1, empty.OpenedDoors.Count);
+        // Saving changes nothing in the world: the door the player opened is still
+        // the only open one.
+        Assert.Equal([(1, 1)], session.OpenedDoors);
     }
 
     /// <summary>A product whose bundle admits two imported levels, for travel.</summary>
-    private static AbyssProduct TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial, ProductContent? content = null)
+    private static AbyssProduct TwoLevelProduct(out UiDouble ui, out GraphicsDouble graphics, out EngineSpatialDouble spatial)
     {
         ui = UiDouble.Create();
         graphics = new GraphicsDouble();
@@ -1211,6 +1232,8 @@ public sealed class OrdinaryCompositionTests
         product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
         product.Update(new ProductUpdate(Facts(3), [Key(KeyboardControl.KeyE, InputEdge.Released)]));
         product.Update(new ProductUpdate(Facts(4), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
+        Dictionary<ulong, Appearance> shadedInOwnLight = graphics.LastSnapshot
+            .ToDictionary(fact => fact.ObjectId, fact => fact.Appearance);
         AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.GrantManaForTest(session.State.Avatar, 12d);
         AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuCastingHosting.CastOutcome outcome =
             session.AttemptCast(TestContent.LightSpellId);
@@ -1230,15 +1253,17 @@ public sealed class OrdinaryCompositionTests
                 + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus,
             session.LightRadius);
 
-        // The wider radius never draws less than the narrower one did.
-        int bandsDrawn = graphics.PrimitiveRequests.Count;
-
-        // And the wider radius is what the player is told about.
+        // The wider radius is what the player is told about, and the scene the
+        // next step publishes shades by it: something that stood in a dimmer band
+        // of the avatar's own light is drawn in a brighter one.
         product.Update(SixtyHzUpdate(6));
         Assert.Equal(
             session.LightRadius,
             (int)Field(ui.LastProjection!.Value.Value, "lightRadius").NumberValue);
-        Assert.True(graphics.PrimitiveRequests.Count >= bandsDrawn);
+        Assert.Contains(graphics.LastSnapshot, fact =>
+            fact.ObjectId != AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.LevelObjectId
+            && shadedInOwnLight.TryGetValue(fact.ObjectId, out Appearance? before)
+            && !ReferenceEquals(before, fact.Appearance));
     }
 
     [Fact]
@@ -1508,12 +1533,6 @@ public sealed class OrdinaryCompositionTests
 
         var carried = reloaded.State.Avatar.Actor.Get<Rusty.Engine.Mechanics.InventoryComponent>().View();
         Assert.Single(carried.UniqueItems);
-        Assert.Equal(
-            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
-            carried.UniqueItems[0].Definition.Value);
-        // The avatar's own view is what play reads, and it holds the torch once.
-        // The floor's view can still name an entity the store no longer maps, which
-        // is #8643: a placement re-admitted while the save already accounts for it.
         Assert.Equal(
             AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
             carried.UniqueItems[0].Definition.Value);

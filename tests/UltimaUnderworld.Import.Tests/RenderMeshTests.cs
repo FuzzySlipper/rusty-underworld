@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using System.Text.Json;
 using UltimaUnderworld.Import;
 using Xunit;
@@ -19,12 +20,11 @@ public sealed class RenderMeshTests
         _output = output;
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Shipped_level_1_emits_indexed_render_geometry()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         LevArkReader.LevelPack pack = LevArkReader.ReadLevel(archive, 1, terrain);
         LevelRenderMesh.RenderMesh mesh = LevelRenderMesh.Emit(pack);
@@ -62,12 +62,11 @@ public sealed class RenderMeshTests
         _output.WriteLine($"L1 render: {mesh.Positions.Length} verts, {mesh.Indices.Length / 3} tris");
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Spawn_stands_on_an_open_tile_inside_the_level()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         LevArkReader.LevelPack pack = LevArkReader.ReadLevel(archive, 1, terrain);
         LevelSpawn.Spawn spawn = LevelSpawn.Choose(pack);
@@ -79,7 +78,4 @@ public sealed class RenderMeshTests
         Assert.Equal(8, spawn.OpenNeighbors);
         _output.WriteLine($"spawn tile ({spawn.TileX},{spawn.TileY}) at ({spawn.X},{spawn.Y},{spawn.Z})");
     }
-
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

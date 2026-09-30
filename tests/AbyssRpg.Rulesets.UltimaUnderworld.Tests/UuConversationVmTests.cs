@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using AbyssRpg.Rulesets.UltimaUnderworld.Conversation;
 using UltimaUnderworld.Import;
 using static AbyssRpg.Rulesets.UltimaUnderworld.Conversation.UuConversationVm;
@@ -89,12 +90,11 @@ public sealed class UuConversationVmTests
         Assert.Equal(["[0:1]"], vm.Transcript); // top became 0, matching PUSHI 0
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/CNV.ARK", "UW/DATA/STRINGS.PAK")]
     public void Shipped_conversation_runs_to_exit_with_stub_imports()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/CNV.ARK");
-        byte[]? strings = RequireDataOrSkip("UW/DATA/STRINGS.PAK");
-        if (archive is null || strings is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/CNV.ARK");
+        byte[] strings = OperatorData.Read("UW/DATA/STRINGS.PAK");
 
         CnvArkReader.DialoguePack pack = CnvArkReader.ReadPack(archive, "UW/DATA/CNV.ARK");
         StringsPakReader.DecodedStrings decoded = StringsPakReader.Decode(strings);
@@ -117,27 +117,5 @@ public sealed class UuConversationVmTests
         Assert.NotEmpty(vm.Transcript);
     }
 
-    // Returns null after writing a SKIP notice when operator data is absent.
-    private byte[]? RequireDataOrSkip(string relative)
-    {
-        string root = FindRepoRoot();
-        string path = Path.Combine(root, "local", "extracted", "uw", relative);
-        if (!File.Exists(path))
-        {
-            _output.WriteLine($"SKIP: operator UW1 file missing, nothing checked: {relative}");
-            return null;
-        }
 
-        return File.ReadAllBytes(path);
-    }
-
-    private static string FindRepoRoot()
-    {
-        for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "AGENTS.md"))) return directory.FullName;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the repository root.");
-    }
 }

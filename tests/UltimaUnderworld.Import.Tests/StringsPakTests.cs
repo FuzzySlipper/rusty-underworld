@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,12 +10,7 @@ namespace UltimaUnderworld.Import.Tests;
 // named string constants (GameStrings.str_you_see_ = 260 etc.).
 public sealed class StringsPakTests
 {
-    private readonly ITestOutputHelper _output;
 
-    public StringsPakTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public void Rejects_empty_and_truncated_input()
@@ -23,10 +19,10 @@ public sealed class StringsPakTests
         Assert.Throws<InvalidDataException>(() => StringsPakReader.Decode(new byte[] { 1, 0, (byte)'A', 0, 0, 0 }));
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/STRINGS.PAK")]
     public void Decodes_shipped_strings_with_donor_named_goldens()
     {
-        if (RequireDataOrSkip("UW/DATA/STRINGS.PAK") is not byte[] raw) return;
+        byte[] raw = OperatorData.Read("UW/DATA/STRINGS.PAK");
         var decoded = StringsPakReader.Decode(raw);
 
         Assert.Equal(122, decoded.Blocks.Count);
@@ -38,18 +34,13 @@ public sealed class StringsPakTests
         Assert.Equal("a_battle axe", decoded.GetString(4, 1));
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/STRINGS.PAK")]
     public void GetString_rejects_unknown_block_and_index()
     {
-        if (RequireDataOrSkip("UW/DATA/STRINGS.PAK") is not byte[] raw) return;
+        byte[] raw = OperatorData.Read("UW/DATA/STRINGS.PAK");
         var decoded = StringsPakReader.Decode(raw);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => decoded.GetString(9999, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => decoded.GetString(1, 1_000_000));
     }
-
-    // Returns null after writing a SKIP notice when operator data is absent;
-    // callers return early so the log, not silence, records what was skipped.
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

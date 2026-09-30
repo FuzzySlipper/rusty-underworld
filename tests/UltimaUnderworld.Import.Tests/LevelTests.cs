@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,12 +10,7 @@ namespace UltimaUnderworld.Import.Tests;
 // addressing (tile blocks 0-8, texture 18-26, automap absent→blank).
 public sealed class LevelTests
 {
-    private readonly ITestOutputHelper _output;
 
-    public LevelTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public void Rejects_bad_level_and_truncated_archive()
@@ -25,12 +21,11 @@ public sealed class LevelTests
         Assert.Throws<ArgumentOutOfRangeException>(() => LevArkReader.ReadLevel(new byte[300_000], 10, new byte[1024]));
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Reads_level_1_golden_pack()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         var pack = LevArkReader.ReadLevel(archive, 1, terrain);
         Assert.Equal(4096, pack.Tiles.Count);
@@ -45,12 +40,11 @@ public sealed class LevelTests
         Assert.Equal("UW1", pack.Provenance.SourceGame);
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Shipped_lava_levels_report_spawns_and_upper_levels_are_clean()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         // Donor-model census of lava-floor tiles per level (L1-L9):
         // 0,0,0,0,168,736,315,1529,49. Levels 1-3 have no lava floors at all;
@@ -69,12 +63,11 @@ public sealed class LevelTests
         }
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Detector_fires_on_a_synthetic_lava_spawn()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         var pack = LevArkReader.ReadLevel(archive, 1, terrain);
         LevArkReader.Tile anchor = pack.Tiles.First(t => t.ObjectHead == 0 && t.Type == LevArkReader.TileOpen);
@@ -93,13 +86,12 @@ public sealed class LevelTests
         Assert.Contains(issues, i => i.Kind == "spawn-on-lava" && i.ObjectIndex == 1);
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/PALS.DAT", "UW/DATA/LIGHT.DAT", "UW/DATA/SHADES.DAT")]
     public void Reads_palette_and_light_tables()
     {
-        byte[]? pals = RequireDataOrSkip("UW/DATA/PALS.DAT");
-        byte[]? light = RequireDataOrSkip("UW/DATA/LIGHT.DAT");
-        byte[]? shades = RequireDataOrSkip("UW/DATA/SHADES.DAT");
-        if (pals is null || light is null || shades is null) return;
+        byte[] pals = OperatorData.Read("UW/DATA/PALS.DAT");
+        byte[] light = OperatorData.Read("UW/DATA/LIGHT.DAT");
+        byte[] shades = OperatorData.Read("UW/DATA/SHADES.DAT");
 
         var tables = PaletteTableReader.Read(pals, light, shades);
         Assert.Equal(8, tables.Palettes.Count);
@@ -110,8 +102,4 @@ public sealed class LevelTests
         Assert.Equal(96, tables.Shades.Length);
         Assert.Throws<InvalidDataException>(() => PaletteTableReader.Read(new byte[10], light, shades));
     }
-
-    // Returns null after writing a SKIP notice when operator data is absent.
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

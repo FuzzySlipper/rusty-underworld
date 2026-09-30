@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -13,12 +14,11 @@ public sealed class CollisionMeshTests
         _output = output;
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Shipped_level_1_emits_closed_indexed_mesh()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         LevArkReader.LevelPack pack = LevArkReader.ReadLevel(archive, 1, terrain);
         LevelCollisionMesh.CollisionMesh mesh = LevelCollisionMesh.Emit(pack);
@@ -155,7 +155,4 @@ public sealed class CollisionMeshTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             LevelCollisionMesh.Emit(pack, parameters with { LevelQuantum = 0 }));
     }
-
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using AbyssRpg.Kit.Time;
 using AbyssRpg.Rulesets.UltimaUnderworld.Dungeon;
 using UltimaUnderworld.Import;
@@ -8,12 +9,7 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Tests;
 
 public sealed class UuDungeonSessionTests
 {
-    private readonly ITestOutputHelper _output;
 
-    public UuDungeonSessionTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public void Remove_move_door_delta_round_trip()
@@ -50,12 +46,11 @@ public sealed class UuDungeonSessionTests
         Assert.Throws<ArgumentOutOfRangeException>(() => session.TravelTo(9, 0));
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void Shipped_level_1_admits_and_round_trips()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         LevArkReader.LevelPack pack = LevArkReader.ReadLevel(archive, 1, terrain);
         var admitted = new AdmittedLevel(
@@ -103,38 +98,5 @@ public sealed class UuDungeonSessionTests
         UuEntityAdmission.AbandonLevel(directory, admission); // idempotent
     }
 
-    // Returns null after writing a SKIP notice when operator data is absent.
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData_Optional(relative) is string path ? File.ReadAllBytes(path) : null;
 
-    private string? TestData_Optional(string relative)
-    {
-        try
-        {
-            string root = FindRepoRoot();
-            string path = Path.Combine(root, "local", "extracted", "uw", relative);
-            if (!File.Exists(path))
-            {
-                _output.WriteLine($"SKIP: operator UW1 file missing, nothing checked: {relative}");
-                return null;
-            }
-
-            return path;
-        }
-        catch (DirectoryNotFoundException)
-        {
-            _output.WriteLine($"SKIP: operator UW1 data root missing, nothing checked: {relative}");
-            return null;
-        }
-    }
-
-    private static string FindRepoRoot()
-    {
-        for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "AGENTS.md"))) return directory.FullName;
-        }
-
-        throw new DirectoryNotFoundException("Could not locate the repository root.");
-    }
 }

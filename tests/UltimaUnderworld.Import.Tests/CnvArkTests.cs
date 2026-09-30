@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -13,11 +14,10 @@ public sealed class CnvArkTests
         _output = output;
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/CNV.ARK")]
     public void Shipped_cnv_headers_and_imports_decode()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/CNV.ARK");
-        if (archive is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/CNV.ARK");
 
         CnvArkReader.DialoguePack pack = CnvArkReader.ReadPack(archive, "UW/DATA/CNV.ARK");
 
@@ -38,12 +38,11 @@ public sealed class CnvArkTests
         _output.WriteLine($"CNV: {pack.Conversations.Count} conversations");
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/CNV.ARK", "UW/DATA/BABGLOBS.DAT")]
     public void Bablob_slots_match_conversation_memory()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/CNV.ARK");
-        byte[]? bablobs = RequireDataOrSkip("UW/DATA/BABGLOBS.DAT");
-        if (archive is null || bablobs is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/CNV.ARK");
+        byte[] bablobs = OperatorData.Read("UW/DATA/BABGLOBS.DAT");
 
         CnvArkReader.DialoguePack pack = CnvArkReader.ReadPack(archive, "UW/DATA/CNV.ARK");
         IReadOnlyList<CnvArkReader.BablobEntry> entries = CnvArkReader.ReadBablobs(bablobs);
@@ -62,7 +61,4 @@ public sealed class CnvArkTests
         Assert.Throws<ArgumentException>(() => CnvArkReader.ReadPack([], "CNV.ARK"));
         Assert.Throws<ArgumentException>(() => CnvArkReader.ReadPack([0x02, 0x00, 0xFF], "CNV.ARK"));
     }
-
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

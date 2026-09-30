@@ -20,6 +20,12 @@ internal sealed class InMemoryPersistenceService
     /// <summary>Fails the next write once, the way a transient persistence outage would.</summary>
     internal bool FailNextSave { get; set; }
 
+    /// <summary>Answers the next write with a revision conflict, as the Engine's guard would.</summary>
+    internal bool ConflictNextSave { get; set; }
+
+    /// <summary>The last write the product asked for, guard and expected revision included.</summary>
+    internal PersistenceSaveRequest? LastSave { get; private set; }
+
     internal void Put(string scope, string key, byte[] payload) => _values[(scope, key)] = new(1, payload.ToArray());
 
     /// <summary>How many opened stores the product has released.</summary>
@@ -39,11 +45,17 @@ internal sealed class InMemoryPersistenceService
             throw new IOException("transient outage");
         }
 
+        LastSave = request;
         (string Scope, string Key) key = (_scope, request.Key);
         bool present = _values.TryGetValue(key, out Entry? existing);
-        if ((request.RevisionGuard == PersistenceRevisionGuard.Absent && present)
-            || (request.RevisionGuard == PersistenceRevisionGuard.Exact && (!present || existing!.Revision != request.ExpectedRevision)))
+        // The revision guard is the Engine's to enforce; this double only answers
+        // a conflict when a test scripts one.
+        if (ConflictNextSave)
+        {
+            ConflictNextSave = false;
             return new PersistenceSaveReceipt(PersistenceSaveOutcome.RevisionConflict, existing?.Revision ?? 0);
+        }
+
         ulong revision = present ? checked(existing!.Revision + 1) : 1;
         _values[key] = new(revision, request.Payload.ToArray());
         return new PersistenceSaveReceipt(revision);
@@ -256,8 +268,18 @@ internal class EngineSpatialDouble : DispatchProxy
     /// <summary>Content artifact replacements the product asked for, in order.</summary>
     internal List<SpatialContentArtifactReplaceRequest> ContentReplacements { get; } = [];
 
-    /// <summary>The transform the next character step reports; a walking avatar lands here.</summary>
+    /// <summary>
+    /// The transform the next character step reports; a walking avatar lands here.
+    /// This double answers for the Engine's character solver, whose collision and
+    /// motion are the Engine suite's to prove: the product's side of a step is what
+    /// it proposes (<see cref="StepIntents"/>, <see cref="StepMotions"/>) and that
+    /// it adopts the pose the receipt reports. A test that places the avatar by
+    /// setting this is placing it, not walking it.
+    /// </summary>
     internal Vector3 StepTranslation { get; set; } = new(1, 4, 0);
+
+    /// <summary>Every planar movement intent the product proposed, in order.</summary>
+    internal List<Vector2> StepIntents { get; } = [];
 
     /// <summary>Every step delta the product proposed, in order.</summary>
     internal List<float> StepSeconds { get; } = [];
@@ -303,6 +325,7 @@ internal class EngineSpatialDouble : DispatchProxy
     private CharacterStepReceipt Step(CharacterStepRequest request)
     {
         StepSeconds.Add(request.Command.StepSeconds);
+        StepIntents.Add(request.Command.PlanarIntent);
         StepMotions.Add(request.Motion);
         StepJumpPressed.Add(request.Command.JumpPressed);
         return Receipt(request);

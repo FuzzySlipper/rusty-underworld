@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using System.Text.Json;
 using Xunit;
 
@@ -34,33 +35,9 @@ public sealed class BundleDeclarationTests
         foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
         {
             string id = pack.GetProperty("id").GetString()!;
-            // Level, object-table and item-catalog packs are operator-produced
-            // from the game's own data, so they are generated into the imports tree
-            // rather than committed; the descriptor is found wherever the
-            // resolver would find it under the content root.
-            if (id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
-                || id == "abyssrpg.object-tables"
-                || id == "abyssrpg.item-catalog"
-                || id == "abyssrpg.strings"
-                || id == "abyssrpg.conversations")
-            {
-                string generated = Directory
-                    .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)
-                    .FirstOrDefault() ?? "";
-                Assert.True(
-                    generated.Length > 0 || !Directory.Exists(Path.Combine(root, "abyss", "imports")),
-                    $"A generated pack must carry its descriptor: {id}");
-                if (generated.Length > 0)
-                {
-                    using JsonDocument generatedDescriptor = JsonDocument.Parse(File.ReadAllText(generated));
-                    string generatedPayload = generatedDescriptor.RootElement.GetProperty("payload").GetString()!;
-                    Assert.True(
-                        File.Exists(Path.Combine(root, generatedPayload)),
-                        $"Missing generated payload {generatedPayload}.");
-                }
-
-                continue;
-            }
+            // Operator-produced packs are checked by the test below, which
+            // skips on a clone that has not run the import.
+            if (IsOperatorImported(id)) continue;
 
             authored.Add(id);
             using JsonDocument descriptor = Read(root, $"abyss/packs/{id}.pack.json");
@@ -81,6 +58,38 @@ public sealed class BundleDeclarationTests
         using JsonDocument profile = Read(root, tuningPayload);
         Assert.Equal(255, profile.RootElement.GetProperty("clockTicksPerSecond").GetInt32());
         Assert.Equal("default", profile.RootElement.GetProperty("movement").GetString());
+    }
+
+    /// <summary>
+    /// Level, object-table, item-catalog, string and conversation packs are
+    /// operator-produced from the game's own data, so they are generated into the
+    /// imports tree rather than committed.
+    /// </summary>
+    private static bool IsOperatorImported(string id) =>
+        id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
+        || id is "abyssrpg.object-tables" or "abyssrpg.item-catalog" or "abyssrpg.strings" or "abyssrpg.conversations";
+
+    [ImportedContentFact]
+    public void Every_operator_pack_the_bundle_names_was_imported_with_its_payload()
+    {
+        string root = ContentRoot();
+        using JsonDocument bundle = Read(root, "abyss/bundles/stygian-abyss.bundle.json");
+        foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
+        {
+            string id = pack.GetProperty("id").GetString()!;
+            if (!IsOperatorImported(id)) continue;
+            // The descriptor is found wherever the resolver would find it under
+            // the imports tree.
+            string generated = Directory
+                .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)
+                .FirstOrDefault() ?? "";
+            Assert.True(generated.Length > 0, $"The bundle names {id}, and the import has not written it.");
+            using JsonDocument generatedDescriptor = JsonDocument.Parse(File.ReadAllText(generated));
+            string generatedPayload = generatedDescriptor.RootElement.GetProperty("payload").GetString()!;
+            Assert.True(
+                File.Exists(Path.Combine(root, generatedPayload)),
+                $"Missing generated payload {generatedPayload}.");
+        }
     }
 
     [Fact]

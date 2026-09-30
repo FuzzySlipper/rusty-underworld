@@ -150,14 +150,21 @@ public sealed class HostEntryTests
     }
 
     [Fact]
-    public void Save_honors_the_engine_revision_guard()
+    public void Save_hands_the_revision_guard_to_the_engine_and_reports_its_answer()
     {
+        // The guard is enforced by Engine persistence; the store's job is to pass
+        // the caller's guard through and return the Engine's receipt unchanged.
         var persistence = new InMemoryPersistenceService();
         using var store = new AbyssSaveStore(EngineContextFake.Create(persistence), "abyssrpg.saves");
         var saved = new AbyssSaveEnvelope("abyssrpg.ultima-underworld", [1, 2, 3]);
 
         var first = store.Save("slot", saved, Rusty.Engine.PersistenceRevisionGuard.Absent);
+        Assert.Equal(Rusty.Engine.PersistenceRevisionGuard.Absent, persistence.LastSave!.Value.RevisionGuard);
+
+        persistence.ConflictNextSave = true;
         var conflict = store.Save("slot", saved, Rusty.Engine.PersistenceRevisionGuard.Exact, first.Revision + 1);
+        Assert.Equal(Rusty.Engine.PersistenceRevisionGuard.Exact, persistence.LastSave!.Value.RevisionGuard);
+        Assert.Equal(first.Revision + 1, persistence.LastSave!.Value.ExpectedRevision);
         Assert.Equal(Rusty.Engine.PersistenceSaveOutcome.RevisionConflict, conflict.Outcome);
         Assert.Equal(first.Revision, conflict.Revision);
         Assert.Equal(first.Revision, store.Load("slot").Revision);

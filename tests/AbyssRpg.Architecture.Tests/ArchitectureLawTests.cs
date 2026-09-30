@@ -14,13 +14,48 @@ public sealed class ArchitectureLawTests
         string kit = SourceDirectory("AbyssRpg.Kit");
         string source = ReadSources(kit);
 
-        // NOTE: "Abyss" as a place name stays a human review check — the Kit's
-        // own namespace (AbyssRpg.Kit) contains that substring, so no
-        // substring test can enforce it. Everything else below is exact.
+        // Substrings, case-insensitive: game, ruleset and donor names. "Abyss" as
+        // a place name is a whole-word check below, since the Kit's own
+        // namespace (AbyssRpg.Kit) contains the substring.
         foreach (string forbidden in new[] { "UltimaUnderworld", "Ultima", "Underworld", "Stygian", "UW1", "UW2", "UU1", "UnderworldGodot", "OpenUnderground", "UnityUnderground" })
             Assert.DoesNotContain(forbidden, source, StringComparison.OrdinalIgnoreCase);
 
         Assert.DoesNotContain("AbyssRpg.Rulesets.UltimaUnderworld", ProjectFile("AbyssRpg.Kit"), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The game's own names, as whole words: its places and people, its creatures,
+    /// the skills and runes no other game names, its signature objects, and the
+    /// original data files. Generic words the game also uses (attack, mana,
+    /// avatar, the two-letter runes) cannot be told apart from Kit vocabulary by
+    /// matching, so they stay a review obligation, and so does a Kit type that
+    /// states a game fact in neutral words.
+    /// </summary>
+    [Fact]
+    public void Kit_does_not_name_the_games_places_creatures_skills_runes_objects_or_files()
+    {
+        string[] words =
+        [
+            // Places and people.
+            "Abyss", "Britannia", "Garamon", "Tyball", "Cabirus", "Arial",
+            // Creatures.
+            "Goblin", "Troll", "Gazer", "Ghoul", "Lurker", "Rotworm", "Reaper", "Mongbat", "Slasher",
+            // Skills no other game names.
+            "Picklock", "Acrobat", "Appraise",
+            // Runes long enough to be told apart from ordinary words.
+            "Flam", "Grav", "Jux", "Mani", "Nox", "Ort", "Quas", "Sanct", "Tym", "Uus", "Ylem", "Corp", "Kal", "Vas",
+            // Signature objects.
+            "Runestone", "Ankh", "Moongate",
+        ];
+        (string Label, string Pattern)[] forbidden =
+        [
+            ("game vocabulary", $@"\b({string.Join("|", words)})\b"),
+            ("original data file name", @"\b[A-Z0-9_]+\.(ARK|GR|BYT|TR|PAK|DAT|VOC|N00)\b"),
+            ("original data file basename", @"\b(LEV|CNV|OBJECTS|STRINGS|XFER|TERRAIN|COMOBJ|WEAPONS|CRIT|CUTS)\b"),
+        ];
+
+        foreach (string file in SourceFiles(SourceDirectory("AbyssRpg.Kit")))
+            AssertNoForbiddenPatterns(file, File.ReadAllText(file), forbidden);
     }
 
     [Fact]

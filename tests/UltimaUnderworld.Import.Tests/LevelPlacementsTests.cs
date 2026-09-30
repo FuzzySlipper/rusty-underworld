@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using System.Text.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -130,10 +131,10 @@ public sealed class LevelPlacementsTests
         Assert.Equal(9, root.GetProperty("objects")[0][8].GetInt32());
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/OBJECTS.DAT")]
     public void Object_tables_are_keyed_by_item_id_class()
     {
-        byte[] data = File.ReadAllBytes(TestData.Find("UW/DATA/OBJECTS.DAT"));
+        byte[] data = OperatorData.Read("UW/DATA/OBJECTS.DAT");
         ObjectTablePack.Tables tables = ObjectTablePack.Emit(
             ObjectsDatReader.Read(data), UwTableProvenance.FromBytes("UW1", "UW/DATA/OBJECTS.DAT", data));
 
@@ -153,13 +154,13 @@ public sealed class LevelPlacementsTests
             document.RootElement.GetProperty("triggerTypes").EnumerateArray().Select(value => value.GetInt32()));
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void The_imported_level_places_objects_and_critters()
     {
         LevArkReader.LevelPack pack = LevArkReader.ReadLevel(
-            File.ReadAllBytes(TestData.Find("UW/DATA/LEV.ARK")),
+            OperatorData.Read("UW/DATA/LEV.ARK"),
             1,
-            File.ReadAllBytes(TestData.Find("UW/DATA/TERRAIN.DAT")));
+            OperatorData.Read("UW/DATA/TERRAIN.DAT"));
         LevelPlacements.Placements placements = LevelPlacements.Emit(pack);
 
         Assert.Equal(1012, placements.LiveObjects);
@@ -191,11 +192,11 @@ public sealed class LevelPlacementsTests
         Assert.All(placedCritters, critter => Assert.InRange(critter.HomeTileY, 0, 63));
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/COMOBJ.DAT", "UW/DATA/STRINGS.PAK")]
     public void The_item_catalog_names_the_operators_own_items()
     {
-        byte[] common = File.ReadAllBytes(TestData.Find("UW/DATA/COMOBJ.DAT"));
-        byte[] strings = File.ReadAllBytes(TestData.Find("UW/DATA/STRINGS.PAK"));
+        byte[] common = OperatorData.Read("UW/DATA/COMOBJ.DAT");
+        byte[] strings = OperatorData.Read("UW/DATA/STRINGS.PAK");
         ItemCatalogPack.Catalog catalog = ItemCatalogPack.Emit(
             CommonObjDatReader.Read(common),
             StringsPakReader.Decode(strings, "UW/DATA/STRINGS.PAK"),

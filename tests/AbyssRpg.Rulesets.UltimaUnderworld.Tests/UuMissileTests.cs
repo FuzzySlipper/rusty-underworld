@@ -28,8 +28,14 @@ public sealed class UuMissileTests
             Assert.InRange(UuStrikeResolution.AbsorbWithArmour(rolled, 2), 0, maximum);
         }
 
-        var hit = UuMissilePolicy.RollShot(15, 15, new Random(3));
-        Assert.True(Enum.IsDefined(hit));
+        // A shot is the melee to-hit roll: the same inputs and the same draw
+        // give the same result.
+        for (int seed = 0; seed < 20; seed++)
+        {
+            Assert.Equal(
+                UuStrikeResolution.RollToHit(15, 15, new Random(seed)),
+                UuMissilePolicy.RollShot(15, 15, new Random(seed)));
+        }
 
         Assert.Equal(
             UuStrikeResolution.DamageMaximum(2, 20),

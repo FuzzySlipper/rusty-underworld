@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using System.Text.Json;
 using Xunit;
 
@@ -9,11 +10,11 @@ namespace UltimaUnderworld.Import.Tests;
 /// </summary>
 public sealed class ConversationTests
 {
-    [Fact]
+    [OperatorDataFact("UW/DATA/CNV.ARK", "UW/DATA/STRINGS.PAK")]
     public void The_operators_conversations_and_their_strings_are_emitted()
     {
-        byte[] cnv = File.ReadAllBytes(TestData.Find("UW/DATA/CNV.ARK"));
-        byte[] strings = File.ReadAllBytes(TestData.Find("UW/DATA/STRINGS.PAK"));
+        byte[] cnv = OperatorData.Read("UW/DATA/CNV.ARK");
+        byte[] strings = OperatorData.Read("UW/DATA/STRINGS.PAK");
         ConversationPack.Catalog catalog = ConversationPack.Emit(CnvArkReader.ReadPack(cnv, "UW/DATA/CNV.ARK"));
         ConversationPack.Strings blocks = ConversationPack.EmitStrings(
             catalog,
@@ -39,10 +40,10 @@ public sealed class ConversationTests
             Assert.Contains(conversation.StringBlock, blocks.Blocks.Keys);
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/CNV.ARK")]
     public void A_conversation_pack_carries_its_scripts_and_provenance()
     {
-        byte[] cnv = File.ReadAllBytes(TestData.Find("UW/DATA/CNV.ARK"));
+        byte[] cnv = OperatorData.Read("UW/DATA/CNV.ARK");
         ConversationPack.Catalog catalog = ConversationPack.Emit(CnvArkReader.ReadPack(cnv, "UW/DATA/CNV.ARK"));
 
         using JsonDocument document = JsonDocument.Parse(ConversationPack.ToJson(catalog));

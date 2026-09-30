@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,12 +10,7 @@ namespace UltimaUnderworld.Import.Tests;
 // comments, trigger-code enum).
 public sealed class ObjectTableTests
 {
-    private readonly ITestOutputHelper _output;
 
-    public ObjectTableTests(ITestOutputHelper output)
-    {
-        _output = output;
-    }
 
     [Fact]
     public void Rejects_short_input()
@@ -50,10 +46,10 @@ public sealed class ObjectTableTests
         Assert.Throws<InvalidDataException>(() => SkillsDatReader.Read(new byte[10]));
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/OBJECTS.DAT")]
     public void Reads_shipped_object_tables()
     {
-        if (RequireDataOrSkip("UW/DATA/OBJECTS.DAT") is not byte[] raw) return;
+        byte[] raw = OperatorData.Read("UW/DATA/OBJECTS.DAT");
         var tables = ObjectsDatReader.Read(raw);
 
         Assert.Equal(16, tables.Weapons.Count);
@@ -96,10 +92,10 @@ public sealed class ObjectTableTests
         Assert.True(tables.FoodNutrition[10] > 127);
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/COMOBJ.DAT")]
     public void Reads_shipped_common_object_records()
     {
-        if (RequireDataOrSkip("UW/DATA/COMOBJ.DAT") is not byte[] raw) return;
+        byte[] raw = OperatorData.Read("UW/DATA/COMOBJ.DAT");
         var rows = CommonObjDatReader.Read(raw);
 
         Assert.Equal(512, rows.Count);
@@ -109,10 +105,10 @@ public sealed class ObjectTableTests
         Assert.True(rows[0].CanBePickedUp);
     }
 
-    [Fact]
+    [PinnedReleaseFact("UW/DATA/SKILLS.DAT")]
     public void Reads_shipped_skill_tables()
     {
-        if (RequireDataOrSkip("UW/DATA/SKILLS.DAT") is not byte[] raw) return;
+        byte[] raw = OperatorData.Read("UW/DATA/SKILLS.DAT");
         var skills = SkillsDatReader.Read(raw);
 
         Assert.Equal(8, skills.Classes.Count);
@@ -120,9 +116,4 @@ public sealed class ObjectTableTests
         Assert.Equal(new SkillsDatReader.ClassAttributes(12, 12, 12, 20), skills.Classes[7]);
         Assert.Equal(155, skills.ChoiceTable.Length);
     }
-
-    // Returns null after writing a SKIP notice when operator data is absent;
-    // callers return early so the log, not silence, records what was skipped.
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

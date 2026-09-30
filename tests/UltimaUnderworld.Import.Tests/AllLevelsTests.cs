@@ -1,3 +1,4 @@
+using AbyssRpg.TestSupport;
 using UltimaUnderworld.Import;
 using Xunit;
 using Xunit.Abstractions;
@@ -13,12 +14,11 @@ public sealed class AllLevelsTests
         _output = output;
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/LEV.ARK", "UW/DATA/TERRAIN.DAT")]
     public void All_nine_levels_decode_validate_and_admit()
     {
-        byte[]? archive = RequireDataOrSkip("UW/DATA/LEV.ARK");
-        byte[]? terrain = RequireDataOrSkip("UW/DATA/TERRAIN.DAT");
-        if (archive is null || terrain is null) return;
+        byte[] archive = OperatorData.Read("UW/DATA/LEV.ARK");
+        byte[] terrain = OperatorData.Read("UW/DATA/TERRAIN.DAT");
 
         for (int level = 1; level <= 9; level++)
         {
@@ -36,18 +36,14 @@ public sealed class AllLevelsTests
         }
     }
 
-    [Fact]
+    [OperatorDataFact("UW/DATA/STRINGS.PAK")]
     public void String_blocks_decode_with_provenance()
     {
-        byte[]? strings = RequireDataOrSkip("UW/DATA/STRINGS.PAK");
-        if (strings is null) return;
+        byte[] strings = OperatorData.Read("UW/DATA/STRINGS.PAK");
 
         StringsPakReader.DecodedStrings decoded = StringsPakReader.Decode(strings, "UW/DATA/STRINGS.PAK");
         Assert.Equal("UW1", decoded.Provenance.SourceGame);
         Assert.True(decoded.Blocks.Count >= 7);
         Assert.True(decoded.Blocks.Values.Sum(block => block.Count) > 1000);
     }
-
-    private byte[]? RequireDataOrSkip(string relative) =>
-        TestData.Optional(relative, _output) is string path ? File.ReadAllBytes(path) : null;
 }

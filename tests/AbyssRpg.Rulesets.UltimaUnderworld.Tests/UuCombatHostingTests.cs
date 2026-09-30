@@ -31,8 +31,10 @@ public sealed class UuCombatHostingTests
         Assert.True(outcome.Hit);
         Assert.True(outcome.Damage >= 1);
         Assert.Equal(0f, combat.ChargeFraction); // release resets
-        if (outcome.TargetDefeated)
-            Assert.Equal(UuDeathPolicy.Respawn.AtAnchor, UuCombatHosting.RouteDefeat(false));
+        // Defeat is what the target's track says, and it routes through the death policy.
+        Assert.Equal(target.GetTrack(UuAvatarFactory.DefeatTrack).Current <= 0, outcome.TargetDefeated);
+        Assert.Equal(UuDeathPolicy.Respawn.AtAnchor, UuCombatHosting.RouteDefeat(false));
+        Assert.Equal(UuDeathPolicy.Respawn.AtTree, UuCombatHosting.RouteDefeat(true));
 
         // Tap (no hold) still lands at least 1 on a hit.
         var weak = Tracks(50);
