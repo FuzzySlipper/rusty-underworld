@@ -358,8 +358,7 @@ test('a missing Engine debug panel degrades to a stated message', async (t) => {
 function pinnedRuntimePack() {
   const props = readFileSync(new URL('../../Directory.Build.props', import.meta.url), 'utf8');
   const version = /<RustyEnginePackageVersion>([^<]+)</.exec(props)[1];
-  const cache = process.env.RUSTY_ENGINE_CACHE
-    || join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'rusty-engine');
+  const cache = join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'rusty-engine');
   return join(cache, 'pairs', version, 'runtime-pack');
 }
 

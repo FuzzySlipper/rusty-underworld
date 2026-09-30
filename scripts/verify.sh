@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Routine repository verification for rusty-underworld.
 #
-# This pass landed the repository shell and the Kit bootstrap, so the script
-# currently proves the installed Engine pair identity and the product UI
-# toolchain, builds the checked-in projects, and runs the architecture suite.
-# Add each landed project to `product_projects` and each suite to
-# `test_projects`; the explicit lists are deliberate, because a
-# discovery-based loop silently stops covering a project whose csproj moved
-# or was renamed.
+# Proves the installed Engine pair and the product shape (`rusty status`),
+# builds every product project, stages the Host (which compiles the DOM
+# companion through the SDK's UI build), and then runs every suite: the DOM
+# tests against the staged UI, and each .NET suite. Every stage runs even when
+# an earlier suite fails, so one run reports everything that is broken; the
+# script exits non-zero if any stage failed.
+#
+# The lists are explicit: a discovery-based loop silently stops covering a
+# project whose csproj moved or was renamed.
 #
 # NativeAOT is a separate fidelity/release target and stays opt-in through
 # --aot; the ordinary development loop does not need it.
-set -euo pipefail
+set -uo pipefail
 
 aot=false
 for argument in "$@"; do
@@ -19,7 +21,7 @@ for argument in "$@"; do
     --aot) aot=true ;;
     -h|--help)
       echo "usage: scripts/verify.sh [--aot]"
-      echo "  no arguments  pinned pair install, UI dependencies, product build, suites, and host staging (once the Host entry lands)"
+      echo "  no arguments  pinned pair install and status, UI dependencies, product build, Host staging, every suite"
       echo "  --aot         also run the NativeAOT fidelity publish"
       exit 0
       ;;
@@ -33,23 +35,26 @@ done
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
-# Installs the pinned pair when it is missing (a no-op offline once installed).
-rusty install
+failures=()
+run() {
+  local label=$1
+  shift
+  if ! "$@"; then
+    failures+=("$label")
+    echo "FAILED: $label" >&2
+  fi
+}
+
+# Installs the pinned pair when it is missing (a no-op offline once installed),
+# then reports the pin, the pair and the project shape the CLI checks.
+rusty install || { echo "rusty install failed; nothing else can build." >&2; exit 1; }
+rusty status || { echo "rusty status reports the product is not ready." >&2; exit 1; }
 pair_version=$(sed -n 's|.*<RustyEnginePackageVersion>\([^<]*\)</RustyEnginePackageVersion>.*|\1|p' Directory.Build.props)
 
-# The product UI is a Node-built DOM companion. Its dependencies and its DOM
-# tests are checked here alongside the product projects, because the UI
-# toolchain is what the product companion work consumes.
-npm ci
-npx tsc -p src/ui
-if compgen -G "tests/AbyssRpg.Ui.Tests/*.test.mjs" > /dev/null; then
-  node --test tests/AbyssRpg.Ui.Tests/*.test.mjs
-else
-  echo "No product UI tests are checked in yet."
-fi
+# The product UI is a Node-built DOM companion; its compiler and DOM test
+# dependencies come from the lockfile.
+npm ci || { echo "npm ci failed; the UI cannot build." >&2; exit 1; }
 
-# Every project this repository builds and runs. Explicit lists: a
-# discovery-based loop silently stops covering a project that moved.
 product_projects=(
   "src/AbyssRpg.Kit/AbyssRpg.Kit.csproj"
   "src/AbyssRpg.Rulesets.UltimaUnderworld/AbyssRpg.Rulesets.UltimaUnderworld.csproj"
@@ -64,39 +69,34 @@ test_projects=(
   "tests/AbyssRpg.Host.Tests/AbyssRpg.Host.Tests.csproj"
   "tests/UltimaUnderworld.Import.Tests/UltimaUnderworld.Import.Tests.csproj"
 )
+# The DOM suite is not a .NET project; it runs against the UI staging compiles.
+ui_tests=(tests/AbyssRpg.Ui.Tests/*.test.mjs)
 host_project="src/AbyssRpg.Host/AbyssRpg.Host.csproj"
-# Set once the Host entry became a stageable product composition
-# (IEngineProduct + SDK targets); staging and --aot run against it.
-
-if [[ ${#product_projects[@]} -eq 0 ]]; then
-  echo "No product projects are listed in product_projects."
-  echo "Verified Engine pair ${pair_version} with UI dependencies installed."
-  [[ "$aot" == false ]] || {
-    echo "NativeAOT verification needs a stageable product host project (none listed yet)." >&2
-    exit 1
-  }
-  exit 0
-fi
 
 for project in "${product_projects[@]}"; do
-  dotnet restore "$project"
-  dotnet build "$project" --configuration Release --no-restore
+  run "build $project" bash -c "dotnet restore '$project' && dotnet build '$project' --configuration Release --no-restore"
 done
+
+# Staging runs the SDK's UI build (scripts/build-ui.sh against the pair's UI
+# declarations), so the DOM tests below exercise the UI the product ships.
+run "stage $host_project" dotnet msbuild "$host_project" -t:StageRustyEngineCoreClrProduct -p:Configuration=Release
+
+run "DOM suite" node --test "${ui_tests[@]}"
 for suite in "${test_projects[@]}"; do
-  dotnet test "$suite"
+  run "test $suite" dotnet test "$suite"
 done
-
-# Compiling projects is not the same as exercising them, and a green build says
-# nothing about a suite nobody ran, so every checked suite above is executed.
-
-[[ -z "$host_project" ]] || dotnet msbuild "$host_project" -t:StageRustyEngineCoreClrProduct -p:Configuration=Release
 
 if [[ "$aot" == true ]]; then
-  [[ -n "$host_project" ]] || {
-    echo "NativeAOT verification needs a stageable product host project (Host shell has no entry yet; see UW-T01)." >&2
-    exit 1
-  }
-  dotnet msbuild "$host_project" -t:VerifyRustyEngineAot -p:Configuration=Release
+  run "NativeAOT $host_project" dotnet msbuild "$host_project" -t:VerifyRustyEngineAot -p:Configuration=Release
+fi
+
+if [[ ${#failures[@]} -gt 0 ]]; then
+  echo "Verification failed for Engine pair ${pair_version}:" >&2
+  printf '  %s\n' "${failures[@]}" >&2
+  exit 1
+fi
+
+if [[ "$aot" == true ]]; then
   echo "Verified Engine pair ${pair_version}: CoreCLR and NativeAOT."
 else
   echo "Verified Engine pair ${pair_version}: CoreCLR. Use --aot for the NativeAOT fidelity publish."

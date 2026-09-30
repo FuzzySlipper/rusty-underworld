@@ -192,7 +192,8 @@ npm ci
 den-serve up rusty-underworld -repo "$PWD"
 ```
 
-The broker serves port 4177; the Host build compiles the browser ESM companion.
+The broker serves port 4177; staging the Host compiles the browser ESM companion
+through the SDK's UI build.
 See [GPU playtesting](docs/gpu-playtesting.md) to register the Crew Wolf profile
 and capture the current product. A successful launch is not gameplay acceptance.
 

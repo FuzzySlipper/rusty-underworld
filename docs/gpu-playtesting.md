@@ -18,9 +18,10 @@ den-serve up rusty-underworld -repo "$PWD"
 den-serve status rusty-underworld -repo "$PWD"
 ```
 
-The ordinary packaged CoreCLR host serves port 4177. The Host build compiles
-`src/ui/main.ts` to browser ESM, stages only `src/ui/generated`, and declares
-source/content watch roots and the HUD projection stream. The broker probes
+The ordinary packaged CoreCLR host serves port 4177. Staging compiles
+`src/ui/main.ts` to browser ESM through the SDK's UI build (only when a UI input
+changed), stages only `src/ui/generated`, and declares the HUD projection
+stream; the SDK derives the watch roots from the UI source and content roots. The broker probes
 `/product-ui/main.js` for `mountProductUi`; this establishes serving, not a
 session, scene, or gameplay readiness.
 

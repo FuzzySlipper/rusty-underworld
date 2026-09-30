@@ -3,8 +3,9 @@
 The ordinary Engine product entry, built-in ruleset selection, lifecycle,
 save helpers, menu projections, and spatial-session adapter live here.
 
-The project builds the TypeScript companion as browser ESM and stages it through
-the packaged Engine SDK. `den-serve` launches that CoreCLR product; see
+Staging builds the TypeScript companion as browser ESM through the SDK's UI
+build (`RustyEngineProductUiBuildCommand` runs `scripts/build-ui.sh` against the
+pair's UI declarations, and only when a UI input changed) and stages it. `den-serve` launches that CoreCLR product; see
 [GPU playtesting](../../docs/gpu-playtesting.md).
 
 The entry loads the selected bundle, creates the session, admits the imported

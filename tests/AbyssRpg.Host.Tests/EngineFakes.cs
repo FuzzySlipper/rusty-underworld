@@ -5,8 +5,13 @@ using Rusty.Engine;
 namespace AbyssRpg.Host.Tests;
 
 /// <summary>In-memory Engine persistence + context doubles (test-only).</summary>
-internal sealed class InMemoryPersistenceService : IPersistenceService
+internal sealed class InMemoryPersistenceService
 {
+    internal InMemoryPersistenceService() => Service = ForwardingDouble<IPersistenceService>.Over(this);
+
+    /// <summary>The Engine service this double stands in for.</summary>
+    internal IPersistenceService Service { get; }
+
     private readonly Dictionary<(string Scope, string Key), Entry> _values = [];
     private readonly Dictionary<ulong, Entry?> _blobs = [];
     private ulong _nextBlob;
@@ -77,6 +82,43 @@ internal sealed class InMemoryPersistenceService : IPersistenceService
     private sealed record Entry(ulong Revision, byte[] Payload);
 }
 
+/// <summary>
+/// Stands a plain double in for an Engine service interface: each call is
+/// forwarded to the double's same-named method, and a member the double does not
+/// implement throws. The double is not compile-bound to the interface, so a pair
+/// that adds a service member does not break this suite.
+/// </summary>
+internal class ForwardingDouble<TService> : DispatchProxy
+    where TService : class
+{
+    private object _target = null!;
+
+    internal static TService Over(object target)
+    {
+        TService service = DispatchProxy.Create<TService, ForwardingDouble<TService>>();
+        ((ForwardingDouble<TService>)(object)service)._target = target;
+        return service;
+    }
+
+    protected override object? Invoke(MethodInfo? method, object?[]? arguments)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+        Type[] parameters = [.. method.GetParameters().Select(parameter => parameter.ParameterType)];
+        MethodInfo own = _target.GetType().GetMethod(
+                method.Name, BindingFlags.Instance | BindingFlags.Public, parameters)
+            ?? throw new NotSupportedException(method.Name);
+        try
+        {
+            return own.Invoke(_target, arguments);
+        }
+        catch (TargetInvocationException error) when (error.InnerException is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(error.InnerException);
+            throw;
+        }
+    }
+}
+
 internal class EngineContextFake : DispatchProxy
 {
     private IPersistenceService? _persistence;
@@ -87,7 +129,7 @@ internal class EngineContextFake : DispatchProxy
     private IGraphicsService? _graphics;
 
     public static IEngineContext Create(
-        IPersistenceService? persistence = null,
+        InMemoryPersistenceService? persistence = null,
         ISpatialService? spatial = null,
         IContentService? content = null,
         IUiService? ui = null,
@@ -96,7 +138,7 @@ internal class EngineContextFake : DispatchProxy
     {
         IEngineContext context = DispatchProxy.Create<IEngineContext, EngineContextFake>();
         var fake = (EngineContextFake)(object)context;
-        fake._persistence = persistence;
+        fake._persistence = persistence?.Service;
         fake._spatial = spatial;
         fake._content = content;
         fake._ui = ui;
@@ -289,6 +331,12 @@ internal class EngineSpatialDouble : DispatchProxy
     };
 }
 
+/// <summary>
+/// Records the graphics crossing. Unlike the other doubles this implements the
+/// interface directly: <c>PublishSnapshot</c> takes a <c>ReadOnlySpan</c>, which
+/// a <c>DispatchProxy</c> cannot box, so a pair that adds a graphics member has to
+/// be answered here.
+/// </summary>
 internal sealed class GraphicsDouble : IGraphicsService
 {
     internal MeshResourceCreateRequest? MeshRequest { get; private set; }

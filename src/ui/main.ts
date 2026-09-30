@@ -11,38 +11,18 @@
  * forwards no commands of its own and keeps no transcript.
  */
 
-interface ProjectionEnvelope {
-  readonly contract: string;
-  readonly value: unknown;
-}
-
-interface ProductUiContext {
-  readonly projection?: {
-    subscribe(listener: (projection: ProjectionEnvelope | null) => void): () => void;
-  };
-  readonly intents?: {
-    claim(
-      intent: string,
-      value: { kind: 'digital'; active: boolean },
-    ): void;
-  };
-  readonly ui?: {
-    readonly active: () => boolean;
-    readonly allowsGameplayInput: (event: Event) => boolean;
-    readonly focusGameplay: () => void;
-    readonly interactionMode: () => string;
-    readonly setInteractionMode: (mode: string) => void;
-  };
-}
+import type {
+  RustyApplicationInteractionMode,
+  RustyApplicationUiContext,
+} from '@rusty-engine/product-ui';
 
 /**
  * The Engine browser shell publishes the live-debug panel at this stable
- * specifier through its import map. The packaged typings live in the installed
- * runtime pack, which a checkout without that pack cannot type-check against,
- * so the two members this companion uses are declared here.
+ * specifier through its import map; the pair's own declarations type it.
  */
 type LiveDebugModule = typeof import('@rusty-engine/live-debug');
-type LiveDebugMount = import('@rusty-engine/live-debug').LiveDebugMount;
+type LiveDebugPanelMount = import('@rusty-engine/live-debug').LiveDebugPanelMount;
+type RendererMetricsMount = import('@rusty-engine/live-debug').RendererMetricsWidgetMount;
 
 export interface ProductUiDependencies {
   /** Overridden in DOM tests, which cannot run the Engine panel bundle. */
@@ -309,7 +289,7 @@ async function loadEngineLiveDebug(): Promise<LiveDebugModule> {
  */
 export function mountProductUi(
   root: HTMLElement,
-  context: ProductUiContext,
+  context: RustyApplicationUiContext,
   dependencies: ProductUiDependencies = {},
 ): { dispose(): void } {
   const style = document.createElement('style');
@@ -415,12 +395,12 @@ export function mountProductUi(
   // The Engine's shell owns cursor capture: while it stays in gameplay mode a
   // pointer-locked click belongs to the canvas, so an open menu could never be
   // clicked. The projection decides the mode, and a redundant switch is skipped.
-  let appliedMode: string | null = null;
-  const applyInteractionMode = (mode: 'gameplay' | 'interface'): void => {
+  let appliedMode: RustyApplicationInteractionMode | null = null;
+  const applyInteractionMode = (mode: RustyApplicationInteractionMode): void => {
     if (appliedMode === mode) return;
     appliedMode = mode;
-    context.ui?.setInteractionMode(mode);
-    if (mode === 'gameplay') context.ui?.focusGameplay();
+    context.ui.setInteractionMode(mode);
+    if (mode === 'gameplay') context.ui.focusGameplay();
   };
 
   // Entering play always asks for gameplay mode and pointer capture: the menu
@@ -429,8 +409,8 @@ export function mountProductUi(
   const enterPlay = (intent: string): void => {
     claim(intent);
     appliedMode = 'gameplay';
-    context.ui?.setInteractionMode('gameplay');
-    context.ui?.focusGameplay();
+    context.ui.setInteractionMode('gameplay');
+    context.ui.focusGameplay();
   };
 
   resumeButton.addEventListener('click', () => enterPlay(INTENTS.resume));
@@ -481,8 +461,8 @@ export function mountProductUi(
     onPointerLockChange();
   }
 
-  let panelMount: LiveDebugMount | null = null;
-  let metricsMount: LiveDebugMount | null = null;
+  let panelMount: LiveDebugPanelMount | null = null;
+  let metricsMount: RendererMetricsMount | null = null;
   let disposed = false;
   const loadLiveDebug = dependencies.loadLiveDebug ?? loadEngineLiveDebug;
 

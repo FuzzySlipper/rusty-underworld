@@ -12,11 +12,12 @@
     <RustyEngineProductId>abyssrpg.product</RustyEngineProductId>
     <RustyEngineProductTitle>AbyssRpg: The Stygian Abyss</RustyEngineProductTitle>
     <RustyEngineProductUiRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui/generated'))</RustyEngineProductUiRoot>
-    <!-- The DOM companion is compiled TypeScript. The SDK runs this command only
-         when a UI input is newer than its last build, and `rusty dev` reloads
-         the UI alone when only UI sources change. -->
+    <!-- The DOM companion is compiled TypeScript, typed against the pair's own
+         UI declarations. The SDK runs this command only when a UI input is
+         newer than its last build, and `rusty dev` reloads the UI alone when
+         only UI sources change. -->
     <RustyEngineProductUiSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))</RustyEngineProductUiSourceRoot>
-    <RustyEngineProductUiBuildCommand>npm --prefix &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../..'))&quot; exec -- tsc -p &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))&quot;</RustyEngineProductUiBuildCommand>
+    <RustyEngineProductUiBuildCommand>bash &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../scripts/build-ui.sh'))&quot; &quot;$(RustyEngineProductUiTypes)&quot;</RustyEngineProductUiBuildCommand>
     <RustyEngineProductContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineProductContentRoot>
     <RustyEngineProductUiEntry>main.js</RustyEngineProductUiEntry>
     <RustyEngineProductUiProjectionStream>abyss.hud</RustyEngineProductUiProjectionStream>
@@ -70,8 +71,10 @@
     <RustyEngineProductInputMapping Include="abyss.action.journey-onward.chord" Intent="abyss.action.journey-onward" Trigger="key:key-l:pressed:chord=alt-left" />
   </ItemGroup>
 
-  <!-- UI build inputs outside the UI source root: the compiler and its lockfile. -->
+  <!-- UI build inputs outside the UI source root: the compiler and its
+       lockfile, the build script, and the pair's UI declarations, so a pair
+       move rebuilds the UI. -->
   <ItemGroup>
-    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../package-lock.json" />
+    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../package-lock.json;$(MSBuildThisFileDirectory)../../scripts/build-ui.sh;$(RustyEngineProductUiTypes)" />
   </ItemGroup>
 </Project>
