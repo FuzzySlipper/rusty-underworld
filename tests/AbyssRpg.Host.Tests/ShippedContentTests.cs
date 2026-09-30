@@ -1,4 +1,8 @@
+using System.Text;
+using AbyssRpg.Kit;
 using AbyssRpg.Rulesets.UltimaUnderworld.Combat;
+using AbyssRpg.TestSupport;
+using Rusty.Engine;
 using AbyssRpg.Rulesets.UltimaUnderworld.Creation;
 using Xunit;
 
@@ -57,5 +61,41 @@ public sealed class ShippedContentTests
             UuCreationFlow.CreationResult choices = UuCreationCatalog.RollDefault(selected, new Random(3));
             Assert.True(choices.Skills[0] > 0, $"class {classIndex} rolls attack skill {choices.Skills[0]}");
         }
+    }
+
+    [Fact]
+    public void The_shipped_bundle_resolves_from_authored_content_alone_and_names_the_missing_import()
+    {
+        // A clone without the operator import resolves the authored packs, and the
+        // product's launch then fails on the missing level with the import step.
+        ProductContent authored = ContentFiles(path => !path.StartsWith("abyss/imports/", StringComparison.Ordinal));
+        ResolvedGameComposition composition = AbyssProduct.ResolveComposition(authored, BuiltInRulesets.DefaultBundle);
+        Assert.Equal(
+            ["abyssrpg.avatar-options", "abyssrpg.classes", "abyssrpg.starting-kit"],
+            composition.ContentPacks.Select(pack => pack.Id.Value));
+    }
+
+    [ImportedContentFact]
+    public void The_shipped_bundle_admits_what_the_operator_imported()
+    {
+        ProductContent all = ContentFiles(_ => true);
+        ResolvedGameComposition composition = AbyssProduct.ResolveComposition(all, BuiltInRulesets.DefaultBundle);
+        string[] imported = [.. Directory
+            .EnumerateFiles(Path.Combine(ContentRoot(), "abyss", "imports"), "*.pack.json", SearchOption.AllDirectories)
+            .Select(path => Path.GetFileName(path)[..^".pack.json".Length])];
+        Assert.NotEmpty(imported);
+        Assert.All(imported, id => Assert.Contains(composition.ContentPacks, pack => pack.Id.Value == id));
+    }
+
+    /// <summary>The shipped content tree as the Engine admits it: paths relative to the content root.</summary>
+    private static ProductContent ContentFiles(Func<string, bool> include)
+    {
+        string root = ContentRoot();
+        ProductContentFile[] files = [.. Directory
+            .EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(path => path.StartsWith("abyss/", StringComparison.Ordinal) && include(path))
+            .Select(path => new ProductContentFile(Encoding.UTF8.GetBytes(path), File.ReadAllBytes(Path.Combine(root, path))))];
+        return new ProductContent(files);
     }
 }

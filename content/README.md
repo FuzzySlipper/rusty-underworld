@@ -9,11 +9,11 @@ Layout:
 
 | Path | Holds |
 | --- | --- |
-| `abyss/bundles/` | Game-bundle declarations: which ruleset, content packs, and tuning profiles a launchable product selects. |
-| `abyss/packs/` | Generated content-pack descriptors, one per pack, naming the payload and its provenance. |
-| `abyss/content-packs/` | Authored **definitions** (attributes, skills, classes, runes, spells, objects, critters, conversations, traps, levels) and **scenario** state. |
-| `abyss/tuning/` | Typed tuning profiles: the adjustable values a launch selects. |
-| `abyss/imports/<level>/` | Imported dungeon content produced offline from an operator-supplied installation: tile maps, object lists, texture maps, automap blocks, media, normalized tables, and the provenance that records game, build, source file, and transformation. Imports are generated; their sources stay outside the repository. |
+| `abyss/bundles/` | Game-bundle declarations: which ruleset, which authored content packs by id, which roots of imported packs, and which tuning profile a launchable product selects. |
+| `abyss/packs/` | Hand-authored content-pack descriptors, one per authored pack, naming its payload. |
+| `abyss/content-packs/` | Authored payloads: avatar options, classes, the starting kit, and the tuning profile's values. |
+| `abyss/tuning/` | Tuning-profile descriptors; each names its payload in `content-packs/`. |
+| `abyss/imports/` | Git-ignored packs produced offline by `scripts/import-level.sh` from the operator's own installation: one directory per level (collision, render mesh, placements, level manifest) and `object-tables/` (object tables, item catalog, strings, conversations). Each generated descriptor records its source game, source file and hash. The default bundle admits every pack under this root, so importing never edits a tracked file. |
 
 Boundary rules:
 

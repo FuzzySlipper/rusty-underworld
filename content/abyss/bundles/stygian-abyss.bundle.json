@@ -11,28 +11,10 @@
     },
     {
       "id": "abyssrpg.starting-kit"
-    },
-    {
-      "id": "abyssrpg.object-tables"
-    },
-    {
-      "id": "abyssrpg.item-catalog"
-    },
-    {
-      "id": "abyssrpg.strings"
-    },
-    {
-      "id": "abyssrpg.conversations"
-    },
-    {
-      "id": "abyssrpg.level-1"
-    },
-    {
-      "id": "abyssrpg.level-2"
-    },
-    {
-      "id": "abyssrpg.level-5"
     }
+  ],
+  "importedPackRoots": [
+    "abyss/imports"
   ],
   "tuning": {
     "id": "abyssrpg.stygian-default"

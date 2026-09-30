@@ -128,8 +128,9 @@ Two documents fix the shape before implementation starts:
 | [`src/`](src/README.md) | The product graph: kit, ruleset, host, importer and its tool, and the product DOM companion. |
 | [`tests/`](tests/README.md) | The suites, including the architecture suite that enforces the ownership laws. |
 | [`content/`](content/README.md) | Loaded content: bundles, authored content packs, and per-level imports produced offline. |
-| [`data/`](data/README.md) | Small checked-in reference tables a person maintains. |
-| `scripts/` | Engine pair installation and pin movement, the operator level import, and `verify.sh`. |
+| `configs/` | Local service profiles (the Crew playtest registration). |
+| `local/` | Operator-only and git-ignored: the extracted game data the import reads, and research notes. Never committed. |
+| `scripts/` | The operator level import, the UI build the Host's staging runs, and `verify.sh`. The Engine pair is installed and moved by the Engine's `rusty` command. |
 
 For every task, identify:
 
@@ -178,11 +179,21 @@ Every landed project is listed in `product_projects` and every suite in
 `test_projects`; keep those lists explicit when adding one, because a
 discovery-based loop silently stops covering a project that moved.
 
-Import a level before launching; the product's default bundle selects it and the
-launch fails with the command to run when it is absent:
+Import a level before launching. The game's data is operator-supplied (extract
+the `UW/` tree of the `game.gog` ISO to `local/extracted/uw/UW`), and every
+import lands in the git-ignored `content/abyss/imports/`, which the default
+bundle admits by root without being edited. Level 1 is enough to launch; the
+launch fails with this command when no level is imported:
 
 ```bash
-scripts/import-level.sh          # operator data under local/extracted/uw
+scripts/import-level.sh
+```
+
+Import further levels to make them reachable by travel (a pit or teleport to a
+level that is not imported says so rather than moving the avatar):
+
+```bash
+scripts/import-level.sh 2
 ```
 
 Start the Engine host after installing the pair and UI dependencies:

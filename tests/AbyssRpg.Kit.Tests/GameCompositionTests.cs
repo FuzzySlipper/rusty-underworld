@@ -46,6 +46,44 @@ public sealed class GameCompositionTests
     }
 
     [Fact]
+    public void A_bundle_admits_the_packs_under_its_imported_roots_without_naming_them()
+    {
+        string Bundle(string roots) =>
+            "{\"kind\":\"abyssrpg.game-bundle\",\"id\":\"test.bundle\",\"ruleset\":\"test.ruleset\",\"contentPacks\":[{\"id\":\"test.pack\"}],\"tuning\":{\"id\":\"test.tuning\"}" + roots + "}";
+        ProductContentFile Imported(string path, string id, string ruleset) =>
+            File(path, "{\"kind\":\"abyssrpg.content-pack\",\"id\":\"" + id + "\",\"ruleset\":\"" + ruleset + "\",\"dependencies\":[],\"payload\":\"payload/pack.bin\"}");
+        ProductContentFile[] authored = [.. BundleWithPack().Where(file => !Encoding.UTF8.GetString(file.Path.Span).StartsWith("bundles/", StringComparison.Ordinal))];
+        ProductContentFile[] imports =
+        [
+            Imported("imports/level-2/level-2.pack.json", "test.level-2", "test.ruleset"),
+            Imported("imports/level-1/level-1.pack.json", "test.level-1", "test.ruleset"),
+            Imported("imports/other/other.pack.json", "other.level-1", "other.ruleset"),
+            Imported("elsewhere/stray.pack.json", "test.stray", "test.ruleset"),
+        ];
+
+        ResolvedGameComposition withImports = GameCompositionResolver.Resolve(
+            Composition([File("bundles/test.bundle.json", Bundle(",\"importedPackRoots\":[\"imports\"]")), .. authored, .. imports]),
+            new GameBundleId("test.bundle")).RequireComposition();
+        // Named packs first, then the imported root's own packs in id order; another
+        // ruleset's import and a pack outside the root are not admitted.
+        Assert.Equal(
+            ["test.pack", "test.level-1", "test.level-2"],
+            withImports.ContentPacks.Select(pack => pack.Id.Value));
+        Assert.Equal(["imports"], withImports.Bundle.ImportedPackRoots);
+
+        // A checkout without the import resolves to what it has.
+        ResolvedGameComposition withoutImports = GameCompositionResolver.Resolve(
+            Composition([File("bundles/test.bundle.json", Bundle(",\"importedPackRoots\":[\"imports\"]")), .. authored]),
+            new GameBundleId("test.bundle")).RequireComposition();
+        Assert.Equal(["test.pack"], withoutImports.ContentPacks.Select(pack => pack.Id.Value));
+
+        GameCompositionResolution invalid = GameCompositionResolver.Resolve(
+            Composition([File("bundles/test.bundle.json", Bundle(",\"importedPackRoots\":[\"../imports\"]")), .. authored]),
+            new GameBundleId("test.bundle"));
+        Assert.False(invalid.IsResolved);
+    }
+
+    [Fact]
     public void Provenance_is_optional()
     {
         GameCompositionResolution resolution = GameCompositionResolver.Resolve(

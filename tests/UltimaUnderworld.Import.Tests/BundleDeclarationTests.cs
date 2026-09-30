@@ -35,10 +35,7 @@ public sealed class BundleDeclarationTests
         foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
         {
             string id = pack.GetProperty("id").GetString()!;
-            // Operator-produced packs are checked by the test below, which
-            // skips on a clone that has not run the import.
-            if (IsOperatorImported(id)) continue;
-
+            // Every named pack is authored; imports are admitted by root.
             authored.Add(id);
             using JsonDocument descriptor = Read(root, $"abyss/packs/{id}.pack.json");
             Assert.Equal("abyssrpg.content-pack", descriptor.RootElement.GetProperty("kind").GetString());
@@ -60,35 +57,25 @@ public sealed class BundleDeclarationTests
         Assert.Equal("default", profile.RootElement.GetProperty("movement").GetString());
     }
 
-    /// <summary>
-    /// Level, object-table, item-catalog, string and conversation packs are
-    /// operator-produced from the game's own data, so they are generated into the
-    /// imports tree rather than committed.
-    /// </summary>
-    private static bool IsOperatorImported(string id) =>
-        id.StartsWith("abyssrpg.level-", StringComparison.Ordinal)
-        || id is "abyssrpg.object-tables" or "abyssrpg.item-catalog" or "abyssrpg.strings" or "abyssrpg.conversations";
-
-    [ImportedContentFact]
-    public void Every_operator_pack_the_bundle_names_was_imported_with_its_payload()
+    [Fact]
+    public void The_bundle_admits_operator_imports_by_root_rather_than_by_name()
     {
+        // The import writes packs under this root and never edits the bundle, so
+        // the bundle names only authored packs.
         string root = ContentRoot();
         using JsonDocument bundle = Read(root, "abyss/bundles/stygian-abyss.bundle.json");
-        foreach (JsonElement pack in bundle.RootElement.GetProperty("contentPacks").EnumerateArray())
+        Assert.Equal(["abyss/imports"], bundle.RootElement.GetProperty("importedPackRoots").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [ImportedContentFact]
+    public void Every_imported_pack_carries_its_payload()
+    {
+        string root = ContentRoot();
+        foreach (string generated in Directory.EnumerateFiles(Path.Combine(root, "abyss", "imports"), "*.pack.json", SearchOption.AllDirectories))
         {
-            string id = pack.GetProperty("id").GetString()!;
-            if (!IsOperatorImported(id)) continue;
-            // The descriptor is found wherever the resolver would find it under
-            // the imports tree.
-            string generated = Directory
-                .EnumerateFiles(Path.Combine(root, "abyss", "imports"), $"{id}.pack.json", SearchOption.AllDirectories)
-                .FirstOrDefault() ?? "";
-            Assert.True(generated.Length > 0, $"The bundle names {id}, and the import has not written it.");
-            using JsonDocument generatedDescriptor = JsonDocument.Parse(File.ReadAllText(generated));
-            string generatedPayload = generatedDescriptor.RootElement.GetProperty("payload").GetString()!;
-            Assert.True(
-                File.Exists(Path.Combine(root, generatedPayload)),
-                $"Missing generated payload {generatedPayload}.");
+            using JsonDocument descriptor = JsonDocument.Parse(File.ReadAllText(generated));
+            string payload = descriptor.RootElement.GetProperty("payload").GetString()!;
+            Assert.True(File.Exists(Path.Combine(root, payload)), $"Missing generated payload {payload}.");
         }
     }
 

@@ -1,7 +1,10 @@
 // Operator-facing importer: emits one level's runtime artifacts (Engine
-// collision/navigation artifact, product render mesh, level manifest) and the
-// content-pack descriptor that admits them into the default bundle. Usage:
-//   emit-level --levark UW/DATA/LEV.ARK --terrain UW/DATA/TERRAIN.DAT --level 1 --out <content/abyss/imports/level-1>
+// collision/navigation artifact, product render mesh, level manifest) and its
+// content-pack descriptor, plus the install-global packs (object tables, item
+// catalog, strings, conversations) when their source files are given. Every
+// output is derived from the operator's own game data, so it goes under the
+// git-ignored content/abyss/imports/ tree, which the default bundle admits by
+// root. scripts/import-level.sh is the ordinary way to run it.
 using System.Security.Cryptography;
 using System.Text.Json;
 using UltimaUnderworld.Import;
@@ -9,8 +12,10 @@ using UltimaUnderworld.Import;
 if (args.Length == 0 || args[0] != "emit-level")
 {
     Console.Error.WriteLine(
-        "Usage: emit-level --levark <LEV.ARK> --terrain <TERRAIN.DAT> --level <n> --out <dir> "
-        + "[--objects <OBJECTS.DAT> --packs <content/abyss/packs>]");
+        "Usage: emit-level --levark <LEV.ARK> --terrain <TERRAIN.DAT> --level <n> --out <content/abyss/imports/level-n> "
+        + "[--objects <OBJECTS.DAT> --packs <content/abyss/imports/object-tables> "
+        + "[--common <COMOBJ.DAT>] [--strings <STRINGS.PAK>] [--cnv <CNV.ARK>]]\n"
+        + "Outputs are derived game data: keep them under content/abyss/imports/ (git-ignored), never with authored packs.");
     return 2;
 }
 
@@ -27,8 +32,8 @@ try
     int level = int.Parse(Get("--level"));
     string output = Get("--out");
     string? objectsPath = Array.IndexOf(args, "--objects") >= 0 ? Get("--objects") : null;
-    // The object tables are install-global, so they are written beside the
-    // authored packs rather than into a per-level directory.
+    // The object tables are install-global, so they get one imports directory of
+    // their own rather than a per-level one; never the authored packs directory.
     string? packsDirectory = Array.IndexOf(args, "--packs") >= 0 ? Get("--packs") : null;
     string? commonDatPath = Array.IndexOf(args, "--common") >= 0 ? Get("--common") : null;
     string? stringsPakPath = Array.IndexOf(args, "--strings") >= 0 ? Get("--strings") : null;
@@ -152,8 +157,8 @@ try
 
     if (objectsPath is not null && packsDirectory is not null)
     {
-        // The object tables are install-global, not per level: one pack beside
-        // the authored packs, admitted by the bundle like any other content.
+        // The object tables are install-global, not per level: one pack in the
+        // imports tree, admitted by the bundle's imported root like any import.
         string tablesId = "abyssrpg.object-tables";
         string tablesFile = $"{tablesId}.json";
         byte[] objectsBytes = File.ReadAllBytes(objectsPath);

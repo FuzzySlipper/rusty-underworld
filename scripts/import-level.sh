@@ -2,9 +2,11 @@
 # Operator step: import one level of the emulated game from operator-supplied
 # data into the product content tree.
 #
-# Original game data is never committed, so this generated level pack lives
-# under content/abyss/imports/ (git-ignored). The product's default bundle
-# selects it by id; launching without it fails with the command to run.
+# Original game data is never committed, so the generated packs live under
+# content/abyss/imports/ (git-ignored). The default bundle admits every pack under
+# that root without naming it, so importing never edits a tracked file: level 1
+# alone is enough to launch, and each further level becomes reachable by travel
+# once it is imported. Launching with no level imported fails with this command.
 #
 #   scripts/import-level.sh [level] [data-dir]
 #
@@ -27,8 +29,9 @@ out="$repo_root/content/abyss/imports/level-$level"
 packs="$repo_root/content/abyss/imports/object-tables"
 mkdir -p "$packs"
 
-# The object tables are install-global (critters, containers), so they land
-# beside the authored packs; the level's placements ride with the level.
+# The object tables are install-global (critters, containers, the item catalog,
+# strings and conversations), so they have one directory of their own; the
+# level's placements ride with the level.
 if [[ -f "$data_dir/OBJECTS.DAT" ]]; then
   tables_args=(--objects "$data_dir/OBJECTS.DAT" --packs "$packs")
   # The item catalog needs the common object table and the name strings too.
@@ -45,52 +48,5 @@ dotnet run --project "$repo_root/src/UltimaUnderworld.Import.Tool/UltimaUnderwor
   --configuration Release -- \
   emit-level --levark "$data_dir/LEV.ARK" --terrain "$data_dir/TERRAIN.DAT" --level "$level" --out "$out" \
   "${tables_args[@]}"
-
-admit_pack() {
-  python3 - "$repo_root" "$1" <<'PYEOF'
-import json, sys, pathlib
-root, pack_id = pathlib.Path(sys.argv[1]), sys.argv[2]
-bundle = root / "content/abyss/bundles/stygian-abyss.bundle.json"
-document = json.loads(bundle.read_text())
-packs = document["contentPacks"]
-if not any(pack["id"] == pack_id for pack in packs):
-    at = min((index for index, pack in enumerate(packs)
-              if pack["id"].startswith("abyssrpg.level-")), default=len(packs))
-    packs.insert(at, {"id": pack_id})
-    bundle.write_text(json.dumps(document, indent=2) + "\n")
-    print(f"Admitted {pack_id} in the shipped bundle.")
-PYEOF
-}
-
-admit_level() {
-  python3 - "$repo_root" "$level" <<'PYEOF'
-import json, sys, pathlib
-root, level = pathlib.Path(sys.argv[1]), int(sys.argv[2])
-bundle = root / "content/abyss/bundles/stygian-abyss.bundle.json"
-document = json.loads(bundle.read_text())
-packs = document["contentPacks"]
-entry = {"id": f"abyssrpg.level-{level}"}
-if entry not in packs:
-    # Keep the authored order: levels stay together, in level order, at the end
-    # of the packs the bundle already lists.
-    at = max((index for index, pack in enumerate(packs)
-              if pack["id"].startswith("abyssrpg.level-")), default=len(packs) - 1) + 1
-    packs.insert(at, entry)
-    bundle.write_text(json.dumps(document, indent=2) + "\n")
-    print(f"Admitted abyssrpg.level-{level} in the shipped bundle.")
-PYEOF
-}
-
-# The shipped bundle is the product's default composition: an imported level is
-# admitted there, so the launcher can reach it and travel can enter it.
-admit_level
-if [[ -f "$packs/abyssrpg.item-catalog.pack.json" ]]; then
-  admit_pack abyssrpg.item-catalog
-fi
-for generated in abyssrpg.strings abyssrpg.conversations; do
-  if [[ -f "$packs/$generated.pack.json" ]]; then
-    admit_pack "$generated"
-  fi
-done
 
 echo "Imported level $level into $out (placements included). Rebuild the product to stage it."

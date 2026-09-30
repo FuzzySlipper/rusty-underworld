@@ -9,7 +9,12 @@ public readonly record struct GameBundleId(string Value);
 public readonly record struct ContentPackId(string Value);
 public readonly record struct TuningProfileId(string Value);
 
-public sealed record GameBundle(GameBundleId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> ContentPacks, TuningProfileReference Tuning);
+/// <summary>
+/// A launchable selection: the packs it names, the content roots whose packs it
+/// admits without naming them (operator-produced imports that a checkout may or
+/// may not have), and its tuning.
+/// </summary>
+public sealed record GameBundle(GameBundleId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> ContentPacks, TuningProfileReference Tuning, IReadOnlyList<string> ImportedPackRoots);
 public sealed record ContentPackReference(ContentPackId Id);
 public sealed record TuningProfileReference(TuningProfileId Id);
 
@@ -137,9 +142,23 @@ public static class GameCompositionResolver
         List<ContentPack> ordered = [];
         Dictionary<ContentPackId, VisitState> visits = [];
         foreach (ContentPackReference reference in selected.ContentPacks) ResolvePack(reference, selected.Ruleset, packs, files, visits, ordered, diagnostics, content);
+        // Packs under an imported root are admitted by being there: an operator
+        // import adds them without editing the authored bundle, and a checkout
+        // without them resolves to what it has. Another ruleset's imports under
+        // the same root are not this bundle's.
+        foreach (string root in selected.ImportedPackRoots)
+        {
+            foreach (ContentPackDescriptor imported in packs.Values
+                .Where(pack => pack.DescriptorPath.StartsWith(root + "/", StringComparison.Ordinal) && pack.Ruleset == selected.Ruleset)
+                .OrderBy(pack => pack.Id.Value, StringComparer.Ordinal))
+            {
+                ResolvePack(new(imported.Id), selected.Ruleset, packs, files, visits, ordered, diagnostics, content);
+            }
+        }
+
         TuningProfile? tuning = ResolveTuning(selected, tunings, files, diagnostics, content);
         if (diagnostics.Any(diagnostic => diagnostic.Code == "error") || tuning is null) return new(null, diagnostics);
-        GameBundle bundle = new(selected.Id, selected.Ruleset, Freeze(selected.ContentPacks), selected.Tuning);
+        GameBundle bundle = new(selected.Id, selected.Ruleset, Freeze(selected.ContentPacks), selected.Tuning, Freeze(selected.ImportedPackRoots));
         return new(new ResolvedGameComposition(bundle, ordered, tuning, content), diagnostics);
     }
 
@@ -170,7 +189,7 @@ public static class GameCompositionResolver
                     if (!bundles.TryAdd(bundle.Id, bundle)) Error(diagnostics, $"Duplicate game bundle '{bundle.Id.Value}'.");
                     break;
                 case PackKind:
-                    ContentPackDescriptor pack = Pack(document.RootElement);
+                    ContentPackDescriptor pack = Pack(document.RootElement, path);
                     if (!packs.TryAdd(pack.Id, pack)) Error(diagnostics, $"Duplicate content pack '{pack.Id.Value}'.");
                     break;
                 case TuningKind:
@@ -189,11 +208,25 @@ public static class GameCompositionResolver
         List<ContentPackReference> contentPacks = References(Array(root, "contentPacks"));
         if (contentPacks.Count == 0) throw new InvalidOperationException("Game bundle must select at least one content pack.");
         if (contentPacks.GroupBy(reference => reference.Id).Any(group => group.Count() > 1)) throw new InvalidOperationException("Game bundle selects a content pack more than once.");
+        List<string> importedRoots = [];
+        if (root.TryGetProperty("importedPackRoots", out JsonElement roots))
+        {
+            if (roots.ValueKind != JsonValueKind.Array) throw new InvalidOperationException("'importedPackRoots' must be an array.");
+            foreach (JsonElement element in roots.EnumerateArray())
+            {
+                string importedRoot = element.ValueKind == JsonValueKind.String && element.GetString() is { } text
+                    ? text
+                    : throw new InvalidOperationException("An imported pack root must be a string.");
+                if (!Path(importedRoot)) throw new InvalidOperationException($"Imported pack root '{importedRoot}' is invalid.");
+                importedRoots.Add(importedRoot);
+            }
+        }
+
         JsonElement tuning = Object(root, "tuning");
-        return new(new(Id(root, "id")), new(Id(root, "ruleset")), contentPacks.ToArray(), new(new(Id(tuning, "id"))));
+        return new(new(Id(root, "id")), new(Id(root, "ruleset")), contentPacks.ToArray(), new(new(Id(tuning, "id"))), importedRoots.ToArray());
     }
 
-    private static ContentPackDescriptor Pack(JsonElement root)
+    private static ContentPackDescriptor Pack(JsonElement root, string descriptorPath)
     {
         List<ContentPackReference> dependencies = References(Array(root, "dependencies"));
         if (dependencies.GroupBy(reference => reference.Id).Any(group => group.Count() > 1)) throw new InvalidOperationException("Content pack declares a dependency more than once.");
@@ -204,7 +237,7 @@ public static class GameCompositionResolver
             provenance = new(String(provenanceElement, "source"), String(provenanceElement, "origin"), String(provenanceElement, "sha256"));
         }
 
-        return new(new(Id(root, "id")), new(Id(root, "ruleset")), dependencies.ToArray(), FilePath(root, "payload"), provenance);
+        return new(new(Id(root, "id")), new(Id(root, "ruleset")), dependencies.ToArray(), FilePath(root, "payload"), provenance, descriptorPath);
     }
 
     private static TuningDescriptor Tuning(JsonElement root) => new(new(Id(root, "id")), new(Id(root, "ruleset")), FilePath(root, "payload"));
@@ -255,9 +288,9 @@ public static class GameCompositionResolver
     private static void Error(List<CompositionDiagnostic> diagnostics, string message) { if (diagnostics.Count < DiagnosticLimit) diagnostics.Add(new("error", message)); else if (diagnostics.Count == DiagnosticLimit) diagnostics.Add(new("error", "Composition diagnostics were truncated.")); }
 
     private enum VisitState { Visiting, Done }
-    internal sealed record ContentPackDescriptor(ContentPackId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> Dependencies, string PayloadPath, ContentPackProvenance? Provenance);
+    internal sealed record ContentPackDescriptor(ContentPackId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> Dependencies, string PayloadPath, ContentPackProvenance? Provenance, string DescriptorPath);
     internal sealed record TuningDescriptor(TuningProfileId Id, RulesetId Ruleset, string PayloadPath);
-    private sealed record GameBundleDescriptor(GameBundleId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> ContentPacks, TuningProfileReference Tuning);
+    private sealed record GameBundleDescriptor(GameBundleId Id, RulesetId Ruleset, IReadOnlyList<ContentPackReference> ContentPacks, TuningProfileReference Tuning, IReadOnlyList<string> ImportedPackRoots);
 }
 
 public sealed class GameSessionContext(IEngineContext engine, ResolvedGameComposition composition)

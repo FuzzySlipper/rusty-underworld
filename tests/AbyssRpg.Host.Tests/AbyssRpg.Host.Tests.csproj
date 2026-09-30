@@ -17,4 +17,8 @@
   <ItemGroup>
     <ProjectReference Include="../../src/AbyssRpg.Host/AbyssRpg.Host.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../Shared/OperatorData.cs" Link="OperatorData.cs" />
+  </ItemGroup>
 </Project>
