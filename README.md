@@ -21,10 +21,11 @@ Bundle assembles. Host launches.**
 > resolves the shipped bundle, creates the compiled ruleset session over an
 > operator-imported level, admits the level's geometry, collision, placements and
 > inhabitants, and runs one admitted update: movement and look, charge-based melee,
-> the use channel (doors, conversation and barter, looting, taking), runic casting
-> from collected runes, survival, and save and load, projected to the companion
-> UI. An imported level is admitted on arrival when the avatar travels, which is
-> the operator probe `abyss.travel` until walkable transitions land.
+> the use channel (doors, talking to a creature, looting, taking, picking up
+> runestones), survival on the dungeon clock, and save and load, projected to the
+> companion UI. Pit and teleport traps move the avatar between imported levels;
+> stairs, answering a conversation, and casting from play are not reached yet
+> (casting runs through the operator probe `abyss.cast`).
 > What that slice reaches, and what it does not, is measured in the Den
 > document `coverage-audit`; Den also holds task state and GPU evidence
 > (`playtest-evidence-log`), and `docs/gpu-playtesting.md` is the operator setup.
@@ -171,13 +172,15 @@ Routine verification:
 ./scripts/verify.sh
 ```
 
-Today that verifies the installed pair identity, installs the product UI
-dependencies, builds the TypeScript companion and runs its DOM suite, then
-builds every product project and runs each semantic suite plus the architecture
-laws. NativeAOT is a separate fidelity target and stays opt-in with `--aot`.
-Every landed project is listed in `product_projects` and every suite in
-`test_projects`; keep those lists explicit when adding one, because a
-discovery-based loop silently stops covering a project that moved.
+It checks the installed pair and project shape (`rusty status`), installs the UI
+dependencies, builds every product project, stages the Host (which compiles the
+TypeScript companion through the SDK's UI build), then runs the DOM suite and
+every .NET suite, architecture laws included, reporting every failed stage
+before it exits. NativeAOT is a separate fidelity target and stays opt-in with
+`--aot`. Projects are listed in `product_projects` and .NET suites in
+`test_projects`, the DOM suite by its glob; keep those lists explicit when adding
+one, because a discovery-based loop silently stops covering a project that
+moved. Tests that need the operator's game data report **Skipped** without it.
 
 Import a level before launching. The game's data is operator-supplied (extract
 the `UW/` tree of the `game.gog` ISO to `local/extracted/uw/UW`), and every

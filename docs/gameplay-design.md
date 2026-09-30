@@ -160,7 +160,9 @@ formulas, ranges, and per-weapon numbers are approximate until verified.
   movement, detection, and utility. Circle or tier gates what the avatar can
   credibly cast; skill decides reliability.
 - Scrolls cast once without skill; wands carry charges; potions are consumed.
-  Failure costs mana and can backfire; it never silently succeeds.
+  A failed cast fizzles without spending mana, a critical failure backfires on
+  the caster, and only a success spends it (donor order: `UuCastGates`, citing
+  the original's cast routine); a cast never silently succeeds.
 
 **Model.** A rune and spell catalog in content; per-avatar known runes, mana,
 and casting state; a casting workflow (validate → cost → target → apply); effect
@@ -335,7 +337,7 @@ their own evidence, not assumptions smuggled into the importer.
 
 One session, one clock, one admitted update. No mode gets its own loop.
 
-## 6. Non-goals
+## 5. Non-goals
 
 - Original save-file compatibility, in either direction.
 - Loading the original executable, its sound drivers, or its mods.
@@ -345,7 +347,7 @@ One session, one clock, one admitted update. No mode gets its own loop.
   artifact.
 - Multiplayer, dedicated server, UW2 support, or a second product runtime.
 
-## 7. Decisions that are expensive to reverse
+## 6. Decisions that are expensive to reverse
 
 These are the seams the rest of the work hangs on. Changing one is a deliberate
 re-plan, not an implementation detail.

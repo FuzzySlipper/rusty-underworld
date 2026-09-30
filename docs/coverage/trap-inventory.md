@@ -28,7 +28,7 @@ that call is not verified). Related but NOT traps: `src/triggers/`
 | 0x1 | `a_teleport_trap.cs` | teleport trap (destination level + tile from trap fields) |
 | 0x2 | `an_arrow_trap.cs` | arrow trap (spawns an object at the trigger tile; code marks `implemented ...-ish`) |
 | 0x3 | `hack_trap.cs` | do/hack entry: dispatches on `quality` (see §2) |
-| 0x4 | — / `a_specialeffect_trap.cs` | pit trap in UW1 (sets `implemented = true` to continue the chain — no effect); special-effect trap in UW2 |
+| 0x4 | — / `a_specialeffect_trap.cs` | pit trap in UW1 (`trap.cs` case 4 sets `implemented = true` to continue the chain — no effect; see divergence note below); special-effect trap in UW2 |
 | 0x5 | `a_change_terrain_trap.cs` | change-terrain trap |
 | 0x6 | `a_spell_trap.cs` | spell trap |
 | 0x7 | `a_create_object_trap.cs` | create-object trap; always stops chain |
@@ -40,6 +40,15 @@ that call is not verified). Related but NOT traps: `src/triggers/`
 | 0xD | `a_set_variable_trap.cs` | set-variable trap (quest/game variable) |
 | 0xE | `a_check_variable_trap.cs` | check-variable trap (test selects the next link) |
 | 0xF | — | null trap / combination trap (does nothing; `implemented = true`) |
+
+**Divergence (ours, not donor behavior):** the donor's UW1 pit trap (6-0-4) does
+nothing — `src/traps/trap.cs` case 4 only marks the trap implemented so the
+chain continues; the donor's `src/traps/a_pit_trap.cs` is the UW2 6-1-7
+tile-height toggle and is never dispatched for UW1. Our ruleset instead drops
+the avatar a level: `UuTrapDispatch.Classify` maps 6-0-4 to `TrapKind.Pit`, and
+`UuGameSession.FallThroughPit` travels to the level below, lands on the nearest
+open tile to the pit, and charges the dungeon clock
+`UuClockPolicy.FallCostTicks` (one game minute — our tuning, not a donor value).
 
 ### 1b. minorclass 1, classindex 0–8 (all but classindex 0 UW2-gated)
 

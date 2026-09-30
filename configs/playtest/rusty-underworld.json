@@ -1,13 +1,18 @@
 {
   "id": "rusty-underworld",
-  "backend": "wolf",
-  "description": "AbyssRpg first-person dungeon slice GPU playtest",
-  "url": "http://192.168.1.22:4177/",
-  "window_title": "AbyssRpg: The Stygian Abyss",
+  "description": "AbyssRpg reference product (rusty-underworld): the imported Abyss level drawn, lit and mapped, with the use channel's verbs.",
+  "url": "http://127.0.0.1:4177/",
+  "window_title": "Rusty Underworld",
   "controls": {
-    "W/A/S/D": "Movement (verify product consumption)",
-    "Mouse": "Click to focus; look; hold/release primary attack",
-    "Escape": "Release pointer and open menu"
+    "W/A/S/D": "Walk forward / strafe left / back / strafe right (held states)",
+    "E": "Use what the avatar stands at (door, container, creature, floor object)",
+    "Mouse": "Look; hold/release the primary button to charge and swing",
+    "Escape": "Release the pointer into the pause menu",
+    "Alt+S": "Quicksave",
+    "Alt+L": "Journey onward (load)",
+    "L": "Examine what the avatar stands at"
   },
-  "reset": "Recover relaunches browser; product state remains in the host. Restart den-serve for a fresh product."
+  "reset": "No in-game reset. Restart the dev host for a fresh session.",
+  "backend": "browser",
+  "environment": "service"
 }

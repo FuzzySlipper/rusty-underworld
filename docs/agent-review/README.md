@@ -1,7 +1,9 @@
 # Agent review workflow
 
-These packets are a starting point for any downstream Rusty Engine product.
-Review the requested change and its real callers. Findings are claims for the
+The review lanes AGENTS.md refers to for this repository. They are optional
+questions a reviewer picks from, not a gate every change must pass; Den tasks
+and their review records say when a review is wanted. Review the requested
+change and its real callers. Findings are claims for the
 implementer to reconcile, not instructions to broaden the task or request
 another user approval.
 
@@ -69,11 +71,10 @@ The lead resolves disagreements against evidence and user/task scope. Record
 each substantive finding as fixed, declined with a reason, or deferred to a
 named receiving task when authorized. Reviewers cannot amend acceptance criteria.
 
-## Customize for a new repository
+## This repository
 
-Keep these questions generic. Add product owner pointers to the architecture
-map and relevant lane, and link genuine donor/provenance or task-system policy
-only when it exists. Set a product-specific trust boundary if the product adds
-untrusted inputs or multiplayer requirements. Add review triggers only for
-concrete risks. Do not copy another product's campaigns, temporary migration
-rules, task IDs, fixed reviewer roster, or game vocabulary.
+Owner pointers are `docs/code-organization.md` (Kit and ruleset owner maps) and
+AGENTS.md (the product graph and the Kit vocabulary rule). Donor evidence rules
+are in AGENTS.md "Update, donors, and evidence" and the donor surveys under
+`docs/research/`; the fidelity stance is AGENTS.md "Fidelity: similar, not a
+remake". Add a lane only for a concrete recurring risk.

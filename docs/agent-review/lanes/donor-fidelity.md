@@ -6,9 +6,11 @@ and never let donor structure leak into our ownership.
 
 - Verify each fidelity claim against its cited donor file path and line.
   A claim without a path is unverified, not faithful.
-- Numbers, thresholds, orderings, and formulas match the donor unless the
-  task explicitly records an approximation (then the task record, not the
-  code comment, owns the divergence).
+- The product is similar, not a remake (AGENTS.md "Fidelity"): values may be
+  adopted, retuned or simplified. What must hold is that a value claimed as
+  faithful matches the donor, and a value that is ours says so where it lives
+  (its tuning record or code comment) and in the task that chose it. A
+  faithful-sounding value with no citation is the defect, not a divergence.
 - Where donors disagree or the evidence is thin, the implementation says so
   rather than picking the convenient answer.
 - Report concrete defects with file/line and the donor path that contradicts

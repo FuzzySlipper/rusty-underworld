@@ -8,6 +8,7 @@ Durable repository documents for Rusty Underworld. Start here.
 | [`../README.md`](../README.md) | What the repository is, its current state, and how to develop and verify it. |
 | [`gameplay-design.md`](gameplay-design.md) | The shape of the game: the loop, every system with a fidelity verdict, the first coherent slice, non-goals, and the decisions that are expensive to reverse. |
 | [`code-organization.md`](code-organization.md) | How the repository expresses that shape: layering, where new code goes, the Kit and ruleset owner maps, content and import shapes, the UI contract, session modes, and persistence. |
+| [`gpu-playtesting.md`](gpu-playtesting.md) | Operator setup for running the product and capturing it through Crew, the live-debug commands, and the controls. |
 | [`research/`](research/) | Donor surveys, the manual-cited experience outline, and the sibling-kit bootstrap map: what the reference recreations, the shipped manual, the ISO data, and `WorldRpg.Kit` say about and for the game. |
 | [`coverage/feature-ledger.md`](coverage/feature-ledger.md) | Scope: stable feature IDs with disposition and the behavior required, including the binding exclusions. |
 | [`coverage/content-scope.md`](coverage/content-scope.md) | Which source families the shipped data holds and what each is for. |

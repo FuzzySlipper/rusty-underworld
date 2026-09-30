@@ -8,8 +8,8 @@ repository imports; imported coverage is measured in the Den document
 
 ## Source families (all under `UW/` in the operator ISO)
 
-| ID | Family | Files | Target |
-| --- | --- | --- | --- |
+| Family | Files | Target |
+| --- | --- | --- |
 | C-01 Levels + object lists | `LEV.ARK` (+ texture map, automap blocks) | Normalized per-level packs with provenance; placement bug-class excluded at import (lava-spawn evidence) |
 | C-02 Conversations | `CNV.ARK` + `BABGLOBS.DAT` | Normalized dialogue corpus + globals; interpreted by ruleset VM, never ported |
 | C-03 Object tables | `OBJECTS.DAT`, `COMOBJ.DAT`, weapon rows | Typed definition packs per family |
@@ -35,4 +35,5 @@ of spells/runes/objects, one NPC conversation with a barter/quest hook,
 automap defaults, and tuning profiles. The importer carries breadth; authoring
 fills what it cannot and everything the first slice needs before its importer
 family lands. Regeneration never overwrites authored files; every imported
-pack records game, release/build, importer revision, and transformation.
+pack records its source game, source file and that file's hash, which pins the
+release.

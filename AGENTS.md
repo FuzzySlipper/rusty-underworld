@@ -21,6 +21,9 @@ AbyssRpg architecture. Ultima Underworld II shares its engine and remains useful
 donor context for formats and divergences; it is not a target, and no code path
 may quietly depend on its data.
 
+Paths below use `/home/dev`, the canonical form (a link to `/home/agent/dev`;
+either resolves).
+
 - Underworld checkout: `/home/dev/rusty-underworld`
 - paired Engine checkout: `/home/dev/rusty-engine`
 - Underworld Den project: `rusty-underworld`
@@ -96,10 +99,10 @@ cover.
 
 | Owner | Responsibility |
 | --- | --- |
-| `AbyssRpg.Kit` | Reusable and reasonably uncertain dungeon-RPG mechanisms: typed IDs, compiled ruleset/session contracts, bundle/content-pack/tuning resolution, avatar state, attributes, skill entries and advancement bookkeeping, condition and recovery mechanisms, attack execution with charge timing, targeting, NPC presence and pursuit coordination, corpse and loot machinery, containers and containment, object physics coordination, conversation state, barter trays, trap and trigger machinery, automap and quest-variable state, world and spatial session stepping, structured UI values. It is not a universal RPG framework, and it holds mechanisms rather than one game's policy. |
+| `AbyssRpg.Kit` | Reusable and reasonably uncertain dungeon-RPG mechanisms: typed IDs, compiled ruleset/session contracts, bundle/content-pack/tuning resolution (including imported-pack roots), actor and avatar state, attributes, progression and skill-use bookkeeping, passive recovery, attack execution, targeting, NPC presence and pursuit coordination, containers, containment and equipment, projectile flights, durable identity, automap, map-note and quest-variable state, spatial stepping and the first-person camera, the game clock, structured UI values. It is not a universal RPG framework, and it holds mechanisms rather than one game's policy. The casting workflow, conversation state and barter, trap and trigger machinery, survival, creation and persistence run in the ruleset today; `docs/code-organization.md` §3 records which of them are Kit owners by design. |
 | `AbyssRpg.Rulesets.UltimaUnderworld` | Ultima Underworld identities, attributes, skills, rune and spell definitions, object and critter definitions, class tables and the creation flow's rules, combat and charge formulas, spell-effect and cost policy, casting workflow, time and schedule policy, conversation interpretation and barter policy, trap, trigger, door and lock policy, survival rates, content interpretation, presentation meaning, save meaning, and session composition. |
 | `AbyssRpg.Host` | Product lifecycle, explicit built-in ruleset/bundle selection, product defaults, and the one ordinary product entry. It may select Ultima Underworld; it never interprets Ultima Underworld rules or reads original game data. |
-| `UltimaUnderworld.Import` | Offline knowledge of the original game's data files and of the donors that document them: source formats, conversion quirks, provenance, normalization into packs, and differential validation against the donor recreations. Not a runtime dependency. |
+| `UltimaUnderworld.Import` | Offline knowledge of the original game's data files and of the donors that document them: source formats, conversion quirks, provenance, and normalization into packs. Not a runtime dependency. |
 | `UltimaUnderworld.Import.Tool` | The operator-facing command line that drives the importer and writes normalized packs. |
 | Content packs | Authored avatar options, skills, runes, spells, objects, critters, conversations, traps, levels, placements, assets, and scenario state interpreted by a ruleset. |
 | TypeScript UI | Thin DOM presentation of Engine-delivered projections and semantic actions. It owns neither gameplay state nor game-world rendering. |
@@ -140,8 +143,9 @@ Host may select a built-in Ultima Underworld ruleset and bundle only at its
 explicit catalog/default composition seam.
 
 **The source game and its provenance are explicit.** The ruleset targets one game
-— Ultima Underworld: The Stygian Abyss — and imported packs record which release
-and build the data came from, so a pack cannot silently mix UW1 and UW2. UW2
+— Ultima Underworld: The Stygian Abyss — and imported packs record their source
+game, the source file and that file's hash (which pins the release it came from),
+so a pack cannot silently mix UW1 and UW2. UW2
 appears only as donor documentation (a format variant, a struct difference, a
 divergence note) and never as a supported target. Where a divergence matters to
 imported data, record it with the donor path that documents it rather than
@@ -291,8 +295,8 @@ independent ready work; never invent a substitute to unblock the queue.
 Keep durable repository documents free of commit revisions and pinned versions: a
 stale pin in prose invites a later agent to roll the code back to match the
 document, and the document is not the owner of that identity. The Engine pair
-identity lives in `Directory.Build.props`, where scripts verify it; move it with
-`scripts/update-engine-pin.sh` and never hand-edit a version into prose.
+identity lives in `Directory.Build.props`, where `rusty status` checks it; move it
+with `rusty update` and never hand-edit a version into prose.
 
 A hard failure must name the loss it prevents. Where the consequence is
 recoverable, warn and report the actual observed value instead. Keep hard stops

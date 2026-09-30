@@ -147,6 +147,7 @@ brackets.
 | C-01…C-12 | Source families (`content-scope.md`) | implement per family; UW2/UNDEROM1/donor-data excluded |
 
 ID ordering rules: M-01…M-40 run §1 table order (1st circle first); R-01…R-24
-run §2 table order row-major; S-01…S-20 run §4 table order; T-Vxx is the
-minorclass-0 classindex in hex, T-Wx the minorclass-1 index, T-Dnn the do/hack
-`quality` number; C-01…C-12 run the content-scope table top-to-bottom.
+run alphabetically by rune name, which reads down each column of the §2 table
+(column-major); S-01…S-20 run §4 table order; T-Vxx is the minorclass-0
+classindex in hex, T-Wx the minorclass-1 index, T-Dnn the do/hack `quality`
+number; C-01…C-12 run the content-scope table top-to-bottom.

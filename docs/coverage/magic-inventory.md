@@ -13,8 +13,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 1st Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-01 Create Food | In Mani Ylem | Causes a fine bounty of food to appear (permanent spell). |
 | M-02 Light | In Lor | Illuminates a darkened area (duration spell). |
 | M-03 Magic Arrow | Ort Jux | Fires a magic arrow at your opponent (targeted spell). |
@@ -23,8 +23,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 2nd Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-06 Cause Fear | Quas Corp | May cause an opponent to lose heart and flee (instantaneous spell). |
 | M-07 Detect Monster | Wis Mani | Reveals the presence of hidden or unperceived enemies (instantaneous spell). |
 | M-08 Lesser Heal | In Bet Mani | Heals your minor wounds (instantaneous spell). |
@@ -33,8 +33,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 3rd Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-11 Conceal | Bet Sanct Lor | Briefly obscures you, so you might remain unseen (duration spell). |
 | M-12 Lightning | Ort Grav | Hurls a bolt of arcane energy at your opponent (targeted spell). |
 | M-13 Night Vision | Quas Lor | Allows you to see without benefit of torch or candle (duration spell). |
@@ -43,8 +43,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 4th Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-16 Heal | In Mani | Heals you of grievous wounds (permanent spell). |
 | M-17 Levitate | Hur Por | Briefly allows you to rise vertically into the air (duration spell). |
 | M-18 Poison | Nox Mani | Poisons your opponent with toxic venom (permanent spell). |
@@ -53,8 +53,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 5th Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-21 Cure Poison | An Nox | Acts as an antidote to any poison (permanent spell). |
 | M-22 Fireball | Por Flam | Hurls a mighty flaming missile at your opponent (targeted spell). |
 | M-23 Missile Protection | Grav Sanct Por | Renders you invulnerable to missiles (duration spell). |
@@ -63,8 +63,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 6th Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-26 Daylight | Vas In Lor | Provides bright illumination for extended periods of time (duration spell). |
 | M-27 Gate Travel | Vas Rel Por | Allows you to travel instantly to a moonstone (instantaneous spell). |
 | M-28 Greater Heal | Vas In Mani | Brings you back to your original vigor (full Vitality) (permanent spell). |
@@ -73,8 +73,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 7th Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-31 Ally | In Mani Rel | Causes the ensorcelled being to fight the last enemy he or she saw you attack (permanent spell). |
 | M-32 Confusion | Vas An Wis | Causes foes to act as if drunk (instantaneous spell). |
 | M-33 Fly | Vas Hur Por | Allows you to fly through the air for a time, and then glide gently to the ground (duration spell). |
@@ -83,8 +83,8 @@ p. 32. Nothing is reconstructed or inferred. Donor dispatch knowledge is cited t
 
 ### 8th Circle
 
-| ID | Spell | Formula | Behavior |
-| --- | --- | --- | --- |
+| Spell | Formula | Behavior |
+| --- | --- | --- |
 | M-36 Flame Wind | Flam Hur | Casts multiple flaming missiles into the area (instantaneous spell). |
 | M-37 Freeze Time | An Tym | Stops the flow of time for all but you (duration spell). |
 | M-38 Iron Flesh | In Vas Sanct | Greatly increases your resistance to damage (duration spell). |
@@ -181,9 +181,9 @@ hook; `src/magic/spellcasting_objects.cs` gates enchanted-equipment casting
 | 9 | Curse (with on-equip path) | `spellcasting_class_9.cs` |
 | 10 | Mana boost | `spellcasting_class_10.cs` |
 | 11 | Misc/special (speed, portal) | `spellcasting_class_11.cs` |
-| 12 | "Not castable here" (debug-print + break inline in `spellcasting.cs`, no class file) |
+| 12 | "Not castable here" (debug-print + break) | none — inline in `spellcasting.cs` |
 | 13 | Misc (Altaras wand, mind blast, …) | `spellcasting_class_13.cs` |
-| 14 | Cutscene (via `cutsplayer.PlayCutscene`, no class file) |
+| 14 | Cutscene (via `cutsplayer.PlayCutscene`) | none — inline in `spellcasting.cs` |
 
 UW2-only branches (donor context, never extraction sources): the UW2
 projectile table (major 5), the UW2 summon branch (major 8), UW2

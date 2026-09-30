@@ -72,6 +72,13 @@ Working names; the responsibilities are the contract, the names are not.
 | Presentation | Projections (HUD and screens) and semantic actions; live-debug diagnostics | DOM, layout, styling, or state |
 | Persistence | The current-schema session snapshot and restore; what is saved and what is deliberately dropped | Original save formats (out of scope) |
 
+These owners are the design. Several are implemented in the ruleset today
+rather than extracted into the Kit: the Magic workflow and effect instances,
+Dialogue state and barter trays, the trap and trigger half of Interaction,
+Survival, Creation, and Persistence. The ruleset is where they run until a
+mechanism is extracted, which happens with the work that needs the seam, not as
+a standalone move; a Kit copy with no caller is not an extraction.
+
 Two Kit rules that prevent most later refactoring:
 
 - **One owner mutates one state family.** Effects, conversations, and traps
@@ -122,22 +129,25 @@ Rules:
 
 - **Regeneration never overwrites authored content**, and authored content never
   overwrites an import silently.
-- Every imported pack records its source: game, release or build, importer
-  revision, and what was transformed.
+- Every imported pack records its source: the game, the source file, and that
+  file's hash, which pins the release. Importer revision and a transformation
+  record are not recorded; the importer's source and its tests are that record.
 - Original game data is never committed; extracted tables stay in `local/`.
 
 ## 7. Import pipeline
 
 ```
-operator ISO → readers (LEV.ARK, CNV.ARK, OBJECTS.DAT, tables, art, sound)
+operator ISO → readers (LEV.ARK, CNV.ARK, OBJECTS.DAT, COMOBJ.DAT, STRINGS.PAK, tables)
              → normalized packs under content/abyss/imports/<level>/
              → provenance record + table dumps used as content sources
 ```
 
-The tool is its own project and is built and tested by `scripts/verify.sh`, so an
-import API change cannot leave it silently broken. Differential checks compare
-the importer's output against the donor recreations where a comparison is
-possible. Nothing in the runtime path parses source-shaped game data.
+The tool is its own project and is built by `scripts/verify.sh`, so an import API
+change cannot leave it silently uncompilable; the readers and pack emitters it
+calls are tested in `UltimaUnderworld.Import.Tests`, over the operator's data
+where it is installed. Values read from the donors are checked by citation, not by
+a test that reads a donor checkout. Art and sound have no reader yet. Nothing in
+the runtime path parses source-shaped game data.
 
 Two known traps that shape the importer, both recorded in the research:
 
@@ -176,10 +186,13 @@ panels never changes what time means.
 
 ## 10. Persistence
 
-A save is a snapshot of the session: avatar (attributes, resources, skills,
-runes, equipment, progression), clock, current level and position, per-level
-dungeon state, knowledge, quest variables, containers and loose world objects,
-and the scenario flags. Transient things — in-flight charge, open panels,
+A save is a snapshot of the session: the avatar as created (class, attributes,
+skills, name) with its world seed, its resources and survival state including
+the timers' progress, what it and every owner on the level hold, the casting
+shelf, clock, current level and position, per-level dungeon state (removed,
+moved and dropped objects, doors, fired triggers, creature poses and wounds),
+knowledge, quest variables, and projectiles in flight. Equipment slots and
+progression are not saved yet, because nothing in play changes them. Transient things — in-flight charge, open panels,
 target selections, AI intentions — are deliberately dropped and rebuilt on load.
 
 One current schema during development. No versions, migrations, compatibility
@@ -204,7 +217,7 @@ Do not build any of these, however convenient they look:
 ## 12. What would force a re-plan
 
 The nine decisions listed in
-[`gameplay-design.md` §7](gameplay-design.md#7-decisions-that-are-expensive-to-reverse)
+[`gameplay-design.md` §6](gameplay-design.md#6-decisions-that-are-expensive-to-reverse)
 — one avatar, one real-time charge state, the level graph, knowledge versus
 world state, one clock, interpreted conversation, policy over data,
 projection-only UI, and one save schema. Changing any of them is a deliberate

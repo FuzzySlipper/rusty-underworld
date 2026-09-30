@@ -1,7 +1,7 @@
 # AbyssRpg.Host
 
 The ordinary Engine product entry, built-in ruleset selection, lifecycle,
-save helpers, menu projections, and spatial-session adapter live here.
+save slots and store, menu and HUD projections live here.
 
 Staging builds the TypeScript companion as browser ESM through the SDK's UI
 build (`RustyEngineProductUiBuildCommand` runs `scripts/build-ui.sh` against the
