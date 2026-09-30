@@ -102,8 +102,8 @@ Two Kit rules that prevent most later refactoring:
 Attributes, skills, objects, critters, conversations, traps, and levels are
 **data**: their numbers live in content packs and tuning profiles, their
 interpretation lives here, and their names never appear in Kit. The rune and spell
-tables are the exception today — they are compiled ruleset identities — and a
-named task carries moving their values into a pack.
+tables are the exception by decision: they are the printed manual's rune and
+spell list, compiled as ruleset identities (see `NOTICE`).
 
 ## 5. Host and product composition
 

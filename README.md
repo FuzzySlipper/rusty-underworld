@@ -31,6 +31,13 @@ Bundle assembles. Host launches.**
 > (`playtest-evidence-log`), and `docs/gpu-playtesting.md` is the operator setup.
 > Start with `scripts/import-level.sh` before launching.
 
+## Licence
+
+The repository's own code, authored content and documents are MIT-licensed
+([`LICENSE`](LICENSE)). [`NOTICE`](NOTICE) states what that does not cover: the
+original game and its data, which are never committed, and the reference
+projects, which keep their own licences.
+
 ## Ownership
 
 - Rusty Engine guarantees reusable infrastructure and admitted update services.

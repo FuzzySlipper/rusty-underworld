@@ -155,9 +155,9 @@ Give each value one honest home:
 
 - Adjustable ruleset values use discoverable, validated, typed tuning handles.
 - Avatar, skill, object, critter, conversation, trap, and level values belong in
-  content packs. The rune and spell tables are currently compiled ruleset
-  identities rather than pack data; moving their values into a pack is carried by
-  a named task, and this document is not the owner of that until it lands.
+  content packs. The rune and spell tables are the exception by decision: they
+  are the printed manual's rune and spell list, kept as compiled ruleset
+  identities (see `NOTICE`), not operator-imported data.
 - Algorithmic invariants stay beside the owning algorithm.
 - Source-format quirks stay in `UltimaUnderworld.Import`.
 - Product default selection stays in the Host.

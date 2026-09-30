@@ -1,0 +1,24 @@
+Rusty Underworld / AbyssRpg
+
+The code, authored content and documentation in this repository are licensed
+under the MIT License (see LICENSE). That licence covers this repository's own
+work only.
+
+Original game data. Ultima Underworld: The Stygian Abyss is a separate
+commercial game; its name is a trademark of its respective owner, and this
+project is not affiliated with or endorsed by that owner. No original game data
+is included here. The importer reads data an operator supplies from their own
+copy of the game, and everything it produces is written to git-ignored paths
+(content/abyss/imports/, local/) and is never committed.
+
+Rune and spell tables. src/AbyssRpg.Rulesets.UltimaUnderworld/Magic/UuRuneCatalog.cs
+and UuSpellCatalog.cs name the game's runes and list its spells with their
+circles and rune combinations and the casting rules' numbers, as the game's
+printed manual presents them to players. They are kept as facts about the game
+this project recreates, in our own code; they are not extracted game files.
+
+Reference projects. UnderworldGodot and OpenUnderground are behaviour and format
+references under their own licences. No code is copied from them; where a
+behaviour follows one of them, the code or document cites the file it was read
+from. The sibling repository rusty-dagger (same author) was the one-time source
+of the AbyssRpg.Kit bootstrap copy.
