@@ -58,7 +58,7 @@ public sealed class UuCastingHosting
             return new(true, 0, MaintainedRunes: light);
         }
         if (major == 5 && minor is >= 1 and <= 4)
-            return new(true, 0, minor switch { 1 => 23, 2 => 21, 3 => 20, _ => 22 });
+            return new(true, 0, UuSpellProjectiles.ForTrapVariant(minor));
         if (major != 4 || minor < 0 || minor > 63) return new(false, 0);
         int healing = 0;
         if (minor == 15) healing = missingHealth;

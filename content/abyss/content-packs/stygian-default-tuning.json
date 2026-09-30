@@ -4,5 +4,23 @@
   "clockTicksPerSecond": 255,
   "movement": "default",
   "projectileSpeed": 24,
-  "projectileLifetimeSeconds": 8
+  "projectileLifetimeSeconds": 8,
+  "combat": {
+    "meleeDifficulty": 15,
+    "meleeDamageSides": 6,
+    "fullChargeSeconds": 1.0
+  },
+  "light": {
+    "baseRadiusTiles": 6,
+    "spellBonusTiles": 8,
+    "placedLightReachTiles": 4
+  },
+  "barter": {
+    "maxPatience": 3
+  },
+  "camera": {
+    "fieldOfViewDegrees": 75,
+    "nearPlane": 0.05,
+    "farPlane": 2000
+  }
 }

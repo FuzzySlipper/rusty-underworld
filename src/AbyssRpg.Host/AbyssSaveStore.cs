@@ -85,9 +85,15 @@ public sealed record AbyssSaveEnvelope(string Ruleset, byte[] Payload, DateTime 
     public AbyssSaveEnvelope(string ruleset, byte[] payload)
         : this(ruleset, payload, default) { }
 
-    /// <summary>A payload written now under this product's ruleset identity.</summary>
-    public static AbyssSaveEnvelope Create(byte[] payload, DateTime? savedAtUtc = null) =>
-        new("abyssrpg.ultima-underworld", payload, savedAtUtc ?? DateTime.UtcNow);
+    /// <summary>
+    /// A ruleset's payload written now, under the ruleset identity the payload
+    /// itself carries: the Host names no ruleset of its own here.
+    /// </summary>
+    public static AbyssSaveEnvelope Create(AbyssRpg.Kit.RulesetSavePayload payload, DateTime? savedAtUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+        return new(payload.Ruleset.Value, payload.Bytes.ToArray(), savedAtUtc ?? DateTime.UtcNow);
+    }
 }
 
 /// <summary>Corrupt persisted save data, rejected before anything is built from it.</summary>

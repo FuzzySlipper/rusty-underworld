@@ -723,14 +723,14 @@ public sealed class OrdinaryCompositionTests
         double mana = session.Status.Mana;
         spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
         product.Update(SixtyHzUpdate(2));
-        Assert.Equal(dark + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus, session.LightRadius);
+        Assert.Equal(dark + session.Tuning.Light.SpellBonusTiles, session.LightRadius);
         Assert.Equal(mana, session.Status.Mana);
         var held = Assert.Single(session.Casting.Panel().Maintained);
         string slot = product.Quicksave();
         Assert.True(product.LoadSlot(slot));
         session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         Assert.Equal(held, Assert.Single(session.Casting.Panel().Maintained));
-        Assert.Equal(dark + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus, session.LightRadius);
+        Assert.Equal(dark + session.Tuning.Light.SpellBonusTiles, session.LightRadius);
         session.Casting.Upkeep(held.ExpiresAtTicks);
         Assert.Equal(dark, session.LightRadius);
     }
@@ -749,7 +749,7 @@ public sealed class OrdinaryCompositionTests
         }
         var mana = session.State.Avatar.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.ManaTrack);
         mana.Maximum.BaseValue = 30; mana.Current = 30;
-        session.State.Avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse("abyss.skill.8")).BaseValue = 30;
+        session.State.Avatar.Stats.GetStat(Rusty.Engine.Mechanics.StatId.Parse($"abyss.skill.{AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuSkillCatalog.CastingIndex}")).BaseValue = 30;
         var result = session.AttemptCast(1);
         Assert.False(result.PrimedForAim);
         Assert.Equal(27, mana.Current);
@@ -1226,7 +1226,7 @@ public sealed class OrdinaryCompositionTests
         product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         Assert.Equal(
-            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius,
+            session.Tuning.Light.BaseRadiusTiles,
             session.LightRadius);
 
         product.Update(new ProductUpdate(Facts(2), [Key(KeyboardControl.KeyE, InputEdge.Pressed)]));
@@ -1249,8 +1249,8 @@ public sealed class OrdinaryCompositionTests
                 AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuSpellCatalog.Family.Light),
             "the caster is maintaining a light spell");
         Assert.Equal(
-            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius
-                + AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.SpellLightBonus,
+            session.Tuning.Light.BaseRadiusTiles
+                + session.Tuning.Light.SpellBonusTiles,
             session.LightRadius);
 
         // The wider radius is what the player is told about, and the scene the
@@ -1647,7 +1647,7 @@ public sealed class OrdinaryCompositionTests
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
 
         // The avatar starts among the level's placements, so its light reaches them.
-        Assert.Equal(AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius, session.LightRadius);
+        Assert.Equal(session.Tuning.Light.BaseRadiusTiles, session.LightRadius);
         int drawn = graphics.LastSnapshot.Count;
         Assert.True(drawn > 1, "the light reaches the placements around the spawn");
 
@@ -1664,7 +1664,7 @@ public sealed class OrdinaryCompositionTests
         // The light the session carries reaches the companion UI: the HUD reads it,
         // so a player can see how far they can see.
         Assert.Equal(
-            AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession.BaseLightRadius,
+            session.Tuning.Light.BaseRadiusTiles,
             (int)Field(ui.LastProjection!.Value.Value, "lightRadius").NumberValue);
 
         // Light falls off rather than switching off: the shapes nearest the avatar
@@ -2087,6 +2087,8 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(original.State.Creation.Skills, snapshot.Avatar.Skills);
 
         int[] skills = [.. snapshot.Avatar.Skills.Select(value => value + 3)];
+        // Lore well above Mana, so a vitals path that read the wrong skill shows.
+        skills[AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuSkillCatalog.ManaIndex + 1] += 20;
         var edited = snapshot with
         {
             Avatar = snapshot.Avatar with { Attributes = [29, 28, 27], Skills = skills, Name = "Shamino" },
@@ -2108,8 +2110,13 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(snapshot.WorldSeed, loaded.State.WorldSeed);
         // Maximum health follows the saved avatar's strength, not a new roll's,
         // and the saved health sits under it.
-        var vitals = AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuVitalsPolicy.Recalculate(29, 1, skills[8], 27);
+        // Maximum mana follows the Mana skill (donor playerdatskills.cs: skill 7 at
+        // 0x29), not Lore beside it; the edit makes the two differ.
+        int mana = AbyssRpg.Rulesets.UltimaUnderworld.Magic.UuSkillCatalog.ManaIndex;
+        Assert.NotEqual(skills[mana], skills[mana + 1]);
+        var vitals = AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuVitalsPolicy.Recalculate(29, 1, skills[mana], 27);
         Assert.Equal(vitals.MaxHp, ((ISessionStatusSource)loaded).Status.MaxHp);
+        Assert.Equal(vitals.MaxMana, ((ISessionStatusSource)loaded).Status.MaxMana);
         Assert.Equal(5, ((ISessionStatusSource)loaded).Status.Hp);
     }
 

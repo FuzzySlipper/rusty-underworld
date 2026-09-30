@@ -31,8 +31,6 @@ namespace AbyssRpg.Rulesets.UltimaUnderworld.Session;
 /// </summary>
 public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveableGameSession, ISessionStatusSource, IRespawnableGameSession
 {
-    /// <summary>Skill index the melee check rolls against (UW1 skill 0 is Attack).</summary>
-    public const int AttackSkill = 0;
     private readonly ProjectileFlights _projectiles = new();
     public IReadOnlyList<ProjectileFlight> Projectiles => _projectiles.Active;
 
@@ -52,6 +50,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private const float EyeHeight = 1.6f;
 
+    // The Engine's spatial grain for an imported level: half-unit collision voxels
+    // and eight-voxel chunks against eight-unit tiles, and one navigation cell per
+    // step. Structural to the import's scale, not tuning.
+    private const double CollisionVoxelSize = 0.5d;
+    private const uint CollisionChunkSize = 8;
+    private const uint NavigationChunkSize = 8;
+    private const uint NavigationMaximumStepCells = 1;
+
     private readonly GameSessionContext _context;
     private readonly UuTuningProfile _tuning;
     private UuLevelDefinition _level;
@@ -61,7 +67,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly PlayerControlState _player;
     private readonly FirstPersonCameraSystem _camera;
     private readonly UuLocomotionPolicy _locomotion;
-    private readonly UuCombatHosting _combat = new();
+    private readonly UuCombatHosting _combat;
     private readonly UuCastingHosting _casting;
     private readonly Random _rng;
     private Material? _material;
@@ -99,6 +105,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         _context = context;
         _tuning = tuning;
+        _combat = new UuCombatHosting(tuning.Combat.FullChargeSeconds);
         _level = level;
         _scene = scene;
         _placements = placements;
@@ -313,7 +320,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             ? RequireSavedAvatar(savedAvatar, creation)
             : UuCreationCatalog.RollDefault(creation, SeededRandom(worldSeed));
         UuVitalsPolicy.Vitals vitals = UuVitalsPolicy.Recalculate(
-            choices.Attributes[0], 1, choices.Skills[SkillIndexForVitals],
+            choices.Attributes[0], 1, choices.Skills[UuSkillCatalog.ManaIndex],
             choices.Attributes[2]);
 
         // The level's placements come from the operator's own import: every
@@ -372,7 +379,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuSession session = UuSession.NewGame(
             choices, vitals, prepared.FirstLevel, level.Spawn, tuning.Movement,
             worldSeed: prepared.WorldSeed);
-        var spatialTuning = new SpatialTuning(0.5d, 8, 8, 1);
+        var spatialTuning = new SpatialTuning(
+            CollisionVoxelSize, CollisionChunkSize, NavigationChunkSize, NavigationMaximumStepCells);
         SpatialMovementSystem movement;
         try
         {
@@ -397,7 +405,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         try
         {
             camera = new FirstPersonCameraSystem(
-                context.Engine.CameraView, player, new FirstPersonCameraTuning(EyeHeight, 75d, 0.05d, 2000d));
+                context.Engine.CameraView, player, new FirstPersonCameraTuning(EyeHeight, tuning.Camera.FieldOfViewDegrees, tuning.Camera.NearPlane, tuning.Camera.FarPlane));
         }
         catch
         {
@@ -493,8 +501,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return avatar with { Name = avatar.Name ?? "" };
     }
 
-    // The vitals policy reads the mana skill index; UW1 skill 8 governs casting.
-    private const int SkillIndexForVitals = 8;
 
     private static (ContentPack Pack, int Level) RequireLevelPack(
         ResolvedGameComposition composition, int? requiredLevel = null)
@@ -773,10 +779,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         get
         {
-            int radius = BaseLightRadius;
+            int radius = _tuning.Light.BaseRadiusTiles;
             // A light spell widens it while it holds; the maintained-spell owner
             // answers that, not a second timer here.
-            if (_casting.MaintainsFamily(Magic.UuSpellCatalog.Family.Light)) radius += SpellLightBonus;
+            if (_casting.MaintainsFamily(Magic.UuSpellCatalog.Family.Light)) radius += _tuning.Light.SpellBonusTiles;
 
             return radius;
         }
@@ -785,11 +791,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// <summary>Engine units per tile in the admitted level: the import's own scale.</summary>
     private float TileUnits => _placements?.UnitsPerTile is > 0 ? (float)_placements.UnitsPerTile : 8f;
 
-    /// <summary>The light the avatar always carries: enough to see what is underfoot.</summary>
-    public const int BaseLightRadius = 6;
-
-    /// <summary>What a light spell adds to the radius while it holds.</summary>
-    public const int SpellLightBonus = 8;
+    /// <summary>The tuning this session plays with: light, combat, barter and camera values.</summary>
+    public UuTuningProfile Tuning => _tuning;
 
     /// <summary>Tiles the avatar has seen on the current level.</summary>
     public int MappedTiles => _session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page)
@@ -830,7 +833,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             index = obj.Next;
             if (!state.IsLive(obj.Index) || !obj.AvatarTriggerEnabled || Traps.UuTriggerPolicy.Type(_objectTables, obj.ItemId) is not { } type) continue;
-            bool pressure = type is 7 or 15;
+            bool pressure = Traps.UuTriggerPolicy.IsPressure(type);
             if (!entering && !pressure && obj.RepeatsTrigger) state.Release(obj.Index);
             long weight = pressure ? TileWeight(tile, obj.Height, entering) : 0;
             if (!Traps.UuTriggerPolicy.Fires(type, entering, weight, obj.PressureThreshold))
@@ -864,7 +867,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _pressureWeights.Clear();
             var admission = _session.PlacedAdmission(_session.Dungeon.CurrentLevel);
             _pressureTiles = _placements.Objects
-                .Where(o => o.AvatarTriggerEnabled && Traps.UuTriggerPolicy.Type(_objectTables, o.ItemId) is 7 or 15)
+                .Where(o => o.AvatarTriggerEnabled && Traps.UuTriggerPolicy.Type(_objectTables, o.ItemId) is { } type && Traps.UuTriggerPolicy.IsPressure(type))
                 .Select(o => (Trigger: o, Tile: admission is not null && admission.Tiles.TryGetValue(o.Index, out var at)
                     ? _placements.Tile(at.X, at.Y) : null))
                 .Where(pair => pair.Tile is not null)
@@ -1054,9 +1057,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     if (_placements?.Object(index) is { } destination) teleport(destination);
                     break;
                 case Traps.UuTrapDispatch.TrapKind.TextString:
-                    // UW1 a_text_string_trap.cs: block 9, sixty-four entries per level.
                     if (_placements?.Object(index) is { } textTrap)
-                        showText(_strings?.Text(9, 64 * (level - 1) + textTrap.Owner) ?? "");
+                        showText(_strings?.TrapText(level, textTrap.Owner) ?? "");
                     break;
                 case Traps.UuTrapDispatch.TrapKind.Spell:
                     if (_placements?.Object(index) is { } spellTrap)
@@ -1226,14 +1228,14 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         int tileX = (int)Math.Floor(position.X / TileUnits);
         int tileY = (int)Math.Floor(position.Z / TileUnits);
         if (!_session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page))
-            _session.Automap[_session.Dungeon.CurrentLevel] = page = new Kit.Knowledge.AutomapPage();
+            _session.Automap[_session.Dungeon.CurrentLevel] = page = new Kit.Knowledge.AutomapPage(UuLevelPlacements.TileDimension);
         // Only what the avatar can see goes on the map: a disc would draw the far
         // side of a wall the player has never looked at.
         for (int y = tileY - LightRadius; y <= tileY + LightRadius; y++)
         {
             for (int x = tileX - LightRadius; x <= tileX + LightRadius; x++)
             {
-                if (x < 0 || y < 0 || x >= Kit.Knowledge.AutomapPage.Dimension || y >= Kit.Knowledge.AutomapPage.Dimension)
+                if (x < 0 || y < 0 || x >= page.Dimension || y >= page.Dimension)
                     continue;
                 if (SeesTile(x, y)) page.Reveal(x, y);
             }
@@ -1287,14 +1289,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             // does not define reaches the default rather than nothing.
             int reach = _items?.Find(obj.ItemId)?.Radius is int radius and > 0
                 ? radius
-                : DefaultLightReach;
+                : _tuning.Light.PlacedLightReachTiles;
             AdmittedTile? placed = _placements.Tile(tile.X, tile.Y);
             yield return (_placements.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0), reach);
         }
     }
 
-    /// <summary>What a burning light on the floor reaches, in tiles.</summary>
-    public const int DefaultLightReach = 4;
 
     /// <summary>Whether the avatar has an unobstructed line to a tile.</summary>
     private bool SeesTile(int tileX, int tileY)
@@ -1526,9 +1526,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             return;
         }
 
-        int attackSkill = (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{AttackSkill}")).Value;
+        int attackSkill = AvatarSkill(UuSkillCatalog.AttackIndex);
         UuCombatHosting.StrikeOutcome strike = _combat.Release(
-            _session.Avatar.Stats, target.Stats, attackSkill, difficulty: 15, damageSides: 6, _rng);
+            _session.Avatar.Stats, target.Stats, attackSkill,
+            _tuning.Combat.MeleeDifficulty, _tuning.Combat.MeleeDamageSides, _rng);
         if (strike.Hit && strike.TargetDefeated) RecordDefeat(target);
         _outcome = strike.Hit
             ? strike.TargetDefeated
@@ -1586,7 +1587,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     var seen = new HashSet<int>();
                     while (doorIndex != 0 && seen.Add(doorIndex) && _placements.Object(doorIndex) is { } doorObject)
                     {
-                        if (doorObject.ItemId is >= 320 and <= 335) RunObjectTriggers(doorObject, 7);
+                        if (UuObjectShape.IsStaticDoorItem(doorObject.ItemId)) RunObjectTriggers(doorObject, Traps.UuTriggerPolicy.Open);
                         doorIndex = doorObject.Next;
                     }
                 }
@@ -1629,7 +1630,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuReachTarget target = InReach(position);
         _outcome = target.Object is { } obj ? $"You examine the {Describe(obj.ItemId)}."
             : target.Kind == UuReachKind.Door ? "You examine the door." : "There is nothing here to examine.";
-        if (target.Object is { } placed) RunObjectTriggers(placed, 5);
+        if (target.Object is { } placed) RunObjectTriggers(placed, Traps.UuTriggerPolicy.Look);
     }
 
     private bool RunObjectTriggers(AdmittedObject used, int type)
@@ -1646,7 +1647,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             index = trigger.Next;
             if (!state.IsLive(trigger.Index)) continue;
-            if (type == 4 && trigger.Flags == 0 && trigger.ItemId is >= 384 and < 416
+            if (type == Traps.UuTriggerPolicy.Use && trigger.Flags == 0 && Traps.UuTrapDispatch.IsTrapItem(trigger.ItemId)
                 && Traps.UuTrapDispatch.ClassifyItem(trigger.ItemId) != Traps.UuTrapDispatch.TrapKind.Door)
             {
                 if (!state.Fire(trigger.Index)) continue;
@@ -1656,9 +1657,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 return true;
             }
             if (!trigger.AvatarTriggerEnabled || Traps.UuTriggerPolicy.Type(_objectTables, trigger.ItemId) != type) continue;
-            if (type == 5 && trigger.SearchDifficulty > 0)
+            if (type == Traps.UuTriggerPolicy.Look && trigger.SearchDifficulty > 0)
             {
-                int search = (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{UuSkillCatalog.SearchIndex}")).Value;
+                int search = AvatarSkill(UuSkillCatalog.SearchIndex);
                 if (Creation.UuSkillRolls.SkillCheck(search, trigger.SearchDifficulty, _rng) <= Creation.UuSkillRolls.CheckResult.Fail)
                     continue;
             }
@@ -1673,7 +1674,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private void Use(AdmittedObject placed)
     {
-        if (RunObjectTriggers(placed, 4)) return;
+        if (RunObjectTriggers(placed, Traps.UuTriggerPolicy.Use)) return;
         if (_levelItems is not { } items)
         {
             _outcome = $"You see {Describe(placed.ItemId)} here.";
@@ -1715,12 +1716,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             CollectRune(rune);
             ShelfRune(rune);
             _outcome = $"You take the runestone and lay it on the shelf.";
-            RunObjectTriggers(placed, 2);
+            RunObjectTriggers(placed, Traps.UuTriggerPolicy.Pickup);
             return;
         }
 
         _outcome = $"You take the {Describe(placed.ItemId)}.";
-        RunObjectTriggers(placed, 2);
+        RunObjectTriggers(placed, Traps.UuTriggerPolicy.Pickup);
     }
 
     /// <summary>
@@ -1757,10 +1758,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _rng,
             tray: Tray(talker),
             avatar: new UuConversationHosting.AvatarPresence(
-                CharmSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.15")).Value,
-                Level: 1,
+                CharmSkill: AvatarSkill(UuSkillCatalog.CharmIndex),
+                Level: _session.Avatar.Progression.Level,
                 Hp: (int)_session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current,
                 Vitality: (int)_session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current),
+            // The object-tables pack does not carry a critter's level yet; the
+            // creature behaviour driver (Den #8683) brings critter stats in.
             talker: new UuConversationHosting.NpcRecord(
                 Level: 1,
                 Hp: (int)talker.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current,
@@ -1794,9 +1797,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return new UuConversationHosting.BarterTray(
             NpcValue: npcValue,
             PlayerValue: playerValue,
-            CharmSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.15")).Value,
-            AppraisalSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse("abyss.skill.18")).Value,
-            MaxPatience: 3);
+            CharmSkill: AvatarSkill(UuSkillCatalog.CharmIndex),
+            AppraisalSkill: AvatarSkill(UuSkillCatalog.AppraiseIndex),
+            MaxPatience: _tuning.Barter.MaxPatience);
     }
 
     /// <summary>The imported monetary value of one runtime item identity.</summary>
@@ -2152,9 +2155,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public UuCastingHosting.CastOutcome AttemptCast(int spellId)
     {
         UuCastingHosting.CastOutcome outcome = _casting.AttemptCast(
-            characterLevel: 1,
+            characterLevel: _session.Avatar.Progression.Level,
             mana: (int)_session.Avatar.Stats.GetTrack(UuAvatarFactory.ManaTrack).Current,
-            castingSkill: (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{SkillIndexForVitals}")).Value,
+            castingSkill: AvatarSkill(UuSkillCatalog.CastingIndex),
             delayed: false,
             nowTicks: _session.Clock.ElapsedTicks,
             ticksPerSecond: _tuning.ClockTicksPerSecond,
@@ -2174,7 +2177,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (outcome.Gate == UuCastGates.GateResult.Cast && outcome.PrimedForAim)
         {
             string runes = UuRuneCatalog.SpellLetters(_casting.Panel().Shelf);
-            int item = runes switch { "OJ" => 23, "OG" => 21, "PF" => 20, _ => 0 };
+            int item = UuSpellProjectiles.ForRunes(runes);
             if (item != 0 && _player.Position is { } position)
             {
                 float yaw = _player.YawRadians, pitch = _player.PitchRadians;
@@ -2199,6 +2202,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             _combat.Reset();
         }
     }
+
+    /// <summary>The avatar's current value in one skill, by the donor's skill number.</summary>
+    private int AvatarSkill(int index) =>
+        (int)_session.Avatar.Stats.GetStat(StatId.Parse($"abyss.skill.{index}")).Value;
 
     public ProductMode? PendingModeRequest
     {

@@ -59,7 +59,7 @@ public sealed class UuSession : IDisposable
     /// <summary>Automap coverage by level.</summary>
     public Dictionary<int, Kit.Knowledge.AutomapPage> Automap { get; } = [];
 
-    /// <summary>Quill notes (per-level pages).</summary>
+    /// <summary>Map notes the player places on the automap (per-level pages).</summary>
     public Kit.Knowledge.QuillNotes Notes { get; } = new();
 
     /// <summary>Planted world seed (respawn identity).</summary>
@@ -284,7 +284,7 @@ public sealed class UuSession : IDisposable
         foreach (AutomapPageDto page in snapshot.Automap)
         {
             if (!Automap.TryGetValue(page.Level, out Kit.Knowledge.AutomapPage? existing))
-                Automap[page.Level] = existing = new Kit.Knowledge.AutomapPage();
+                Automap[page.Level] = existing = new Kit.Knowledge.AutomapPage(Content.UuLevelPlacements.TileDimension);
             existing.DecodeInto(page.Rle);
         }
 

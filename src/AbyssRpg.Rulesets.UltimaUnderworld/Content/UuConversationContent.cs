@@ -113,6 +113,15 @@ public sealed class UuStrings
     public Func<int, int, string> Provider => Text;
 
     /// <summary>A creature's own name, which lives in the conversation block at whoami+16.</summary>
+    /// <summary>The block text-string traps read (donor a_text_string_trap.cs).</summary>
+    public const int TrapTextBlock = 9;
+
+    /// <summary>Text-string traps index their block in sixty-four entries per level.</summary>
+    public const int TrapTextsPerLevel = 64;
+
+    /// <summary>The text a text-string trap on a level shows for its own index.</summary>
+    public string TrapText(int level, int index) => Text(TrapTextBlock, TrapTextsPerLevel * (level - 1) + index);
+
     public string CreatureName(int whoami) => whoami <= 0 ? "" : Text(ConversationBlock, whoami + 16).Trim();
 
     public static UuStrings Read(ReadOnlyMemory<byte> payload, string payloadLabel)

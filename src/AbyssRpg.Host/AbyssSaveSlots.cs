@@ -1,3 +1,4 @@
+using AbyssRpg.Kit;
 using Rusty.Engine.Persistence;
 
 namespace AbyssRpg.Host;
@@ -13,7 +14,15 @@ namespace AbyssRpg.Host;
 public sealed class AbyssSaveSlots
 {
     public const int QuicksaveCount = 3;
-    public const int LevelCount = 9;
+
+    /// <summary>
+    /// How many per-level autosave slots the Host names, levels 1 to this. It is a
+    /// slot capacity, not a fact about any dungeon: the menu's load-slot intents
+    /// are declared statically (AbyssRpg.Host.csproj) and cover exactly these
+    /// keys, so the count cannot follow a bundle. A level numbered above it plays
+    /// without an autosave.
+    /// </summary>
+    public const int AutosaveSlotCount = 9;
     public const string AnchorKey = "anchor";
     public const string AutosavePrefix = "autosave/";
 
@@ -26,7 +35,7 @@ public sealed class AbyssSaveSlots
     }
 
     public static string AutosaveKey(int level) =>
-        level >= 1 && level <= LevelCount
+        level >= 1 && level <= AutosaveSlotCount
             ? $"{AutosavePrefix}level-{level}"
             : throw new ArgumentOutOfRangeException(nameof(level));
 
@@ -39,7 +48,7 @@ public sealed class AbyssSaveSlots
     public static IEnumerable<string> Keys()
     {
         yield return AnchorKey;
-        for (int level = 1; level <= LevelCount; level++) yield return AutosaveKey(level);
+        for (int level = 1; level <= AutosaveSlotCount; level++) yield return AutosaveKey(level);
         for (int index = 0; index < QuicksaveCount; index++) yield return QuicksaveKey(index);
     }
 
@@ -55,15 +64,15 @@ public sealed class AbyssSaveSlots
         return key;
     }
 
-    public void Autosave(int level, byte[] snapshot) =>
+    public void Autosave(int level, RulesetSavePayload snapshot) =>
         _store.Save(AutosaveKey(level), AbyssSaveEnvelope.Create(snapshot));
 
-    public void PlantAnchor(byte[] snapshot) =>
+    public void PlantAnchor(RulesetSavePayload snapshot) =>
         _store.Save(AnchorKey, AbyssSaveEnvelope.Create(snapshot));
 
     public byte[]? LoadAnchor() => LoadBytes(AnchorKey);
 
-    public string Quicksave(byte[] snapshot)
+    public string Quicksave(RulesetSavePayload snapshot)
     {
         string key = QuicksaveKey(_quicksaveNext);
         _store.Save(key, AbyssSaveEnvelope.Create(snapshot));

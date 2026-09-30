@@ -141,8 +141,8 @@ public sealed class HostEntryTests
     [Fact]
     public void Created_saves_stamp_the_write_time()
     {
-        AbyssSaveEnvelope created = AbyssSaveEnvelope.Create([1]);
-        Assert.Equal("abyssrpg.ultima-underworld", created.Ruleset);
+        AbyssSaveEnvelope created = AbyssSaveEnvelope.Create(new RulesetSavePayload(new RulesetId("abyssrpg.some-ruleset"), [1]));
+        Assert.Equal("abyssrpg.some-ruleset", created.Ruleset);
         Assert.NotEqual(default, created.SavedAtUtc);
     }
 

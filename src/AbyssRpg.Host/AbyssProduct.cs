@@ -451,12 +451,12 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
         if (_session is not ISaveableGameSession saveable || _session is not ISessionStatusSource status) return;
         int level = status.Status.Level;
         if (level == _lastAutosaveLevel) return;
-        // Slots are named per level and the shipped dungeon has nine; a bundle
-        // that admits another level still plays, it just has no autosave name.
-        if (level is < 1 or > AbyssSaveSlots.LevelCount) return;
+        // Slots are named per level up to the Host's slot capacity; a level
+        // numbered above it still plays, it just has no autosave name.
+        if (level is < 1 or > AbyssSaveSlots.AutosaveSlotCount) return;
         try
         {
-            _slots.Autosave(level, saveable.CaptureSave().Bytes.ToArray());
+            _slots.Autosave(level, saveable.CaptureSave());
         }
         catch (Exception error) when (error is AbyssSaveFormatException or NotSupportedException or IOException)
         {
@@ -476,7 +476,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
     {
         ThrowIfShutdown();
         if (_session is not ISaveableGameSession saveable) return "This session cannot be saved yet.";
-        string key = _slots.Quicksave(saveable.CaptureSave().Bytes.ToArray());
+        string key = _slots.Quicksave(saveable.CaptureSave());
         MarkSlotsDirty();
         _hostOutcome = $"Saved to {key}.";
         Publish();

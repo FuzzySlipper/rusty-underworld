@@ -18,7 +18,7 @@ public sealed class UuCombatHostingTests
     [Fact]
     public void Charge_builds_release_hits_and_defeat_routes()
     {
-        var combat = new UuCombatHosting();
+        var combat = new UuCombatHosting(fullChargeSeconds: 1.0);
         Assert.Equal(0f, combat.ChargeFraction);
         combat.Hold(0.5);
         Assert.Equal(0.5f, combat.ChargeFraction);

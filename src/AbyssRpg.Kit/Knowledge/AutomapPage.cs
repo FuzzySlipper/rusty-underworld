@@ -1,15 +1,23 @@
 namespace AbyssRpg.Kit.Knowledge;
 
 /// <summary>
-/// Automap coverage: one 64x64 explored page per level, with the donor's
-/// boolean run-length encoding for saves ("0:100,5,50" = 100 unexplored,
-/// 5 explored, 50 unexplored).
+/// Automap coverage: one explored page per level, a square grid of the side the
+/// ruleset's levels use, with a boolean run-length encoding for saves
+/// ("0:100,5,50" = 100 unexplored, 5 explored, 50 unexplored).
 /// </summary>
 public sealed class AutomapPage
 {
-    public const int Dimension = 64;
+    private readonly bool[] _mapped;
 
-    private readonly bool[] _mapped = new bool[Dimension * Dimension];
+    public AutomapPage(int dimension)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(dimension);
+        Dimension = dimension;
+        _mapped = new bool[checked(dimension * dimension)];
+    }
+
+    /// <summary>Tiles per side of the page.</summary>
+    public int Dimension { get; }
 
     public bool IsMapped(int x, int y) =>
         (uint)x < Dimension && (uint)y < Dimension && _mapped[y * Dimension + x];
@@ -38,7 +46,7 @@ public sealed class AutomapPage
     public static string Encode(bool[] mapped)
     {
         ArgumentNullException.ThrowIfNull(mapped);
-        if (mapped.Length == 0) return string.Empty; // donor-compatible: no data encodes empty
+        if (mapped.Length == 0) return string.Empty; // no data encodes empty
         var runs = new List<int>();
         bool current = mapped[0];
         int length = 1;
@@ -53,8 +61,8 @@ public sealed class AutomapPage
     }
 
     /// <summary>
-    /// An empty document decodes as all-unexplored (donor-compatible: the
-    /// live default of an unsaved page is the empty string).
+    /// An empty document decodes as all-unexplored: an unsaved page is the
+    /// empty string.
     /// </summary>
     public static bool[] Decode(string encoded, int expectedLength)
     {

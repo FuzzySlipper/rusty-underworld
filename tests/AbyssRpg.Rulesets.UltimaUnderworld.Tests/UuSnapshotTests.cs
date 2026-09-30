@@ -37,7 +37,7 @@ public sealed class UuSnapshotTests
         session.Clock.Advance(1000);
         session.Survival.Hunger = 50;
         session.Quests.Set(0, 2);
-        session.Automap[1] = new AbyssRpg.Kit.Knowledge.AutomapPage();
+        session.Automap[1] = new AbyssRpg.Kit.Knowledge.AutomapPage(64);
         session.Automap[1].Reveal(5, 5);
         session.Notes.Place(1, "trap", 5, 5);
         session.Avatar.Stats.GetTrack(UuAvatarFactory.DefeatTrack).Current = 20.0;

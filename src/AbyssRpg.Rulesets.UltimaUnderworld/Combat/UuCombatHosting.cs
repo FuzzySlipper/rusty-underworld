@@ -4,19 +4,25 @@ using AbyssRpg.Rulesets.UltimaUnderworld.Creation;
 namespace AbyssRpg.Rulesets.UltimaUnderworld.Combat;
 
 /// <summary>
-/// Combat integration: hold builds charge (full in FullChargeSeconds,
-/// Ours — no donor number found), release resolves through the shared
+/// Combat integration: hold builds charge (full after the tuned
+/// full-charge time — ours, no donor number found), release resolves through the shared
 /// strike path with charge-scaled damage on the defeat track, and defeat
 /// routes through T34 death (tree/anchor). The Kit attack-execution
 /// machine (cooldowns/impacts) integrates when NPC combat lands.
 /// </summary>
 public sealed class UuCombatHosting
 {
-    public const double FullChargeSeconds = 1.0;
-
+    private readonly double _fullChargeSeconds;
     private double _heldSeconds;
 
-    public float ChargeFraction => (float)Math.Clamp(_heldSeconds / FullChargeSeconds, 0.0, 1.0);
+    public UuCombatHosting(double fullChargeSeconds)
+    {
+        if (!double.IsFinite(fullChargeSeconds) || fullChargeSeconds <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(fullChargeSeconds));
+        _fullChargeSeconds = fullChargeSeconds;
+    }
+
+    public float ChargeFraction => (float)Math.Clamp(_heldSeconds / _fullChargeSeconds, 0.0, 1.0);
 
     public void Hold(double seconds)
     {

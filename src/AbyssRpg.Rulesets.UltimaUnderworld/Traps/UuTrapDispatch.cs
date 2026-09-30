@@ -40,6 +40,12 @@ public static class UuTrapDispatch
     public static bool IsTrap(int itemId) => itemId >> 6 == TrapMajorClass;
 
     /// <summary>Classifies an item id the way the donor's records split it.</summary>
+    /// <summary>
+    /// Whether an item id is a trap record (majorclass 6, the first half: 384-415);
+    /// the second half, 416-447, is triggers.
+    /// </summary>
+    public static bool IsTrapItem(int itemId) => itemId >> 6 == TrapMajorClass && itemId < 416;
+
     public static TrapKind ClassifyItem(int itemId) =>
         Classify(itemId >> 6, (itemId & 0x30) >> 4, itemId & 0xF);
 

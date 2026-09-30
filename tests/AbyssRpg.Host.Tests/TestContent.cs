@@ -95,6 +95,21 @@ internal static class TestContent
     public const int LitLightObjectIndex = 510;
 
     /// <summary>A square floor at y=0 with a wall box: enough geometry to walk and collide.</summary>
+    /// <summary>
+    /// The shipped tuning profile: the fixture plays with the product's own
+    /// numbers rather than a copy of them that could drift.
+    /// </summary>
+    private static string ShippedTuningPath()
+    {
+        for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            string candidate = Path.Combine(directory.FullName, "content", "abyss", "content-packs", "stygian-default-tuning.json");
+            if (System.IO.File.Exists(candidate)) return candidate;
+        }
+
+        throw new FileNotFoundException("The shipped tuning profile was not found above the test binaries.");
+    }
+
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
         bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter",
@@ -166,7 +181,7 @@ internal static class TestContent
             File("abyss/content-packs/starting-kit.json", """{ "id": "abyssrpg.starting-kit", "items": ["torch"] }"""),
             File("abyss/packs/test.object-tables.pack.json", Pack("abyssrpg.object-tables", "abyss/content-packs/object-tables.json")),
             File("abyss/content-packs/object-tables.json", ObjectTables()),
-            File("abyss/content-packs/tuning.json", """{ "id": "abyssrpg.stygian-default", "clockTicksPerSecond": 255, "movement": "default" }"""),
+            File("abyss/content-packs/tuning.json", System.IO.File.ReadAllText(ShippedTuningPath())),
         ];
 
         if (withLevel) StageLevel(files, level, withPlacements, withCritter, withRunes, creatureWhoAmI);

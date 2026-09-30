@@ -8,7 +8,7 @@ public sealed class KnowledgeStateTests
     [Fact]
     public void Automap_reveals_and_round_trips_rle()
     {
-        var page = new AutomapPage();
+        var page = new AutomapPage(64);
         Assert.False(page.IsMapped(10, 10));
         page.Reveal(10, 10);
         Assert.True(page.IsMapped(10, 10));
@@ -19,7 +19,7 @@ public sealed class KnowledgeStateTests
         Assert.Equal(1 + 5, page.MappedCount); // center + 4 orthogonal
 
         string encoded = page.EncodePage();
-        var revived = new AutomapPage();
+        var revived = new AutomapPage(64);
         revived.DecodeInto(encoded);
         Assert.Equal(page.MappedCount, revived.MappedCount);
         Assert.True(revived.IsMapped(10, 10));

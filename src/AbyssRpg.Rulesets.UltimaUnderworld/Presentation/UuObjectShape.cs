@@ -12,6 +12,9 @@ public readonly record struct UuObjectShape(
     /// Whether an item id is a door: the donor's static door, majorclass 5 minorclass 0,
     /// or its moving door, majorclass 7 minorclass 0 classindex 0xF.
     /// </summary>
+    /// <summary>A static door: majorclass 5, minorclass 0 (item ids 320-335).</summary>
+    public static bool IsStaticDoorItem(int itemId) => itemId >> 6 == 5 && ((itemId & 0x30) >> 4) == 0;
+
     public static bool IsDoorItem(int itemId) =>
         (itemId >> 6 == 5 && ((itemId & 0x30) >> 4) == 0)
         || (itemId >> 6 == 7 && ((itemId & 0x30) >> 4) == 0 && (itemId & 0xF) == 0xF);
