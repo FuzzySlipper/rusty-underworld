@@ -83,23 +83,34 @@ public sealed class HostEntryTests
     }
 
     [Fact]
-    public void Lifecycle_starts_pauses_resumes_and_stops()
+    public void Lifecycle_starts_pauses_resumes_and_restarts()
     {
-        var lifecycle = new AbyssProductLifecycle();
-        Assert.Equal(AbyssLifecycleMode.Stopped, lifecycle.Mode);
-        Assert.Throws<InvalidOperationException>(() => lifecycle.Pause());
-        Assert.Throws<InvalidOperationException>(() => lifecycle.Resume());
+        using var product = new AbyssProduct(
+            EngineContextFake.Create(
+                persistence: new InMemoryPersistenceService(),
+                spatial: EngineSpatialDouble.Create().Service,
+                content: SpatialContentDouble.Create().Service,
+                ui: UiDouble.Create().Service,
+                cameraView: CameraViewDouble.Create().Service,
+                graphics: new GraphicsDouble()),
+            TestContent.Build(),
+            BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld));
+        Assert.Equal(AbyssLifecycleMode.Stopped, product.LifecycleMode);
+        Assert.Throws<InvalidOperationException>(product.Pause);
+        Assert.Throws<InvalidOperationException>(product.Resume);
 
-        lifecycle.Start();
-        Assert.Equal(AbyssLifecycleMode.Running, lifecycle.Mode);
-        Assert.Throws<InvalidOperationException>(() => lifecycle.Start());
+        product.Start();
+        Assert.Equal(AbyssLifecycleMode.Running, product.LifecycleMode);
+        Assert.Throws<InvalidOperationException>(product.Start);
 
-        lifecycle.Pause();
-        Assert.Equal(AbyssLifecycleMode.Paused, lifecycle.Mode);
-        lifecycle.Resume();
-        Assert.Equal(AbyssLifecycleMode.Running, lifecycle.Mode);
-        lifecycle.Stop();
-        Assert.Equal(AbyssLifecycleMode.Stopped, lifecycle.Mode);
+        product.Pause();
+        Assert.Equal(AbyssLifecycleMode.Paused, product.LifecycleMode);
+        product.Resume();
+        Assert.Equal(AbyssLifecycleMode.Running, product.LifecycleMode);
+        product.Restart();
+        Assert.Equal(AbyssLifecycleMode.Running, product.LifecycleMode);
+        product.Shutdown();
+        Assert.Throws<ObjectDisposedException>(product.Start);
     }
 
     [Fact]

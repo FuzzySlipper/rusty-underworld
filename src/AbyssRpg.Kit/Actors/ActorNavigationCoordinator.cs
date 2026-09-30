@@ -4,7 +4,10 @@ using AbyssRpg.Kit.Controls;
 
 namespace AbyssRpg.Kit.Actors;
 
+// Kept for the creature behaviour driver (Den #8683): pursuit and NPC schedules
+// move actors through Engine navigation with it.
 /// <summary>Ruleset-supplied limits for one Engine navigation evaluation.</summary>
+
 public readonly record struct ActorNavigationRequest(WorldPoint Target, float MaximumStepUnits, uint MaximumVisited)
 {
     public ActorNavigationRequest Validate()

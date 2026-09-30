@@ -3,6 +3,9 @@ using AbyssRpg.Kit.Facts;
 
 namespace AbyssRpg.Kit.Combat;
 
+// Kept for the creature behaviour driver (Den #8683): a creature's attack runs
+// through this one lifecycle (cooldown, delayed impact, interruption).
+
 public readonly record struct AttackRequest(long AttackerId, long? TargetId, ulong Generation, ulong SimulationStep,
     double FixedDeltaSeconds, bool Delayed, string? Action = null);
 public readonly record struct AttackOutcome(bool Hit, bool Allowed, int Body, int Damage, int Roll, int Chance);

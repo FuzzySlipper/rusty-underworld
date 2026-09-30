@@ -338,51 +338,12 @@ public interface IRespawnableGameSession : IGameSession
     void RespawnAtAnchor();
 }
 
-/// <summary>Optional ruleset seam for recognizing its own entry-screen action.</summary>
-public interface IEntryScreenSession
-{
-    bool RequestsBegin(ReadOnlySpan<ProductInputEvent> input);
-}
-
-/// <summary>
-/// Optional entry seam for a ruleset whose entry action starts work before ordinary play may begin.
-/// The Host owns the eventual mode transition; the ruleset only says whether its entry work is
-/// waiting, ready, or could not start.
-/// </summary>
-public interface IEntryScreenStartupSession
-{
-    EntryScreenStartupResult StartEntry();
-
-    /// <summary>Consumes the one completion which permits the Host to leave its entry screen.</summary>
-    bool TakeEntryReadyForPlay();
-}
-
-/// <summary>The result of requesting a ruleset-owned entry startup operation.</summary>
-public enum EntryScreenStartupResult
-{
-    /// <summary>The Host may enter ordinary play now.</summary>
-    ReadyForPlay,
-
-    /// <summary>The ruleset accepted the request and is waiting on an Engine-admitted operation.</summary>
-    Waiting,
-
-    /// <summary>The ruleset refused or could not start its entry operation.</summary>
-    Failed,
-}
-
 /// <summary>
 /// The mode a product runs a game session under. The product decides the mode; a session decides
 /// what the mode means for its own world, input and presentation.
 /// </summary>
 public enum ProductMode
 {
-    /// <summary>
-    /// The entry screen owns the product: it shows the screen the product offers before a world
-    /// starts, so neither gameplay input nor world time reaches the session until the product leaves
-    /// this mode. A product that never enters it behaves exactly as it did before the mode existed.
-    /// </summary>
-    Title,
-
     /// <summary>Ordinary play: gameplay input is interpreted and world time advances.</summary>
     Playing,
 
@@ -423,76 +384,6 @@ public interface IModeAwareGameSession
     bool PendingModeRequestClosesModal { get; }
 }
 
-/// <summary>
-/// Optional session seam for the choices a player can make after defeat. The ruleset recognizes
-/// its own action payload and asks; the Host owns session replacement, title selection, and save
-/// storage. Keeping this seam ruleset-neutral lets the Host route new, load, and quit without
-/// interpreting a product's UI vocabulary or reading its save payload.
-/// </summary>
-public interface IPlayerDefeatOutcomeSession : IGameSession
-{
-    /// <summary>Takes the one defeat outcome request admitted by the ruleset, if any.</summary>
-    PlayerDefeatOutcomeRequest? TakePlayerDefeatOutcomeRequest();
-
-    /// <summary>Presents a Host-owned new-game or title outcome on the current session.</summary>
-    void ReportPlayerDefeatOutcome(string message);
-}
-
-/// <summary>The session replacement or persistence action requested by a defeated player.</summary>
-public enum PlayerDefeatOutcome
-{
-    NewGame,
-    Load,
-    QuitToTitle,
-}
-
-/// <summary>One ruleset-neutral player-defeat choice, optionally naming a Host save slot.</summary>
-public sealed record PlayerDefeatOutcomeRequest(PlayerDefeatOutcome Outcome, string? SaveKey = null);
-
-/// <summary>
-/// Optional session seam for ordinary named save-slot requests. The session interprets the
-/// player-facing actions and asks, because only the ruleset knows whether an action means
-/// anything in the current mode; the product owns catalog storage and any session replacement,
-/// then reports the outcome back for the session to present. A session that does not implement
-/// this ignores save-slot actions, which is why the seam is optional rather than part of
-/// <see cref="IGameSession"/>.
-/// </summary>
-public interface ISaveRequestingGameSession : IGameSession
-{
-    /// <summary>Presents the product's save/load outcome after it honored a request.</summary>
-    void ReportSaveOutcome(string message);
-
-    /// <summary>
-    /// Takes one named save-slot request.
-    /// </summary>
-    SaveSlotRequest? TakeSaveSlotRequest();
-
-    /// <summary>
-    /// Delivers the Host-owned catalog after listing or changing it. Rulesets only present this
-    /// projection; they do not inspect storage or choose persistence behavior.
-    /// </summary>
-    void ReportSaveSlots(IReadOnlyList<SaveSlotSummary> slots, string? diagnostic);
-}
-
-/// <summary>The named operation a ruleset asks the Host's ordinary save-slot owner to perform.</summary>
-public enum SaveSlotOperation
-{
-    List,
-    Save,
-    Load,
-    Delete,
-}
-
-/// <summary>
-/// A player-visible save-slot request. Save names new slots when <see cref="Key"/> is absent;
-/// selecting an existing key requires <see cref="Confirm"/> before it can overwrite or delete.
-/// </summary>
-public sealed record SaveSlotRequest(SaveSlotOperation Operation, string? Key = null, string? Label = null, bool Confirm = false);
-
-/// <summary>Host-owned metadata a ruleset may project without opening a save payload.</summary>
-public sealed record SaveSlotSummary(string Key, string Label, DateTime SavedAtUtc, string Ruleset);
-
-
 /// <summary>Opaque current-state save bytes plus the compiled ruleset that interprets them.</summary>
 public sealed class RulesetSavePayload
 {
@@ -505,16 +396,6 @@ public sealed class RulesetSavePayload
     }
     public RulesetId Ruleset { get; }
     public ReadOnlyMemory<byte> Bytes => _bytes.ToArray();
-}
-
-/// <summary>Ruleset-neutral envelope persisted by the Host; only the ruleset interprets Payload.</summary>
-public sealed class GameSaveEnvelope
-{
-    public GameSaveEnvelope(RulesetSavePayload payload)
-    {
-        Payload = payload ?? throw new ArgumentNullException(nameof(payload));
-    }
-    public RulesetSavePayload Payload { get; }
 }
 
 /// <summary>Optional compiled-ruleset persistence seam. A resume payload is supplied after its ruleset identity is checked.</summary>

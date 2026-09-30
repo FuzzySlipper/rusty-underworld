@@ -1,6 +1,9 @@
 namespace AbyssRpg.Kit.Facts;
 
+// Kept for the creature behaviour driver (Den #8683): attack and pursuit report
+// their typed facts through it.
 /// <summary>Marker for product facts delivered after an admitted simulation step.</summary>
+
 public interface IAbyssRpgFact;
 
 /// <summary>

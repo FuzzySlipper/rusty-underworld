@@ -58,6 +58,53 @@ public sealed class ArchitectureLawTests
             AssertNoForbiddenPatterns(file, File.ReadAllText(file), forbidden);
     }
 
+    /// <summary>
+    /// Kit files a named campaign task will give a caller, with that task. A file
+    /// here has no consumer outside the Kit yet; the law below fails once it gains
+    /// one, so the list only ever shrinks.
+    /// </summary>
+    private static readonly Dictionary<string, string> KitFilesAwaitingTheirCampaign = new(StringComparer.Ordinal)
+    {
+        ["Combat/IAttackCapabilities.cs"] = "Den #8683: the creature behaviour driver implements it",
+    };
+
+    /// <summary>
+    /// Every Kit file declares a public type something outside the Kit names -- a
+    /// ruleset or Host consumer, or a test. A mechanism nothing reaches is either
+    /// awaiting a named campaign above or deleted, never left in between.
+    /// </summary>
+    [Fact]
+    public void Every_kit_file_has_a_consumer_or_a_test_outside_the_kit()
+    {
+        string kit = SourceDirectory("AbyssRpg.Kit");
+        string outside = string.Join(
+            Environment.NewLine,
+            new[] { "src", "tests" }
+                .SelectMany(root => SourceFiles(Path.Combine(RepositoryRoot, root)))
+                .Where(file => !file.StartsWith(kit + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                // This suite names Kit files in its own lists; that is not a consumer.
+                .Where(file => !file.StartsWith(SourceDirectory("AbyssRpg.Architecture.Tests"), StringComparison.Ordinal))
+                .Select(File.ReadAllText));
+        var typeDeclaration = new Regex(
+            @"\bpublic\s+(?:(?:sealed|static|abstract|readonly|partial|record)\s+)*(?:class|record|struct|interface|enum)\s+(\w+)",
+            RegexOptions.CultureInvariant);
+
+        foreach (string file in SourceFiles(kit))
+        {
+            string relative = Path.GetRelativePath(kit, file).Replace(Path.DirectorySeparatorChar, '/');
+            string[] types = [.. typeDeclaration.Matches(File.ReadAllText(file)).Select(match => match.Groups[1].Value)];
+            if (types.Length == 0) continue;
+            bool reached = types.Any(type => Regex.IsMatch(outside, $@"\b{Regex.Escape(type)}\b", RegexOptions.CultureInvariant));
+            if (KitFilesAwaitingTheirCampaign.TryGetValue(relative, out string? campaign))
+            {
+                Assert.False(reached, $"{relative} now has a consumer; remove it from the awaiting list ({campaign}).");
+                continue;
+            }
+
+            Assert.True(reached, $"{relative} declares [{string.Join(", ", types)}] and nothing outside the Kit names any of them: give it a caller or a test, or delete it.");
+        }
+    }
+
     [Fact]
     public void Project_references_follow_the_abyssrpg_dependency_graph()
     {

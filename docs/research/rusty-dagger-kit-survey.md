@@ -11,6 +11,22 @@ AbyssRpg copy is the owner from then on. Donor-license posture does not apply
 Den note: task records live in Den (project `rusty-underworld`); this survey
 creates none.
 
+**After the copy.** The survey below records what was copied. The copy was later
+trimmed to what the product reaches or a named campaign will reach, and the
+architecture suite now fails on a Kit file nothing outside the Kit names. Removed
+as superseded by an owner the product already has, and not to be recopied
+without a caller: `Effects/ActiveEffectLifecycle` (the casting owner's held
+spells and effect instances), `Targeting/InteractionTargetingService` (the
+ruleset's one in-reach resolution), `Combat/CombatResolution` and
+`Combat/AttackCapabilities` (the ruleset's strike resolution and charge path),
+`Loot/CorpseLootCoordinator` (looting through the level's item owners),
+`Controls/PlayerInputSystem` and `ControllerInputTuning` (the ruleset's
+locomotion policy reads input; `ProductUpdateState` stayed), `GameplayServices`,
+`PlayerPreferencesSession` (the Host's options), `Inventory/InventoryGridLayout`,
+and `Presentation/PresentationState`, `PresentationSlots` and `SpriteAtlasAdapter`
+(the scene is drawn from Engine appearances). The kept files that still await a
+caller say which campaign carries them.
+
 ## 1. What was surveyed (sizes verified by listing)
 
 | Location | Size | Role |

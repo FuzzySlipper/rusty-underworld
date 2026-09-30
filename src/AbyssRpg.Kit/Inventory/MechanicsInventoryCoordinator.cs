@@ -4,6 +4,8 @@ using AbyssRpg.Kit.World;
 
 namespace AbyssRpg.Kit.Inventory;
 
+// The equipment coordinator here is kept for the equipment and paperdoll verbs
+// (Den #8628); the ruleset already uses InventoryItemId.
 public readonly record struct InventoryItemId(string Value);
 public readonly record struct EquipmentSlotId(string Value);
 /// <summary>A live runtime item reference. Save its directory identity, not this session-local number.</summary>

@@ -1,5 +1,7 @@
 namespace AbyssRpg.Kit.Progression;
 
+// Kept for progression (Den #8985): experience, level and skill-use advancement.
+
 public sealed class ProgressionState
 {
     private readonly Dictionary<string, int> _skillUses = new(StringComparer.Ordinal);

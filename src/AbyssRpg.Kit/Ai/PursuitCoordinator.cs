@@ -7,6 +7,10 @@ using AbyssRpg.Kit.Facts;
 
 namespace AbyssRpg.Kit.Ai;
 
+// Kept for the creature behaviour driver (Den #8683): creatures notice, close
+// and attack through this coordinator. Its tests are the ones dagger had; the
+// coordinator itself is first exercised by that task's Engine-backed tests.
+
 public enum PursuitState { Idle, Chase, Attack, Retreat, Dead }
 
 /// <summary>Entity-local memory for one actor's current pursuit decision.</summary>

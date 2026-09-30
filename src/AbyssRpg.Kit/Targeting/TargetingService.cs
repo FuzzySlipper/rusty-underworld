@@ -6,6 +6,10 @@ using AbyssRpg.Kit.Controls;
 
 namespace AbyssRpg.Kit.Targeting;
 
+// Kept for the creature behaviour driver (Den #8683): ActorsState attaches the
+// targeting component every actor carries, and creature target selection uses it.
+// The avatar's use-channel reach is the ruleset's UuReach, not this service.
+
 public sealed class TargetingComponent
 {
     public EntityId? Current { get; internal set; }

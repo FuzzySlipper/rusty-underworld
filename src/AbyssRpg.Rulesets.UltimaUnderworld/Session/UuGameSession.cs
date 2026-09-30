@@ -1829,23 +1829,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     public const int FirstCritterItemId = 64;
     public const int NoResponseWhoAmI = 255;
 
-    /// <summary>The nearest fallen opponent within a hand's reach, if any.</summary>
-    private ActorState? FallenOpponentInReach(WorldPoint position)
-    {
-        ActorState? nearest = null;
-        float nearestDistance = InteractionReach;
-        foreach (ActorState actor in PlacedCritters.Values)
-        {
-            if (!actor.IsDefeated) continue;
-            float distance = actor.Position.HorizontalDistanceTo(position);
-            if (distance > nearestDistance) continue;
-            nearest = actor;
-            nearestDistance = distance;
-        }
-
-        return nearest;
-    }
-
     /// <summary>Loots a fallen opponent through the inventory owner that holds what it carried.</summary>
     private void LootFallen(ActorState fallen)
     {

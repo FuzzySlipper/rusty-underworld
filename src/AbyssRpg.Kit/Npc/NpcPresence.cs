@@ -1,6 +1,9 @@
 namespace AbyssRpg.Kit.Npc;
 
+// Kept for the creature behaviour driver (Den #8683): NPC schedules station
+// NPCs through this roster.
 /// <summary>NPC presence roster: who exists and where they are stationed. Schedules and attitudes live ruleset-side.</summary>
+
 public sealed record NpcStation(int Level, int TileX, int TileY);
 
 public sealed class NpcPresence

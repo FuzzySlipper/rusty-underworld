@@ -2,10 +2,12 @@ using Rusty.Engine.Mechanics;
 
 namespace AbyssRpg.Kit.Actors;
 
+// Kept for health and mana regeneration on the dungeon clock (Den #8985).
 /// <summary>
 /// Recovers a track from explicitly admitted simulation time after an optional quiet period.
 /// Product policy decides when to restart the quiet period and whether recovery is eligible.
 /// </summary>
+
 public sealed class PassiveTrackRecovery
 {
     private readonly double _pointsPerSecond;
