@@ -24,6 +24,7 @@ public sealed record UuSessionSnapshot(
     int Fatigue,
     int Poison,
     int Drunkenness,
+    UuSurvivalTimersDto SurvivalTimers,
     long WorldSeed,
     UuRespawnAnchor Anchor,
     UuLevelDeltaDto[] Deltas,
@@ -37,6 +38,19 @@ public sealed record UuSessionSnapshot(
     UuHoldingDto[]? Holdings = null,
     AbyssRpg.Kit.Actors.ProjectileFlight[]? Projectiles = null,
     Magic.UuCastingHosting.SavedState? Casting = null);
+
+/// <summary>
+/// Where each survival timer stands, in dungeon seconds until it next acts: a
+/// load resumes the countdowns rather than restarting them.
+/// </summary>
+public sealed record UuSurvivalTimersDto(
+    double Hunger,
+    double HungerDamage,
+    double Fatigue,
+    double FatigueDamage,
+    double Poison,
+    double PoisonDamage,
+    double Drunk);
 
 /// <summary>
 /// What one owner holds. The level and owner index locate the owner, which a

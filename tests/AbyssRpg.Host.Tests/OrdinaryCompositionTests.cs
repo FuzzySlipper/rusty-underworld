@@ -2174,6 +2174,40 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void Time_a_journey_spends_on_the_clock_reaches_survival_and_a_load_keeps_the_timers()
+    {
+        using AbyssProduct product = TwoLevelSaveLoadProduct(out _, out _);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        int hungerBefore = session.State.Survival.Hunger;
+
+        // An hour of dungeon time spent by the journey itself, not by steps.
+        session.TravelToLevel(2, AbyssRpg.Rulesets.UltimaUnderworld.Time.UuClockPolicy.TicksPerGameMinute * 60);
+        product.Update(SixtyHzUpdate(2));
+        Assert.True(
+            session.State.Survival.Hunger - hungerBefore >= 58,
+            $"an hour's journey left hunger at {session.State.Survival.Hunger}");
+
+        // Part way through a countdown, a save and a load resume it rather than
+        // starting it again.
+        for (ulong step = 3; step <= 40; step++) product.Update(SixtyHzUpdate(step));
+        double hungerTimer = session.State.Survival.HungerTimer;
+        double fatigueTimer = session.State.Survival.FatigueTimer;
+        Assert.NotEqual(60.0, hungerTimer);
+        Assert.Equal("quicksave/0", product.Quicksave());
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var loaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        Assert.Equal(hungerTimer, loaded.State.Survival.HungerTimer, 9);
+        Assert.Equal(fatigueTimer, loaded.State.Survival.FatigueTimer, 9);
+
+        // The first step after the load spends one step of time, not the whole
+        // clock the save had already consumed.
+        product.Update(SixtyHzUpdate(41));
+        Assert.Equal(hungerTimer - (1.0 / 60.0), loaded.State.Survival.HungerTimer, 3);
+    }
+
+    [Fact]
     public void A_refused_load_keeps_the_live_session_and_reports_why()
     {
         using AbyssProduct product = Product(out UiDouble ui, out _, out _, out InMemoryPersistenceService persistence);

@@ -30,6 +30,21 @@ public sealed class UuSurvivalTests
     }
 
     [Fact]
+    public void A_long_span_counts_every_point_it_covers()
+    {
+        // An hour of dungeon time in one call -- a journey or a rest -- is the same
+        // hour as 3600 one-second steps, not one hunger point.
+        var jumped = new UuSurvivalState();
+        var stepped = new UuSurvivalState();
+        UuSurvivalPolicy.Tick(jumped, 3600.0, new Random(5));
+        for (int second = 0; second < 3600; second++) UuSurvivalPolicy.Tick(stepped, 1.0, new Random(5));
+        Assert.True(jumped.Hunger >= 58, $"an hour made the avatar {jumped.Hunger} hungry");
+        Assert.Equal(stepped.Hunger, jumped.Hunger);
+        Assert.Equal(stepped.Fatigue, jumped.Fatigue);
+        Assert.Equal(stepped.HungerTimer, jumped.HungerTimer, 6);
+    }
+
+    [Fact]
     public void Poison_and_drink_wear_off()
     {
         var state = new UuSurvivalState { Poison = 3, PoisonTimer = 0, PoisonDamageTimer = 0, Drunkenness = 2, DrunkTimer = 0 };

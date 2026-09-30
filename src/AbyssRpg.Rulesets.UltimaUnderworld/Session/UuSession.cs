@@ -207,6 +207,14 @@ public sealed class UuSession : IDisposable
             Survival.Fatigue,
             Survival.Poison,
             Survival.Drunkenness,
+            new UuSurvivalTimersDto(
+                Survival.HungerTimer,
+                Survival.HungerDamageTimer,
+                Survival.FatigueTimer,
+                Survival.FatigueDamageTimer,
+                Survival.PoisonTimer,
+                Survival.PoisonDamageTimer,
+                Survival.DrunkTimer),
             WorldSeed,
             Anchor,
             _storedDeltas.Values.Append(captured).Select(ToDeltaDto).ToArray(),
@@ -234,6 +242,15 @@ public sealed class UuSession : IDisposable
         Survival.Fatigue = snapshot.Fatigue;
         Survival.Poison = snapshot.Poison;
         Survival.Drunkenness = snapshot.Drunkenness;
+        UuSurvivalTimersDto timers = snapshot.SurvivalTimers
+            ?? throw new InvalidOperationException("The save carries no survival timers.");
+        Survival.HungerTimer = timers.Hunger;
+        Survival.HungerDamageTimer = timers.HungerDamage;
+        Survival.FatigueTimer = timers.Fatigue;
+        Survival.FatigueDamageTimer = timers.FatigueDamage;
+        Survival.PoisonTimer = timers.Poison;
+        Survival.PoisonDamageTimer = timers.PoisonDamage;
+        Survival.DrunkTimer = timers.Drunk;
         _storedDeltas.Clear();
         foreach (UuLevelDeltaDto delta in snapshot.Deltas)
             _storedDeltas[delta.LevelNumber] = FromDeltaDto(delta);

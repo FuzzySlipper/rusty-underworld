@@ -460,6 +460,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     new WorldPoint(savedSnapshot.AvatarPose.X, savedSnapshot.AvatarPose.Y, savedSnapshot.AvatarPose.Z),
                     DetachedMotion(savedSnapshot.AvatarPose.Y));
                 player.YawRadians = savedSnapshot.AvatarPose.YawRadians;
+                // A load resumes the clock where the save stopped it; the span
+                // before that was consumed by the session that wrote it.
+                gameSession._consumedClock = session.Clock.ElapsedTicks;
                 gameSession._triggerTile = (session.Dungeon.CurrentLevel, gameSession.AvatarTile.X, gameSession.AvatarTile.Y);
             }
             catch
@@ -1392,19 +1395,23 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         ulong whole = (ulong)_tickCarry;
         _tickCarry -= whole;
         if (whole > 0) _session.Clock.Advance(whole);
+        // Everything timed in the step runs on the dungeon clock: the span since
+        // the last step, which is this step's own time plus whatever a fall, a
+        // journey or a rest spent since then.
+        double elapsed = DungeonSecondsSinceLastStep();
 
         EnsurePressureState();
         UuLocomotionPolicy.UuPlayerStep step = _locomotion.BeginPlayerStep(
             _player, update.Input, (float)seconds, canMove: true, _session.Swimming, _session.Flying);
         StepLocomotion(step, update, seconds);
         TickTriggers();
-        TickProjectiles((float)seconds);
-        TickAttack(step, (float)seconds);
+        TickProjectiles((float)elapsed);
+        TickAttack(step, elapsed);
         if (step.UsePressed && !_session.Flying) Interact();
         if (step.LookPressed) Examine();
         TickPressureChanges();
         _casting.Upkeep(_session.Clock.ElapsedTicks);
-        TickSurvival(seconds);
+        TickSurvival(elapsed);
         _camera.Update(_player);
         RevealAroundAvatar();
         // What stands on the level changes when play takes, opens, strikes or
@@ -1491,7 +1498,23 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         if (_appearance is not null) PublishScene(_appearance);
     }
 
-    private void TickAttack(UuLocomotionPolicy.UuPlayerStep step, float seconds)
+    /// <summary>
+    /// Dungeon seconds since the previous step consumed the clock. The clock's
+    /// sub-tick carry is part of the reading, so an ordinary step reads exactly
+    /// its own length rather than a whole-tick approximation of it.
+    /// </summary>
+    private double DungeonSecondsSinceLastStep()
+    {
+        double now = _session.Clock.ElapsedTicks + _tickCarry;
+        double elapsed = Math.Max(0d, now - _consumedClock) / _tuning.ClockTicksPerSecond;
+        _consumedClock = now;
+        return elapsed;
+    }
+
+    /// <summary>The clock reading, in ticks, that timed systems have consumed up to.</summary>
+    private double _consumedClock;
+
+    private void TickAttack(UuLocomotionPolicy.UuPlayerStep step, double seconds)
     {
         if (step.AttackHeld || step.AttackPressed) _combat.Hold(seconds);
         if (!step.AttackReleased) return;
