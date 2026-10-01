@@ -23,6 +23,7 @@
     <RustyEngineProductUiProjectionStream>abyss.hud</RustyEngineProductUiProjectionStream>
     <RustyEngineProductUiProjectionContract>abyss.ui.snapshot.v1</RustyEngineProductUiProjectionContract>
     <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
+    <RustyEngineProductDefaultWorldLights>disabled</RustyEngineProductDefaultWorldLights>
     <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz>
     <RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
     <RustyEngineProductInputCursorMode>pointer-lock</RustyEngineProductInputCursorMode>

@@ -440,8 +440,21 @@ internal sealed class GraphicsDouble : IGraphicsService
     public SpritePlaybackAdvanceResult AdvanceSpritePlayback(SpritePlaybackAdvanceRequest arg0) => throw new NotSupportedException("AdvanceSpritePlayback");
     public SpritePlaybackSample SampleSpritePlayback(SpritePlaybackSampleRequest arg0) => throw new NotSupportedException("SampleSpritePlayback");
     public SpritePlaybackReadout ReadSpritePlayback(SpritePlayback arg0) => throw new NotSupportedException("ReadSpritePlayback");
-    public Light CreateLight(LightRequest arg0) => throw new NotSupportedException("CreateLight");
-    public void UpdateLight(LightUpdateRequest arg0) => throw new NotSupportedException("UpdateLight");
+    internal Dictionary<ulong, LightRequest> Lights { get; } = [];
+    internal List<LightRequest> LightUpdates { get; } = [];
+    private ulong _nextLightHandle = 1;
+
+    public Light CreateLight(LightRequest request)
+    {
+        Lights.Add(request.LogicalId, request);
+        return new Light(new LightHandle(_nextLightHandle++), () => Lights.Remove(request.LogicalId));
+    }
+
+    public void UpdateLight(LightUpdateRequest update)
+    {
+        Lights[update.Replacement.LogicalId] = update.Replacement;
+        LightUpdates.Add(update.Replacement);
+    }
     public Light ReplaceLight(LightUpdateRequest arg0) => throw new NotSupportedException("ReplaceLight");
     public LightReadout ReadLight(Light arg0) => throw new NotSupportedException("ReadLight");
     public PresentationReadout ReadPresentation() => throw new NotSupportedException("ReadPresentation");

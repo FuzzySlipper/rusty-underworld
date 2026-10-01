@@ -243,3 +243,10 @@ character obstacle environment. Closed leaves block movement and projectiles;
 ordinary use opens them from outside the leaf. Open/closed state is restored
 from the dungeon save. Object offsets and static/mobile headings are admitted
 from content, and actor presentation follows live pose and facing.
+
+Dungeon geometry is lit by Engine point lights derived from the same avatar and
+floor-light sources as object visibility and the automap. The default global
+light rig is disabled. Renderer intensity is our typed tuning; point attenuation
+approximates the imported viewing distances. Wall shadows are not enabled in the
+current Engine surface, so the tile line-of-sight policy remains authoritative
+for objects and the automap; geometry does not claim matching shadow occlusion.

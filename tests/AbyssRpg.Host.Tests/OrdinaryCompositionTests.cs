@@ -718,10 +718,12 @@ public sealed class OrdinaryCompositionTests
         product.Start(); product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         int dark = session.LightRadius;
+        float darkRange = lightGraphics.Lights[1].Descriptor.Range;
         double mana = session.Status.Mana;
         spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
         product.Update(SixtyHzUpdate(2));
         Assert.Equal(dark + session.Tuning.Light.SpellBonusTiles, session.LightRadius);
+        Assert.True(lightGraphics.Lights[1].Descriptor.Range > darkRange);
         Assert.Equal(mana, session.Status.Mana);
         var held = Assert.Single(session.Casting.Panel().Maintained);
         string slot = product.Quicksave();
@@ -734,6 +736,7 @@ public sealed class OrdinaryCompositionTests
         session.Casting.Upkeep(held.ExpiresAtTicks);
         Assert.Equal(dark, session.LightRadius);
         product.Update(SixtyHzUpdate(5));
+        Assert.Equal(darkRange, lightGraphics.Lights[1].Descriptor.Range);
         Assert.Contains(lightGraphics.LastSnapshot, fact => bright.TryGetValue(fact.ObjectId, out var appearance)
             && !ReferenceEquals(appearance, fact.Appearance));
     }
@@ -1750,6 +1753,35 @@ public sealed class OrdinaryCompositionTests
         product.Update(SixtyHzUpdate(4)); product.Update(SixtyHzUpdate(5));
         ulong prop = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.PropObjectIndex).Value;
         Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == prop);
+    }
+
+    [Fact]
+    public void Engine_lights_follow_the_same_avatar_and_floor_owners_and_release_with_the_session()
+    {
+        using var product = DrawProduct(out _, out var graphics, out var spatial,
+            TestContent.Build(withLighting: true, edit: json => json.Replace(
+                "{ \"itemId\": 200, \"name\": \"torch\"",
+                "{ \"itemId\": 148, \"name\": \"burning torch\", \"massTenthStones\": 4, \"height\": 5, \"radius\": 1, \"canPickUp\": true, \"class\": 2, \"minorClass\": 1, \"classIndex\": 4 }, { \"itemId\": 200, \"name\": \"torch\"")));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        ulong source = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+            .LevelObjectIdentity(1, TestContent.LitLightObjectIndex).Value;
+        Assert.Equal(2, graphics.Lights.Count);
+        Assert.All(graphics.Lights.Values, light => Assert.Equal(Rusty.Engine.LightKind.Point, light.Descriptor.Kind));
+        Assert.Equal(40f, graphics.Lights[source].Descriptor.Range); // imported brightness reaches five tiles
+        Assert.Equal(20f, graphics.Lights[source].Descriptor.Position.X);
+        var floorPose = graphics.Lights[source].Descriptor.Position;
+        spatial.StepTranslation = new System.Numerics.Vector3(76f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2)); product.Update(SixtyHzUpdate(3));
+        Assert.Equal(76f, graphics.Lights[1].Descriptor.Position.X);
+        Assert.Equal(floorPose, graphics.Lights[source].Descriptor.Position);
+        UseAt(product, spatial, 4, 20f, 4f);
+        Assert.False(graphics.Lights.ContainsKey(source));
+        Assert.Single(graphics.Lights);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        Assert.Single(graphics.Lights); // restoring the taken item does not recreate a floor source
+        product.Dispose();
+        Assert.Empty(graphics.Lights);
     }
 
     [Fact]

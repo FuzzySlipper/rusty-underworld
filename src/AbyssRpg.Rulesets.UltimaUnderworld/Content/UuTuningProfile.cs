@@ -69,7 +69,8 @@ public sealed record UuTuningProfile(
                 new UuLightTuning(
                     Whole(light, "baseRadiusTiles", payloadLabel),
                     Whole(light, "spellBonusTiles", payloadLabel),
-                    Whole(light, "placedLightReachTiles", payloadLabel)),
+                    Whole(light, "placedLightReachTiles", payloadLabel),
+                    PositiveFloat(light, "rendererIntensityPerSquareUnit", payloadLabel)),
                 new UuBarterTuning(Whole(barter, "maxPatience", payloadLabel)),
                 new UuCameraTuning(
                     Positive(camera, "fieldOfViewDegrees", payloadLabel),
@@ -92,6 +93,13 @@ public sealed record UuTuningProfile(
             ? number
             : throw new InvalidOperationException($"'{label}' must declare a positive {name}.");
 
+    private static float PositiveFloat(JsonElement section, string name, string label)
+    {
+        float value = (float)Positive(section, name, label);
+        if (!float.IsFinite(value)) throw new InvalidOperationException($"'{label}' {name} exceeds a finite renderer value.");
+        return value;
+    }
+
     private static int Whole(JsonElement section, string name, string label) =>
         section.TryGetProperty(name, out JsonElement value)
         && value.ValueKind == JsonValueKind.Number
@@ -111,9 +119,10 @@ public sealed record UuCombatTuning(int MeleeDifficulty, int MeleeDamageSides, d
 /// <summary>
 /// How far light reaches, in tiles: the light the avatar always carries, what a
 /// light spell adds while it holds, and what a burning light the item catalog
-/// gives no radius reaches. Ours.
+/// gives no radius reaches. Renderer intensity per squared range scales the
+/// Engine point lights to these reaches; attenuation is an approximation. Ours.
 /// </summary>
-public sealed record UuLightTuning(int BaseRadiusTiles, int SpellBonusTiles, int PlacedLightReachTiles);
+public sealed record UuLightTuning(int BaseRadiusTiles, int SpellBonusTiles, int PlacedLightReachTiles, float RendererIntensityPerSquareUnit);
 
 /// <summary>How many refused offers a merchant tolerates before breaking off. Ours.</summary>
 public sealed record UuBarterTuning(int MaxPatience);
