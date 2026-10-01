@@ -134,3 +134,20 @@ this directory.
 `UW.EXE`/`UW2.EXE` carry 3D model data per Godot §3 (`modelloader.cs`) — an
 executable-derived source like any other, mined for geometry knowledge, never
 loaded at runtime.
+
+## Lighting table relationships
+
+UnderworldGodot `src/World/uwobject.cs`, `src/interaction/use.cs`
+(`UseMajorClass2`) and `src/objects/light.cs` identify lights as major class 2,
+minor class 1, indices 0–7: IDs 144–147 unlit, 148–151 lit.
+`src/objectdata/lightsourceobjectdat.cs` reads duration then brightness from
+`OBJECTS.DAT` at `0xD62 + 2 * (item_id & 15)`; brightness is 0–4. The
+`COMOBJ.DAT` radius describes object geometry, not emitted light.
+
+`src/loaders/paletteloader.cs` documents eight 256-color six-bit RGB palettes
+and sixteen 256-entry light index remaps. `src/loaders/shadesdatloader.cs`
+reads eight twelve-byte records; the viewing-distance field is the low nibble
+of the word at byte six. Its current `GetViewingDistance` implementation is
+hardcoded, so these records do not certify the original game's complete
+illumination formula. Four distance bands using maps 0, 5, 10 and 15 are product
+presentation policy, not an emulation claim.

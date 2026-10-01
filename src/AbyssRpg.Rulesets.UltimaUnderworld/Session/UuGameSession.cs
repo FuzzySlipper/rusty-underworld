@@ -177,6 +177,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private readonly UuItemCatalog? _items;
 
     private UuObjectTables? _objectTables;
+    private UuLightingContent? _lighting;
     private (int Level, int X, int Y)? _triggerTile;
 
     /// <summary>The conversations the import produced, when the bundle carries them.</summary>
@@ -279,6 +280,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         AdmittedLevel FirstLevel,
         UuLevelPlacements? Placements,
         UuObjectTables? Tables,
+        UuLightingContent? Lighting,
         UuItemCatalog? Items,
         UuConversationCatalog? Conversations,
         UuStrings? Strings,
@@ -336,6 +338,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuObjectTables? tables = tablesPack is null
             ? null
             : UuObjectTablesContent.Read(tablesPack.Payload, $"content pack '{tablesPack.Id.Value}'");
+        ContentPack? lightingPack = composition.ContentPacks.SingleOrDefault(pack => pack.Id.Value == UuLightingContent.PackId);
+        UuLightingContent? lighting = lightingPack is null ? null : UuLightingContent.Read(lightingPack.Payload, $"content pack '{lightingPack.Id.Value}'");
         ContentPack? itemsPack = composition.ContentPacks
             .SingleOrDefault(pack => pack.Id.Value == UuItemCatalogContent.PackId);
         UuItemCatalog? items = itemsPack is null
@@ -356,7 +360,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             : new AdmittedLevel(level.Level, placements.Tiles, placements.Objects);
 
         return new Prepared(
-            tuning, level, choices, vitals, firstLevel, placements, tables, items, conversations, strings,
+            tuning, level, choices, vitals, firstLevel, placements, tables, lighting, items, conversations, strings,
             savedSnapshot, worldSeed,
             creation.Defaults.Name);
     }
@@ -434,6 +438,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             _avatarName = choices.Name.Length == 0 ? prepared.DefaultAvatarName : choices.Name,
             _objectTables = prepared.Tables,
+            _lighting = prepared.Lighting,
         };
 
         // Placed critters become actors in the same admitted world the item
@@ -1229,15 +1234,21 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         int tileY = (int)Math.Floor(position.Z / TileUnits);
         if (!_session.Automap.TryGetValue(_session.Dungeon.CurrentLevel, out Kit.Knowledge.AutomapPage? page))
             _session.Automap[_session.Dungeon.CurrentLevel] = page = new Kit.Knowledge.AutomapPage(UuLevelPlacements.TileDimension);
-        // Only what the avatar can see goes on the map: a disc would draw the far
-        // side of a wall the player has never looked at.
-        for (int y = tileY - LightRadius; y <= tileY + LightRadius; y++)
+        // Use the same distance and line-of-sight policy as drawn objects. Floor
+        // lights can extend the visible area beyond the avatar's own disc.
+        int minX = tileX - LightRadius, maxX = tileX + LightRadius;
+        int minY = tileY - LightRadius, maxY = tileY + LightRadius;
+        foreach (var light in PlacedLights())
         {
-            for (int x = tileX - LightRadius; x <= tileX + LightRadius; x++)
+            int x = (int)Math.Floor(light.Where.X / TileUnits), y = (int)Math.Floor(light.Where.Z / TileUnits);
+            minX = Math.Min(minX, x - light.Reach); maxX = Math.Max(maxX, x + light.Reach);
+            minY = Math.Min(minY, y - light.Reach); maxY = Math.Max(maxY, y + light.Reach);
+        }
+        for (int y = Math.Max(0, minY); y <= Math.Min(page.Dimension - 1, maxY); y++)
+        {
+            for (int x = Math.Max(0, minX); x <= Math.Min(page.Dimension - 1, maxX); x++)
             {
-                if (x < 0 || y < 0 || x >= page.Dimension || y >= page.Dimension)
-                    continue;
-                if (SeesTile(x, y)) page.Reveal(x, y);
+                if (BandAt((x + 0.5f) * TileUnits, (y + 0.5f) * TileUnits) < Presentation.UuLightBands.Hidden) page.Reveal(x, y);
             }
         }
 
@@ -1273,8 +1284,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     /// <summary>
     /// The lights standing on this level: admitted objects whose item id is a light
-    /// that is burning, with the radius the item catalog gives that item.
+    /// that is burning, with the viewing distance of its imported brightness.
     /// </summary>
+    private int LightReach(int itemId) => _lighting is not null && _objectTables?.Lights.TryGetValue(itemId, out UuLightDefinition? light) == true
+        ? _lighting.Reach(light.Brightness)
+        : _tuning.Light.PlacedLightReachTiles;
+
     private IEnumerable<(WorldPoint Where, int Reach)> PlacedLights()
     {
         if (_placements is null) yield break;
@@ -1285,11 +1300,8 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (!_session.Dungeon.Current.IsLive(index)) continue;
             if (admission.Holders.TryGetValue(index, out int heldBy) && heldBy != 0) continue;
             if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile)) continue;
-            // The item catalog gives each light its own radius; a light the catalog
-            // does not define reaches the default rather than nothing.
-            int reach = _items?.Find(obj.ItemId)?.Radius is int radius and > 0
-                ? radius
-                : _tuning.Light.PlacedLightReachTiles;
+            // Brightness comes from the light table, never the physical collision radius.
+            int reach = LightReach(obj.ItemId);
             AdmittedTile? placed = _placements.Tile(tile.X, tile.Y);
             yield return (_placements.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0), reach);
         }
@@ -1352,7 +1364,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         Appearance created = _context.Engine.Graphics.CreatePrimitive(new PrimitiveAppearanceRequest(
             shape.Class is UuObjectShapeKind.Rune ? PrimitiveGeometry.Sphere : PrimitiveGeometry.Cube,
             Wireframe: false,
-            Presentation.UuLightBands.Shade(shape.Color, band)));
+            _lighting?.Shade(shape.Color, band) ?? Presentation.UuLightBands.Shade(shape.Color, band)));
         _objectAppearances[key] = created;
         return created;
     }

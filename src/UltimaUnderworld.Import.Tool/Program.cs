@@ -187,6 +187,19 @@ try
             }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"Emitted object tables: {tables.Critters.Count} critters, {tables.Containers.Count} containers.");
 
+        string dataDirectory = Path.GetDirectoryName(objectsPath)!;
+        string[] lightingPaths = ["PALS.DAT", "LIGHT.DAT", "SHADES.DAT"];
+        if (lightingPaths.All(name => File.Exists(Path.Combine(dataDirectory, name))))
+        {
+            string lighting = LightingPack.Emit(
+                File.ReadAllBytes(Path.Combine(dataDirectory, lightingPaths[0])),
+                File.ReadAllBytes(Path.Combine(dataDirectory, lightingPaths[1])),
+                File.ReadAllBytes(Path.Combine(dataDirectory, lightingPaths[2])));
+            WriteGeneratedPack(packsDirectory, LightingPack.PackId, "UW/DATA/PALS.DAT;LIGHT.DAT;SHADES.DAT", lighting);
+            Console.WriteLine("Emitted UW1 lighting distances and palette remaps.");
+        }
+        else Console.Error.WriteLine("Lighting source files missing: importing without palette remaps and shade distances.");
+
         // The item catalog joins them: the common object table plus the string
         // archive's item-name block, both install-global.
         if (commonDatPath is not null && stringsPakPath is not null

@@ -17,7 +17,12 @@ public sealed record UuObjectTables(
     IReadOnlyDictionary<int, UuCritterFactory.CritterDefinition> Critters,
     IReadOnlyDictionary<int, UuContainerDefinition> Containers,
     IReadOnlyList<int> TriggerTypes,
-    IReadOnlyList<int> ProjectileDamage);
+    IReadOnlyList<int> ProjectileDamage)
+{
+    public IReadOnlyDictionary<int, UuLightDefinition> Lights { get; init; } = new Dictionary<int, UuLightDefinition>();
+}
+
+public sealed record UuLightDefinition(int ItemId, int Brightness, int Duration);
 
 /// <summary>One container item id's source capacity and mask, with its class index.</summary>
 public sealed record UuContainerDefinition(
@@ -116,7 +121,19 @@ public static class UuObjectTablesContent
         int[] damage = damageRows.EnumerateArray().Select(row => row.GetInt32()).ToArray();
         if (damage.Any(value => value < 0 || value > byte.MaxValue))
             throw new InvalidOperationException($"'{payloadLabel}' projectileDamage must contain byte values.");
-        return new UuObjectTables(critters, containers, triggerTypes, damage);
+        var lights = new Dictionary<int, UuLightDefinition>();
+        foreach (JsonElement row in Required(root, "lights").EnumerateArray())
+        {
+            int id = Required(row, "itemId").GetInt32();
+            int brightness = Required(row, "brightness").GetInt32();
+            int duration = Required(row, "duration").GetInt32();
+            if (id < 144 || id > 159 || brightness < 0 || brightness > 4 || duration < 0 || duration > 255
+                || !lights.TryAdd(id, new UuLightDefinition(id, brightness, duration)))
+                throw new InvalidOperationException($"'{payloadLabel}' contains an invalid or duplicate light row.");
+        }
+        if (lights.Count != 16)
+            throw new InvalidOperationException($"'{payloadLabel}' must define 16 lights; regenerate the object-tables import.");
+        return new UuObjectTables(critters, containers, triggerTypes, damage) { Lights = lights };
     }
 
     private static JsonDocument Parse(ReadOnlyMemory<byte> payload, string label)

@@ -714,7 +714,7 @@ public sealed class OrdinaryCompositionTests
         ProductContent content = TestContent.Build(edit: json => json.Replace(
             "[521,0,384,0,5,0,0,0,-1,-1,-1,-1]",
             "[521,0,390,0,0,0,3,0,-1,-1,-1,-1]"));
-        using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
+        using AbyssProduct product = DrawProduct(out _, out GraphicsDouble lightGraphics, out EngineSpatialDouble spatial, content);
         product.Start(); product.Update(SixtyHzUpdate(1));
         var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         int dark = session.LightRadius;
@@ -729,8 +729,13 @@ public sealed class OrdinaryCompositionTests
         session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
         Assert.Equal(held, Assert.Single(session.Casting.Panel().Maintained));
         Assert.Equal(dark + session.Tuning.Light.SpellBonusTiles, session.LightRadius);
+        product.Update(SixtyHzUpdate(4));
+        var bright = lightGraphics.LastSnapshot.ToDictionary(fact => fact.ObjectId, fact => fact.Appearance);
         session.Casting.Upkeep(held.ExpiresAtTicks);
         Assert.Equal(dark, session.LightRadius);
+        product.Update(SixtyHzUpdate(5));
+        Assert.Contains(lightGraphics.LastSnapshot, fact => bright.TryGetValue(fact.ObjectId, out var appearance)
+            && !ReferenceEquals(appearance, fact.Appearance));
     }
 
     [Fact]
@@ -1698,7 +1703,7 @@ public sealed class OrdinaryCompositionTests
     [Fact]
     public void A_burning_light_on_the_floor_lights_the_room_it_stands_in()
     {
-        // The fixture places a burning light (majorclass 1, classindex 4) on tile
+        // The fixture places a burning light (majorclass 2, minorclass 1, classindex 4) on tile
         // (2,0) and the avatar spawns two tiles away. Walking off to the far side of
         // the level must not take the light with it: the room stays lit, and what is
         // in that room is still drawn.
@@ -1724,6 +1729,39 @@ public sealed class OrdinaryCompositionTests
         // What stands near the placed light is drawn from the light, and the light
         // itself is still drawn where it stands.
         Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == lit);
+    }
+
+    [Fact]
+    public void Imported_palette_and_light_strength_reach_the_ordinary_scene()
+    {
+        using var product = DrawProduct(out _, out var graphics, out var spatial, TestContent.Build(withLighting: true, edit: json => json.Replace("[0,1,1,500,0,0]", "[0,1,1,0,0,0]").Replace("[8,0,1,0,0,0]", "[8,0,1,500,0,0]")));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        spatial.StepTranslation = new System.Numerics.Vector3(100f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2)); product.Update(SixtyHzUpdate(3));
+        ulong source = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.LitLightObjectIndex).Value;
+        Assert.Contains(graphics.LastSnapshot, fact => fact.ObjectId == source);
+        Assert.All(graphics.PrimitiveRequests, request => {
+            Assert.Equal(0, request.Color.G); Assert.Equal(0, request.Color.B);
+        });
+        // A floor light at x=20 reaches five tiles. The torch at x=68 is
+        // outside that reach once the avatar leaves it.
+        spatial.StepTranslation = new System.Numerics.Vector3(164f, 1f, 4f);
+        product.Update(SixtyHzUpdate(4)); product.Update(SixtyHzUpdate(5));
+        ulong prop = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.PropObjectIndex).Value;
+        Assert.DoesNotContain(graphics.LastSnapshot, fact => fact.ObjectId == prop);
+    }
+
+    [Fact]
+    public void Automap_excludes_the_square_corner_outside_the_light_disc()
+    {
+        using var product = DrawProduct(out _, out _, out _, TestContent.Build(withCritter: false));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var map = session.State.Automap[1];
+        Assert.False(map.IsMapped(6, 6));
+        Assert.False(map.IsMapped(3, 3)); // wall at 2,2 blocks this line.
+        Assert.True(map.IsMapped(0, 1));
     }
 
     [Fact]
