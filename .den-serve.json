@@ -1,7 +1,7 @@
 {
   "project": "rusty-underworld",
   "serve": {
-    "command": "PATH=\"$HOME/.local/bin:$HOME/.dotnet:$PATH\" exec rusty dev --project ./src/AbyssRpg.Host/AbyssRpg.Host.csproj --live-debug --bind-host {host} --port {port}",
+    "command": "PATH=\"$HOME/.local/bin:$HOME/.dotnet:$PATH\" exec rusty dev --project ./src/AbyssRpg.Host/AbyssRpg.Host.csproj --live-debug --bind-host {host} --port {port} --diagnostics-log {session_dir}/rusty-engine-diagnostics.ndjson",
     "preferredPort": 4177,
     "healthUrl": "/product-ui/main.js",
     "readyText": "mountProductUi",
