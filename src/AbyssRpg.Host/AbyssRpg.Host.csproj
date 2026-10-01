@@ -67,6 +67,7 @@
     <RustyEngineProductInputIntent Include="abyss.action.load-slot-12" Value="digital" />
     <RustyEngineProductInputIntent Include="abyss.action.load-slot-13" Value="digital" />
     <RustyEngineProductInputIntent Include="abyss.action.respawn" Value="digital" />
+    <RustyEngineProductInputMapping Include="abyss.lifecycle.pause.escape" Intent="abyss.lifecycle.pause" Trigger="key:escape:pressed" />
     <RustyEngineProductInputMapping Include="abyss.action.quicksave.chord" Intent="abyss.action.quicksave" Trigger="key:key-s:pressed:chord=alt-left" />
     <RustyEngineProductInputMapping Include="abyss.action.journey-onward.chord" Intent="abyss.action.journey-onward" Trigger="key:key-l:pressed:chord=alt-left" />
   </ItemGroup>

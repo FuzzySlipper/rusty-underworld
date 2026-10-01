@@ -6,7 +6,8 @@
 that a release swings. `E` uses the current in-reach target (take, container,
 door, or linked Use trigger). `L` examines that same target and dispatches its
 linked Look triggers. `Alt+S` quicksaves and `Alt+L` journeys onward (loads the
-newest save); `Alt+L` is also a physical `L`, so the same press examines what is
+newest autosave, or the respawn anchor). To restore a quicksave, press Escape
+and choose that save in the pause menu; `Alt+L` is also a physical `L`, so the same press examines what is
 in reach before the load replaces the session. The pause menu's slot buttons
 send the declared `abyss.action.load-slot-N` intents, one per slot the Host
 owns. Pickup
@@ -126,8 +127,9 @@ failures the browser would otherwise swallow.
 
 ## Persistence checks
 
-Take an item and loot a container, quicksave with `Alt+S`, then load with
-`Alt+L`: `abyss.pack` should name the same durable items once, and using the
+Take an item and loot a container, quicksave with `Alt+S`, then press
+Escape and select the quicksave in the pause menu: `abyss.pack` should name
+the same durable items once, and using the
 container again should report it empty. Defeated actors remain lootable corpses;
 travel and save/load retain their position, health and contents. For a fresh
 product load use a hosted profile with the same product state store.
