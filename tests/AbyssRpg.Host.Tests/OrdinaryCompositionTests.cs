@@ -2065,6 +2065,60 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void One_save_restores_taken_items_wounds_doors_triggers_and_map_twice()
+    {
+        using var product = DrawProduct(out _, out _, out var spatial,
+            TestContent.Build(edit: json => json.Replace("[514,0,420,6,5,0,0,521", "[514,0,420,4,5,0,0,521")));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var target = session.NearestActors(1)[0].Actor;
+        var health = target.Stats.GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack);
+        ulong step = 10;
+        for (int attempt = 0; attempt < 60 && target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current >= health.MaximumValue; attempt++)
+        {
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Pressed)]));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(new ProductUpdate(Facts(step++), [Attack(InputEdge.Released)]));
+        }
+        double wounded = target.Stats.GetTrack(
+            AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current;
+        Assert.True(wounded < health.MaximumValue);
+        UseAt(product, spatial, step, 4f, 12f); step += 4;
+        Assert.Equal("You take the torch.", session.Status.Outcome);
+        UseAt(product, spatial, step, 12f, 4f); step += 4;
+        Assert.Equal("You loot 1 item from the sack.", session.Status.Outcome);
+        UseAt(product, spatial, step, 12f, 9.5f); step += 4;
+        Assert.Contains((1, 1), session.State.Dungeon.Current.OpenedDoors);
+        spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+        product.Update(SixtyHzUpdate(step++));
+        Assert.Contains(TestContent.DamageTrapObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+        int avatarHp = session.Status.Hp;
+        var items = session.CarriedItems.UniqueItems.Select(item => session.State.Directory.IdentityOf(item.Entity).Value).Order().ToArray();
+        Assert.Equal(2, items.Length);
+        string map = session.State.Automap[1].EncodePage();
+        string slot = product.Quicksave();
+        for (int load = 0; load < 2; load++)
+        {
+            Assert.True(product.LoadSlot(slot));
+            session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+            Assert.Equal(items, session.CarriedItems.UniqueItems.Select(item => session.State.Directory.IdentityOf(item.Entity).Value).Order().ToArray());
+            Assert.Equal(wounded, Assert.Single(session.NearestActors(1)).Actor.Stats
+                .GetTrack(AbyssRpg.Rulesets.UltimaUnderworld.Creation.UuAvatarFactory.DefeatTrack).Current);
+            Assert.Contains((1, 1), session.State.Dungeon.Current.OpenedDoors);
+            Assert.Contains(TestContent.DamageTrapObjectIndex, session.State.Dungeon.Current.FiredTriggers);
+            Assert.Equal(avatarHp, session.Status.Hp);
+            Assert.Equal(map, session.State.Automap[1].EncodePage());
+            // Leaving and returning to a consumed trap cannot apply its damage again.
+            spatial.StepTranslation = new System.Numerics.Vector3(4f, 1f, 4f);
+            product.Update(SixtyHzUpdate(step++));
+            spatial.StepTranslation = new System.Numerics.Vector3(44f, 1f, 4f);
+            product.Update(SixtyHzUpdate(step++));
+            Assert.Equal(avatarHp, session.Status.Hp);
+        }
+    }
+
+    [Fact]
     public void A_wounded_creature_is_still_wounded_and_a_restore_does_not_duplicate()
     {
         using AbyssProduct product = SaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial);
