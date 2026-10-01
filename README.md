@@ -237,3 +237,9 @@ and palette remaps with per-file provenance. Placed burning lights use those
 distances; four distance bands and nearest-palette primitive colors remain our
 presentation approximation. Physical item collision radius does not set light
 reach. Fuel consumption and equipping remain equipment policy work.
+
+Door leaves use the same normalized pose for presentation and the Engine
+character obstacle environment. Closed leaves block movement and projectiles;
+ordinary use opens them from outside the leaf. Open/closed state is restored
+from the dungeon save. Object offsets and static/mobile headings are admitted
+from content, and actor presentation follows live pose and facing.

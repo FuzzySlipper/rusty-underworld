@@ -155,3 +155,15 @@ from the product side.
 A connected session is still not by itself gameplay acceptance: the captures
 and the state reads recorded in the Den document `playtest-evidence-log` are what
 establish the visible result, including the earlier failed runs recorded there.
+
+## Door traversal checks
+
+Approach a visible closed door using browser movement. Record the avatar
+stopping at its leaf, then press `E` from outside it. Record the leaf opening
+and ordinary movement crossing the same plane. Close it and check that it
+blocks again. The static level collision artifact is installed once; the
+current Engine character proposal receives the leaf's call-local bounds and
+enabled state. Save/load derives both drawing and collision from the saved
+door state. Debug positioning may set up this scenario but does not prove
+ordinary traversal. Also capture an admitted prop and creature, and a charged
+swing visibly lowering the creature into its corpse shape.

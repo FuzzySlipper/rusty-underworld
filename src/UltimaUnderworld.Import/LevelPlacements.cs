@@ -70,8 +70,7 @@ public static class LevelPlacements
     /// <summary>
     /// The facing a record carries: a mobile keeps it in the low five bits at
     /// offset 0x18 (donor: <c>uwobject.npc_heading</c>), and a static object in
-    /// bits 7-9 of the word at offset 2 (donor: <c>uwobject.heading</c>). Both
-    /// are in 32 steps per full turn; -1 means the record holds none.
+    /// bits 7-9 of the word at offset 2 (donor: <c>uwobject.heading</c>). Mobile headings have 32 steps and static headings eight per full turn; -1 means the record holds none.
     /// </summary>
     /// <summary>
     /// A mobile record's whoami byte, which selects the conversation it holds

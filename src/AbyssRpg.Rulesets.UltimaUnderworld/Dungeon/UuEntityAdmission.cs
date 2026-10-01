@@ -64,6 +64,22 @@ public static class UuEntityAdmission
             }
         }
 
+        // A non-creature mobile has its own admitted location even without a
+        // tile-chain entry. It remains one item entity in the canonical directory.
+        foreach (AdmittedObject obj in level.Objects)
+        {
+            if (!obj.Mobile || IsCritter(obj) || obj.ItemId == 0 || obj.Owner != 0
+                || obj.HomeTileX < 0 || obj.HomeTileY < 0 || !state.IsLive(obj.Index)) continue;
+            if (!byIndex.ContainsKey(obj.Index))
+            {
+                var identity = UuIdentityPolicy.LevelObjectIdentity(level.LevelNumber, obj.Index);
+                if (!directory.TryResolve(identity, out EntityId entity))
+                    entity = directory.CreateItemEntity(identity, new EntityTypeId($"abyss.item.{obj.ItemId}"));
+                byIndex[obj.Index] = entity; identities[obj.Index] = identity; live[obj.Index] = obj;
+            }
+            tiles[obj.Index] = (obj.HomeTileX, obj.HomeTileY);
+        }
+
         // What a container holds, and what a critter carries, hangs off that
         // record's own link rather than off a tile, so it is admitted here and
         // recorded without a tile: it is inside the container or on the

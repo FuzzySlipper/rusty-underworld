@@ -49,7 +49,9 @@ public static class UuCritterAdmission
             AdmittedTile? tile = placements.Tile(placed.HomeTileX, placed.HomeTileY);
             if (tile is null) continue;
 
-            var pose = new ActorPose(position(tile.X, tile.Y, tile.FloorHeight), Facing(placed.Heading));
+            var pose = new ActorPose(positionOf is null
+                ? placements.ObjectPosition(placed, tile.X, tile.Y, tile.FloorHeight)
+                : position(tile.X, tile.Y, tile.FloorHeight), Facing(placed.Heading));
             ActorState actor = UuCritterFactory.CreateCritter(
                 session.Actors, session.ActorIdentities, pose, definition);
             actors.Add(actor);

@@ -279,6 +279,8 @@ internal class EngineSpatialDouble : DispatchProxy
     internal Vector3 StepTranslation { get; set; } = new(1, 4, 0);
 
     /// <summary>Every planar movement intent the product proposed, in order.</summary>
+    internal List<CharacterObstacle[]> StepObstacles { get; } = [];
+
     internal List<Vector2> StepIntents { get; } = [];
 
     /// <summary>Every step delta the product proposed, in order.</summary>
@@ -324,6 +326,7 @@ internal class EngineSpatialDouble : DispatchProxy
 
     private CharacterStepReceipt Step(CharacterStepRequest request)
     {
+        StepObstacles.Add(request.Obstacles.ToArray());
         StepSeconds.Add(request.Command.StepSeconds);
         StepIntents.Add(request.Command.PlanarIntent);
         StepMotions.Add(request.Motion);

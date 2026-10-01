@@ -24,7 +24,7 @@ public readonly record struct UuObjectShape(
 
     public static UuObjectShape Of(int itemId, bool mobile, bool door)
     {
-        if (mobile) return new(UuObjectShapeKind.Creature, 0.7f, 1.5f, 0.7f, new(0.72f, 0.24f, 0.2f, 1f));
+        if (mobile && Content.UuObjectTablesContent.IsCritterItem(itemId)) return new(UuObjectShapeKind.Creature, 0.7f, 1.5f, 0.7f, new(0.72f, 0.24f, 0.2f, 1f));
         if (door) return new(UuObjectShapeKind.Door, 1.5f, 1.7f, 0.25f, new(0.45f, 0.3f, 0.16f, 1f));
         if (Content.UuObjectTablesContent.IsContainerItem(itemId))
             return new(UuObjectShapeKind.Container, 0.7f, 0.7f, 0.7f, new(0.5f, 0.36f, 0.2f, 1f));
