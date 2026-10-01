@@ -56,8 +56,10 @@ runs on (on this installation the same machine, so `127.0.0.1`).
 Inspect `systemctl --user cat crew-playtest.service` for its `--games` path (on
 this installation `/home/agent/.config/crew-playtest/games.json`). Merge the
 profile into that JSON array by `id`, preserving all other profiles.
-Profiles load at service startup: inspect `playtest status`, then restart the
-service only when no other sessions are active. Do not interrupt other tests.
+Run `playtest reload` after editing profiles; it preserves active sessions.
+For independent testing, register `rusty-underworld-hosted` with
+`"host": { "repo": "/home/agent/dev/rusty-underworld" }` in place of the URL.
+Each session then owns its product host, and stopping it releases that host.
 
 ```bash
 playtest games
@@ -121,6 +123,16 @@ curl -s -X POST -H 'content-type: application/json' -d '{}' \
 `abyss.rune <index>` and `abyss.cast <spellId>` answer from the live session
 (the registered set is the Engine catalog `abyss.` prefix lists); the diagnostics route reports product-callback
 failures the browser would otherwise swallow.
+
+## Persistence checks
+
+Take an item and loot a container, quicksave with `Alt+S`, then load with
+`Alt+L`: `abyss.pack` should name the same durable items once, and using the
+container again should report it empty. Defeated actors remain lootable corpses;
+travel and save/load retain their position, health and contents. For a fresh
+product load use a hosted profile with the same product state store.
+Label debug `abyss.goto` or `abyss.travel` positioning separately from ordinary
+movement; the use/save/load controls must still be exercised through the browser.
 
 ## Current product limitations
 

@@ -265,7 +265,9 @@ public sealed class UuSession : IDisposable
             {
                 foreach (int removed in current.RemovedObjects)
                 {
-                    if (admission.Identities.TryGetValue(removed, out DurableIdentityReference identity))
+                    if (admission.Identities.TryGetValue(removed, out DurableIdentityReference identity)
+                        && !(HeldItems is not null && Directory.TryResolve(identity, out var item)
+                            && HeldItems.TryGetContainer(item, out _)))
                         Directory.Destroy(identity);
                 }
             }

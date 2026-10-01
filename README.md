@@ -29,6 +29,10 @@ Bundle assembles. Host launches.**
 > What that slice reaches, and what it does not, is measured in the Den
 > document `coverage-audit`; Den also holds task state and GPU evidence
 > (`playtest-evidence-log`), and `docs/gpu-playtesting.md` is the operator setup.
+> Saves retain the canonical inventory across travel and fresh loads, including
+> the belongings of a fallen creature. A corpse remains its loot owner with
+> its saved pose and health. Equipment persistence is verified with the
+> equipment interactions tracked in Den.
 > Start with `scripts/import-level.sh` before launching.
 
 ## Licence

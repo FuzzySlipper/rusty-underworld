@@ -247,11 +247,9 @@ public sealed class OrdinaryCompositionTests
         for (int attempt = 0; attempt < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; attempt++) Swing();
 
         Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "the placed critter can be defeated");
-        // The kill is recorded in the level state, which is what a save carries;
-        // without it the critter stands there again after a load.
-        Assert.False(
-            session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex),
-            "the fallen critter's placement is removed from the level");
+        // The corpse remains the canonical actor and loot owner; its health is
+        // captured in the level's actor state rather than deleting its placement.
+        Assert.True(session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex));
         Swing();
         Assert.Equal("Your swing meets empty air.", HudString(ui.LastProjection!.Value.Value, "outcome"));
 
@@ -404,10 +402,10 @@ public sealed class OrdinaryCompositionTests
         for (int attempt = 0; attempt < 200 && !session.NearestActors(1)[0].Actor.IsDefeated; attempt++) Swing();
 
         Assert.True(session.NearestActors(1)[0].Actor.IsDefeated, "level 1's critter can be defeated");
-        Assert.False(session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex));
+        Assert.True(session.State.Dungeon.Current.IsLive(TestContent.CritterObjectIndex));
 
         // Away and back: the door is still open and the fallen critter is still
-        // gone, because both are level state the dungeon keeps per level.
+        // defeated, because both are level state the dungeon keeps per level.
         session.TravelToLevel(TestContent.SecondLevel, costTicks: 0);
         Assert.DoesNotContain((1, 1), session.OpenedDoors);
         Assert.Equal(TestContent.SecondLevel, session.Status.Level);
@@ -415,8 +413,8 @@ public sealed class OrdinaryCompositionTests
         session.TravelToLevel(1, costTicks: 0);
         Assert.Equal(1, session.Status.Level);
         Assert.Contains((1, 1), session.OpenedDoors);
-        Assert.Empty(session.NearestActors(1));
-        Assert.Equal(0, session.PresentActors);
+        Assert.True(Assert.Single(session.NearestActors(1)).Actor.IsDefeated);
+        Assert.Equal(1, session.PresentActors);
     }
 
     [Fact]
@@ -1490,12 +1488,12 @@ public sealed class OrdinaryCompositionTests
     }
 
     /// <summary>The two-level fixture with a spatial double the test can drive.</summary>
-    private static AbyssProduct TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial)
+    private static AbyssProduct TwoLevelSaveLoadProduct(out UiDouble ui, out EngineSpatialDouble spatial, InMemoryPersistenceService? persistence = null)
     {
         ui = UiDouble.Create();
         spatial = EngineSpatialDouble.Create(new System.Numerics.Vector3(4f, 1f, 4f));
         IEngineContext engine = EngineContextFake.Create(
-            persistence: new InMemoryPersistenceService(),
+            persistence: persistence ?? new InMemoryPersistenceService(),
             spatial: spatial.Service,
             content: SpatialContentDouble.Create().Service,
             ui: ui.Service,
@@ -1536,6 +1534,99 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(
             AbyssRpg.Rulesets.UltimaUnderworld.Session.UuItemDefinitions.ItemIdOf(200).Value,
             carried.UniqueItems[0].Definition.Value);
+    }
+
+    [Fact]
+    public void Taken_and_looted_items_restore_once_in_a_fresh_product()
+    {
+        var persistence = new InMemoryPersistenceService();
+        using var original = TwoLevelSaveLoadProduct(out _, out var originalSpatial, persistence);
+        original.Start();
+        original.Update(SixtyHzUpdate(1));
+        UseAt(original, originalSpatial, 2, 4f, 12f);
+        UseAt(original, originalSpatial, 6, 12f, 4f);
+        var before = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)original.Session!;
+        var ids = before.CarriedItems.UniqueItems.Select(item => before.State.Directory.IdentityOf(item.Entity).Value).Order().ToArray();
+        Assert.Equal(2, ids.Length);
+        original.Quicksave();
+        original.Dispose();
+
+        using var fresh = TwoLevelSaveLoadProduct(out _, out var freshSpatial, persistence);
+        fresh.Start();
+        for (int restore = 0; restore < 2; restore++)
+        {
+            Assert.True(fresh.LoadSlot("quicksave/0"));
+            var loaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)fresh.Session!;
+            Assert.Equal(ids, loaded.CarriedItems.UniqueItems.Select(item => loaded.State.Directory.IdentityOf(item.Entity).Value).Order().ToArray());
+            UseAt(fresh, freshSpatial, (ulong)(20 + restore * 4), 12f, 4f);
+            Assert.Equal("The sack is empty.", loaded.Status.Outcome);
+        }
+    }
+
+    [Fact]
+    public void Travel_after_loading_does_not_reapply_the_saved_pack()
+    {
+        using var product = TwoLevelSaveLoadProduct(out _, out var spatial);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        UseAt(product, spatial, 2, 4f, 12f);
+        product.Quicksave();
+        Assert.True(product.LoadSlot("quicksave/0"));
+        var loaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var item = Assert.Single(loaded.CarriedItems.UniqueItems);
+        var sack = loaded.State.PlacedAdmission(1)!.ByIndex[TestContent.ContainerObjectIndex];
+        loaded.LevelItems!.Take(item.Entity, loaded.State.Avatar.Actor.Entity, sack);
+        Assert.Empty(loaded.CarriedItems.UniqueItems);
+        loaded.TravelToLevel(2, 0);
+        Assert.Empty(loaded.CarriedItems.UniqueItems);
+        loaded.TravelToLevel(1, 0);
+        Assert.Empty(loaded.CarriedItems.UniqueItems);
+        sack = loaded.State.PlacedAdmission(1)!.ByIndex[TestContent.ContainerObjectIndex];
+        Assert.Contains(loaded.LevelItems.Read(sack).UniqueItems, held => loaded.State.Directory.IdentityOf(held.Entity).Value ==
+            AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, 500).Value);
+    }
+
+    [Fact]
+    public void Corpse_loot_survives_travel_and_a_fresh_repeated_load()
+    {
+        var persistence = new InMemoryPersistenceService();
+        using var product = TwoLevelSaveLoadProduct(out _, out _, persistence);
+        product.Start();
+        product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var target = Assert.Single(session.NearestActors(1)).Actor;
+        ulong step = 10;
+        for (int attempt = 0; attempt < 200 && !target.IsDefeated; attempt++)
+        {
+            product.Update(SixtyHzUpdate(step++, Attack(InputEdge.Pressed)));
+            for (int held = 0; held < 26; held++) product.Update(SixtyHzUpdate(step++));
+            product.Update(SixtyHzUpdate(step++, Attack(InputEdge.Released)));
+        }
+        Assert.True(target.IsDefeated);
+        var lootIdentity = session.State.Directory.IdentityOf(Assert.Single(session.LevelItems!.Read(target.Actor.Entity).UniqueItems).Entity).Value;
+        session.TravelToLevel(2, 0);
+        product.Quicksave();
+        product.Dispose();
+
+        using var fresh = TwoLevelSaveLoadProduct(out _, out var spatial, persistence);
+        fresh.Start();
+        for (int restore = 0; restore < 2; restore++)
+        {
+            Assert.True(fresh.LoadSlot("quicksave/0"));
+            var loaded = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)fresh.Session!;
+            loaded.TravelToLevel(1, 0);
+            var corpse = Assert.Single(loaded.NearestActors(1)).Actor;
+            Assert.True(corpse.IsDefeated);
+            Assert.Equal(lootIdentity, loaded.State.Directory.IdentityOf(Assert.Single(loaded.LevelItems!.Read(corpse.Actor.Entity).UniqueItems).Entity).Value);
+            UseAt(fresh, spatial, (ulong)(100 + restore * 4), 4f, 4f);
+            Assert.Equal("You loot 1 item from the giant rat.", loaded.Status.Outcome);
+            Assert.Equal(lootIdentity, loaded.State.Directory.IdentityOf(Assert.Single(loaded.CarriedItems.UniqueItems).Entity).Value);
+            loaded.TravelToLevel(2, 0);
+            loaded.TravelToLevel(1, 0);
+            corpse = Assert.Single(loaded.NearestActors(1)).Actor;
+            Assert.Empty(loaded.LevelItems.Read(corpse.Actor.Entity).UniqueItems);
+            Assert.Single(loaded.CarriedItems.UniqueItems);
+        }
     }
 
     [Fact]

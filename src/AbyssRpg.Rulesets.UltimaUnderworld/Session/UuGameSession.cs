@@ -1489,8 +1489,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 ApplyDefeatDamage(flight.Damage, $"A spell strikes you for {flight.Damage}.");
             else if (PlacedCritters.Values.FirstOrDefault(a => (ulong)a.DurableId == hit.Entity) is { } target)
             {
-                UuCombatHosting.StrikeOutcome strike = UuCombatHosting.ApplyImpact(target.Stats, flight.Damage);
-                if (strike.TargetDefeated) RecordDefeat(target);
+                UuCombatHosting.ApplyImpact(target.Stats, flight.Damage);
                 _outcome = $"The spell strikes for {flight.Damage}.";
             }
             else _outcome = "The spell strikes the dungeon.";
@@ -1530,7 +1529,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         UuCombatHosting.StrikeOutcome strike = _combat.Release(
             _session.Avatar.Stats, target.Stats, attackSkill,
             _tuning.Combat.MeleeDifficulty, _tuning.Combat.MeleeDamageSides, _rng);
-        if (strike.Hit && strike.TargetDefeated) RecordDefeat(target);
         _outcome = strike.Hit
             ? strike.TargetDefeated
                 ? $"You strike for {strike.Damage} and it falls."
@@ -1938,21 +1936,6 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return name.Length > 0 ? name : "something";
     }
 
-    /// <summary>
-    /// Records a fallen placement in the level state, which is what the save
-    /// carries: without it the same critter is standing at full strength after
-    /// a load.
-    /// </summary>
-    private void RecordDefeat(ActorState target)
-    {
-        foreach (KeyValuePair<int, ActorState> placed in PlacedCritters)
-        {
-            if (placed.Value.DurableId != target.DurableId) continue;
-            _session.Dungeon.Current.RemoveObject(placed.Key);
-            return;
-        }
-    }
-
     private ActorState? NearestOpponent()
     {
         ActorState? nearest = null;
@@ -2040,6 +2023,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
         // The level left behind keeps what happened on it, in the session's own
         // stored deltas, and its actors leave the world with it.
+        _storedHoldings[from] = CaptureLevelHoldings(from);
         _projectiles.Clear(); // Flights cannot cross an unloaded level. Saves retain live flights.
         _session.TravelTo(admitted, costTicks);
         AbandonActors(from);
@@ -2104,7 +2088,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         if (!_placedCrittersByLevel.Remove(level, out IReadOnlyDictionary<int, ActorState>? actors)) return;
         foreach (ActorState actor in actors.Values)
+        {
+            // The actor leaves admission; its items remain in the canonical
+            // inventory world until the level's new actor owner is available.
+            if (_levelItems is { } items) items.Loot(actor.Actor.Entity, items.Floor(level));
             _session.Actors.Entities.Destroy(AbyssRpg.Kit.Actors.ActorsState.Identity(actor.DurableId));
+        }
     }
 
     /// <summary>The anchor pose of a level: its spawn raised to the capsule's standing center.</summary>
@@ -2245,18 +2234,20 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         if (_levelItems is not { } items) return [];
         int level = _session.Dungeon.CurrentLevel;
-        var rows = new List<UuHoldingDto>
-        {
+        return [
             Holding(level, UuHoldingDto.AvatarOwner, items.Read(_session.Avatar.Actor.Entity)),
-            Holding(level, UuHoldingDto.FloorOwner, items.Read(items.Floor(level))),
-        };
-        foreach (int index in OwnerIndexes(level))
-        {
-            InventoryView held = items.Read(OwnerEntity(level, index));
-            if (held.UniqueItems.Count > 0) rows.Add(Holding(level, index, held));
-        }
+            .. _storedHoldings.Values.SelectMany(rows => rows),
+            .. CaptureLevelHoldings(level),
+        ];
+    }
 
-        return rows.ToArray();
+    private UuHoldingDto[] CaptureLevelHoldings(int level)
+    {
+        if (_levelItems is not { } items) return [];
+        return [
+            Holding(level, UuHoldingDto.FloorOwner, items.Read(items.Floor(level))),
+            .. OwnerIndexes(level).Select(index => Holding(level, index, items.Read(OwnerEntity(level, index)))),
+        ];
     }
 
     /// <summary>
@@ -2324,97 +2315,40 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         _projectiles.Restore(snapshot.Projectiles ?? []);
         if (snapshot.Casting is not null) _casting.Restore(snapshot.Casting);
         if (_levelItems is null) return;
-        // Held until each level is admitted: a save names owners on levels the
-        // restored session has not stood in yet, and their contents are applied
-        // when admission rebuilds them rather than all at once here.
-        _savedHoldings = snapshot.Holdings ?? [];
+        _storedHoldings.Clear();
+        foreach (var level in (snapshot.Holdings ?? [])
+            .Where(row => row.OwnerIndex != UuHoldingDto.AvatarOwner).GroupBy(row => row.Level))
+            _storedHoldings[level.Key] = level.ToArray();
+        // The pack travels with the avatar. Restore it once, independently of
+        // deferred level admission, so travel cannot undo later inventory changes.
+        foreach (UuHoldingDto pack in (snapshot.Holdings ?? [])
+            .Where(row => row.OwnerIndex == UuHoldingDto.AvatarOwner))
+            RestoreHolding(pack, _session.Avatar.Actor.Entity);
         ApplySavedWorld(_session.Dungeon.CurrentLevel);
-        // The level's creatures are admitted from content at full strength; what
-        // the save says they became rides in the level's own delta.
         _session.ApplyActors(_session.StoredDelta(_session.Dungeon.CurrentLevel)?.Actors ?? []);
     }
 
-    /// <summary>
-    /// Puts back everything the save recorded for one level: what each of its
-    /// owners held and how its creatures stood. Called once the level's own
-    /// content has been admitted, which is what creates the owners.
-    /// </summary>
+    /// <summary>Consumes the latest holdings of a level when its owners are admitted.</summary>
     private void ApplySavedWorld(int level)
     {
-        if (_levelItems is not { } items) return;
-        // A level's saved world is input to its first admission, not a standing
-        // authority over it: re-applying it after every travel would undo what the
-        // player did since the load and heal what they wounded.
-        if (!_appliedSavedWorld.Add(level)) return;
-        // Where every item of this level stands right now, as content admission
-        // left it. An item the save places somewhere else is moved out of the
-        // owner it was admitted into, through the same transfer play uses, so the
-        // owner it left does not keep a second helping of it.
-        Dictionary<ulong, EntityId> standing = StandingItems(items, level);
-        foreach (UuHoldingDto holding in _savedHoldings)
-        {
-            if (holding.Level != level
-                && !(level == _session.Dungeon.CurrentLevel && holding.OwnerIndex == UuHoldingDto.AvatarOwner))
-            {
-                continue;
-            }
-
-            EntityId destination = holding.OwnerIndex switch
-            {
-                UuHoldingDto.AvatarOwner => _session.Avatar.Actor.Entity,
-                UuHoldingDto.FloorOwner => items.Floor(level),
-                _ => OwnerEntity(holding.Level, holding.OwnerIndex),
-            };
-            foreach (UuHeldItemDto item in holding.Items)
-            {
-                if (standing.TryGetValue(item.Identity, out EntityId from)
-                    && from.Value != destination.Value
-                    && _session.Directory.TryResolve(
-                        new AbyssRpg.Kit.World.DurableIdentityReference(
-                            AbyssRpg.Kit.World.DurableIdentityKind.Item, item.Identity),
-                        out EntityId entity))
-                {
-                    items.Take(entity, from, destination);
-                    standing[item.Identity] = destination;
-                    continue;
-                }
-
-                items.TryHold(item.Identity, item.Definition, destination);
-                standing[item.Identity] = destination;
-            }
-        }
-
+        if (_levelItems is not { } items || !_storedHoldings.Remove(level, out UuHoldingDto[]? rows)) return;
+        foreach (UuHoldingDto holding in rows)
+            RestoreHolding(holding, holding.OwnerIndex == UuHoldingDto.FloorOwner
+                ? items.Floor(level)
+                : OwnerEntity(level, holding.OwnerIndex));
     }
 
-    /// <summary>Every item this level holds right now, by durable identity.</summary>
-    private Dictionary<ulong, EntityId> StandingItems(UuLevelItems items, int level)
+    private void RestoreHolding(UuHoldingDto holding, EntityId destination)
     {
-        var standing = new Dictionary<ulong, EntityId>();
-        Collect(items.Read(items.Floor(level)), items.Floor(level), standing);
-        Collect(items.Read(_session.Avatar.Actor.Entity), _session.Avatar.Actor.Entity, standing);
-        foreach (int index in OwnerIndexes(level))
+        foreach (UuHeldItemDto item in holding.Items)
         {
-            EntityId owner = OwnerEntity(level, index);
-            Collect(items.Read(owner), owner, standing);
-        }
-
-        return standing;
-
-        void Collect(InventoryView held, EntityId owner, Dictionary<ulong, EntityId> into)
-        {
-            foreach (Rusty.Engine.Mechanics.UniqueInventoryItem item in held.UniqueItems)
-            {
-                if (!_session.Directory.Store.IsAlive(item.Entity)) continue;
-                into[_session.Directory.IdentityOf(item.Entity).Value] = owner;
-            }
+            if (!_levelItems!.TryHold(item.Identity, item.Definition, destination))
+                throw new InvalidOperationException($"Cannot restore held item {item.Identity} ({item.Definition}).");
         }
     }
 
-    /// <summary>The saved world, kept until every level it names has been admitted.</summary>
-    private UuHoldingDto[] _savedHoldings = [];
-
-    /// <summary>The levels whose saved world has already been put back.</summary>
-    private readonly HashSet<int> _appliedSavedWorld = [];
+    /// <summary>Unloaded levels' latest holdings, consumed on re-admission.</summary>
+    private readonly Dictionary<int, UuHoldingDto[]> _storedHoldings = [];
 
     /// <summary>Returns the avatar to the level spawn and restores its vitals: the defeat outcome.</summary>
     public void RespawnAtAnchor()
