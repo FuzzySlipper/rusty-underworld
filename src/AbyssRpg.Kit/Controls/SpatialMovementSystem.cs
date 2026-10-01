@@ -311,6 +311,27 @@ public sealed class SpatialMovementSystem : IDisposable
         return _spatial.CastRay(request);
     }
 
+    /// <summary>Asks the Engine whether the current character body overlaps the admitted
+    /// scene or caller-selected obstacles. Useful before enabling a solid obstacle.</summary>
+    public SpatialHit OverlapCharacter(PlayerControlState player, CharacterStepEnvironment environment)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(SpatialMovementSystem));
+        ArgumentNullException.ThrowIfNull(player);
+        if (player.Position is not WorldPoint position)
+            throw new InvalidOperationException("A character overlap requires a live player position.");
+        CharacterShapeConfig shape = _controller.Shape;
+        float height = player.Motion.Stance switch
+        {
+            CharacterStance.Standing => shape.StandingHeight,
+            CharacterStance.Crouched => shape.CrouchedHeight,
+            _ => throw new ArgumentOutOfRangeException(nameof(player), "Character stance is invalid."),
+        };
+        return _spatial.OverlapCapsule(new SpatialCapsuleQueryRequest(
+            _session, position.ToVector(), MathF.Max(0f, height / 2f - shape.Radius), shape.Radius,
+            Vector3.Zero, shape.ContactSkin, new SpatialQueryFilter(uint.MaxValue, uint.MaxValue),
+            SpatialColliders(environment), ReadOnlyMemory<ulong>.Empty));
+    }
+
     /// <summary>
     /// Projects the current Engine character shape as a world-space AABB for a caller-owned
     /// query such as the session trigger service. Trigger overlap uses this conservative envelope;

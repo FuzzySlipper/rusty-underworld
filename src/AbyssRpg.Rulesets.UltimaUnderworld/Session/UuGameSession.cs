@@ -1495,18 +1495,29 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         }
     }
 
+    private static CharacterObstacle DoorObstacle(DoorLeaf door, bool enabled)
+    {
+        // The packaged obstacle bounds are translation-relative AABBs; its
+        // rotation carries support pose and does not rotate collision bounds.
+        Vector3 right = Vector3.Transform(Vector3.UnitX, door.Pose.Rotation);
+        Vector3 forward = Vector3.Transform(Vector3.UnitZ, door.Pose.Rotation);
+        Vector3 half = new(
+            MathF.Abs(right.X) * door.Shape.Width / 2f + MathF.Abs(forward.X) * door.Shape.Depth / 2f,
+            door.Shape.Height / 2f,
+            MathF.Abs(right.Z) * door.Shape.Width / 2f + MathF.Abs(forward.Z) * door.Shape.Depth / 2f);
+        return new CharacterObstacle(door.Entity.Value, door.Pose, -half, half, enabled, Vector3.Zero, Vector3.Zero);
+    }
+
     private CharacterStepEnvironment DoorEnvironment() => new(default,
-        DoorLeaves().Select(door => {
-            // The packaged obstacle bounds are translation-relative AABBs; its
-            // rotation carries support pose and does not rotate collision bounds.
-            Vector3 right = Vector3.Transform(Vector3.UnitX, door.Pose.Rotation);
-            Vector3 forward = Vector3.Transform(Vector3.UnitZ, door.Pose.Rotation);
-            Vector3 half = new(
-                MathF.Abs(right.X) * door.Shape.Width / 2f + MathF.Abs(forward.X) * door.Shape.Depth / 2f,
-                door.Shape.Height / 2f,
-                MathF.Abs(right.Z) * door.Shape.Width / 2f + MathF.Abs(forward.Z) * door.Shape.Depth / 2f);
-            return new CharacterObstacle(door.Entity.Value, door.Pose, -half, half, !door.Open, Vector3.Zero, Vector3.Zero);
-        }).ToArray());
+        DoorLeaves().Select(door => DoorObstacle(door, !door.Open)).ToArray());
+
+    private bool DoorCloseBlocked(AdmittedTile tile)
+    {
+        CharacterObstacle[] leaves = DoorLeaves()
+            .Where(door => door.Tile.X == tile.X && door.Tile.Y == tile.Y)
+            .Select(door => DoorObstacle(door, true)).ToArray();
+        return leaves.Length > 0 && _movement.OverlapCharacter(_player, new(default, leaves)).Present;
+    }
 
     private void StepLocomotion(UuLocomotionPolicy.UuPlayerStep step, ProductUpdate update, double seconds)
     {
@@ -1657,6 +1668,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             // so the change survives a load.
             case UuReachKind.Door when target.Door is { } door:
                 bool open = !_session.Dungeon.Current.OpenedDoors.Contains((door.X, door.Y));
+                if (!open && DoorCloseBlocked(door))
+                {
+                    _outcome = "The doorway is obstructed; step clear before closing it.";
+                    return;
+                }
                 _session.Dungeon.Current.SetDoor(door.X, door.Y, open);
                 _outcome = open ? "You open the door." : "You close the door.";
                 // UW1 door.cs dispatches OPEN (7); its CLOSE dispatch is UW2-only.

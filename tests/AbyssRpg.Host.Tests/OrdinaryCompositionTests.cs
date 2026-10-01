@@ -1856,6 +1856,38 @@ public sealed class OrdinaryCompositionTests
     }
 
     [Fact]
+    public void A_door_cannot_be_closed_around_the_current_Engine_character_body()
+    {
+        using var product = DrawProduct(out _, out var graphics, out var spatial);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        UseAt(product, spatial, 2, 12f, 12f);
+        Assert.Contains((1, 1), session.State.Dungeon.Current.OpenedDoors);
+        spatial.CapsuleOverlap = request => default(SpatialHit) with
+        {
+            Present = true, Kind = SpatialHitKind.Entity, Entity = request.Entities.Span[0].Entity,
+        };
+        UseAt(product, spatial, 6, 12f, 12f);
+        Assert.Contains("obstructed", session.Status.Outcome);
+        Assert.Contains((1, 1), session.State.Dungeon.Current.OpenedDoors);
+        var query = Assert.Single(spatial.OverlapRequests);
+        Assert.Equal(session.PlayerPosition!.Value.ToVector(), query.Center);
+        Assert.True(query.Radius > 0 && query.HalfHeight > 0);
+        var leaf = Assert.Single(query.Entities.ToArray());
+        Assert.True(leaf.Enabled);
+        Assert.Equal(session.State.PlacedAdmission(1)!.ByIndex[TestContent.DoorObjectIndex].Value, leaf.Entity);
+        // Engine reports clear once the avatar steps away; the ordinary close then succeeds.
+        spatial.CapsuleOverlap = null;
+        UseAt(product, spatial, 10, 12f, 9.5f);
+        Assert.Equal("You close the door.", session.Status.Outcome);
+        Assert.DoesNotContain((1, 1), session.State.Dungeon.Current.OpenedDoors);
+        ulong id = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy
+            .LevelObjectIdentity(1, TestContent.DoorObjectIndex).Value;
+        Assert.True(Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == id).Visible);
+        Assert.Single(spatial.ContentReplacements);
+    }
+
+    [Fact]
     public void Door_leaf_pose_and_toggle_state_reach_scene_and_Engine_steps_once()
     {
         using var product = DrawProduct(out _, out var graphics, out var spatial, TestContent.Build(edit: json => json.Replace("[512,0,320,0,0,0,0,0,-1,-1,0]", "[512,0,320,0,0,0,0,0,-1,-1,0,0,1,0,4,0,0.5,0.25]")));

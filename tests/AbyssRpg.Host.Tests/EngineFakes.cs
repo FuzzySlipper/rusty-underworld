@@ -259,6 +259,13 @@ internal class EngineSpatialDouble : DispatchProxy
     internal int SessionsCreated { get; private set; }
     internal List<SpatialRaycastRequest> RayRequests { get; } = [];
     internal Func<SpatialRaycastRequest, SpatialHit>? RayHit { get; set; }
+    internal List<SpatialCapsuleQueryRequest> OverlapRequests { get; } = [];
+    internal Func<SpatialCapsuleQueryRequest, SpatialHit>? CapsuleOverlap { get; set; }
+    private SpatialHit OverlapCapsule(SpatialCapsuleQueryRequest request)
+    {
+        OverlapRequests.Add(request);
+        return CapsuleOverlap?.Invoke(request) ?? default;
+    }
     private SpatialHit CastRay(SpatialRaycastRequest request)
     {
         RayRequests.Add(request);
@@ -304,6 +311,7 @@ internal class EngineSpatialDouble : DispatchProxy
     protected override object? Invoke(MethodInfo? method, object?[]? arguments) => method?.Name switch
     {
         nameof(ISpatialService.CastRay) => CastRay((SpatialRaycastRequest)arguments![0]!),
+        nameof(ISpatialService.OverlapCapsule) => OverlapCapsule((SpatialCapsuleQueryRequest)arguments![0]!),
         nameof(ISpatialService.DefaultCharacterControllerConfig) => RepresentativeConfig(),
         nameof(ISpatialService.ValidateCharacterControllerConfig) => null,
         nameof(ISpatialService.CreateSession) => Created(),

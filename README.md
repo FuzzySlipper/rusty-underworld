@@ -250,3 +250,6 @@ light rig is disabled. Renderer intensity is our typed tuning; point attenuation
 approximates the imported viewing distances. Wall shadows are not enabled in the
 current Engine surface, so the tile line-of-sight policy remains authoritative
 for objects and the automap; geometry does not claim matching shadow occlusion.
+Our instantaneous door toggle refuses closing when the Engine capsule query
+reports the avatar obstructing the leaf. Step clear and use it again. This avoids
+inserting a solid obstacle around the avatar; movement recovery stays Engine-owned.

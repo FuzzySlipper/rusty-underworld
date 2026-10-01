@@ -151,3 +151,9 @@ of the word at byte six. Its current `GetViewingDistance` implementation is
 hardcoded, so these records do not certify the original game's complete
 illumination formula. Four distance bands using maps 0, 5, 10 and 15 are product
 presentation policy, not an emulation claim.
+
+Door-closing approximation: UnderworldGodot `src/objects/door.cs`
+`CloseDoor`/`TurnIntoMovingDoor` animate the leaf. Our current instantaneous
+open/close policy instead refuses closure while the Engine capsule query
+reports an obstruction. This is our recovery-safe interaction choice, not a
+claim about donor collision or animation fidelity.

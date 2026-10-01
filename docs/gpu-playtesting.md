@@ -178,3 +178,7 @@ save with that item carried must not recreate a floor light. The product uses
 Engine point lights without the default global rig. Attenuation is our tuning,
 and geometry shadows remain limited by the Engine; object visibility and map
 reveal still apply the tile line-of-sight policy.
+Also try closing while overlapping the open leaf. The outcome must report an
+obstruction and leave it open; step clear, close, and test blocking from both
+sides. A close message followed by one-way escape through an overlapping leaf
+is a failure.
