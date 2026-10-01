@@ -60,6 +60,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
     private readonly GameSessionContext _context;
     private readonly UuTuningProfile _tuning;
+    private readonly UuSceneLights _sceneLights;
     private UuLevelDefinition _level;
     private readonly UuLevelScene _scene;
     private readonly UuSession _session;
@@ -105,6 +106,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     {
         _context = context;
         _tuning = tuning;
+        _sceneLights = new UuSceneLights(context.Engine.Graphics, tuning.Light.RendererIntensityPerSquareUnit);
         _combat = new UuCombatHosting(tuning.Combat.FullChargeSeconds);
         _level = level;
         _scene = scene;
@@ -615,6 +617,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     private void PublishScene(Appearance? levelAppearance)
     {
         int level = _session.Dungeon.CurrentLevel;
+        _sceneLights.Reconcile(SceneLightSources(), TileUnits);
         var facts = new List<AppearanceFact>
         {
             new(
@@ -1266,12 +1269,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             MathF.Sqrt((dx * dx) + (dz * dz)), LightRadius * TileUnits);
         // A light standing on the floor lights the room around it too, so what is
         // near one is drawn even when the avatar has walked away from it.
-        foreach ((WorldPoint where, int reach) in PlacedLights())
+        foreach (UuSceneLightSource light in PlacedLights())
         {
-            float lightX = x - where.X;
-            float lightZ = z - where.Z;
+            float lightX = x - light.Where.X;
+            float lightZ = z - light.Where.Z;
             int near = Presentation.UuLightBands.Band(
-                MathF.Sqrt((lightX * lightX) + (lightZ * lightZ)), reach * TileUnits);
+                MathF.Sqrt((lightX * lightX) + (lightZ * lightZ)), light.Reach * TileUnits);
             if (near < band) band = near;
         }
 
@@ -1292,7 +1295,15 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         ? _lighting.Reach(light.Brightness)
         : _tuning.Light.PlacedLightReachTiles;
 
-    private IEnumerable<(WorldPoint Where, int Reach)> PlacedLights()
+    private IEnumerable<UuSceneLightSource> SceneLightSources()
+    {
+        if (_player.Position is { } position)
+            yield return new UuSceneLightSource(Identity.UuIdentityPolicy.AvatarId,
+                new WorldPoint(position.X, position.Y + EyeHeight, position.Z), LightRadius);
+        foreach (UuSceneLightSource light in PlacedLights()) yield return light;
+    }
+
+    private IEnumerable<UuSceneLightSource> PlacedLights()
     {
         if (_placements is null) yield break;
         if (_session.PlacedAdmission(_session.Dungeon.CurrentLevel) is not { } admission) yield break;
@@ -1301,11 +1312,16 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (!Dungeon.UuLightSources.IsLit(obj.ItemId)) continue;
             if (!_session.Dungeon.Current.IsLive(index)) continue;
             if (admission.Holders.TryGetValue(index, out int heldBy) && heldBy != 0) continue;
-            if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile)) continue;
+            if (!admission.ByIndex.TryGetValue(index, out EntityId entity)
+                || IsCarriedOff(admission, _session.Dungeon.CurrentLevel, entity)) continue;
+            if (_session.PlacedObjectAt(_session.Dungeon.CurrentLevel, index, out (int X, int Y) tile) is null) continue;
             // Brightness comes from the light table, never the physical collision radius.
             int reach = LightReach(obj.ItemId);
             AdmittedTile? placed = _placements.Tile(tile.X, tile.Y);
-            yield return (_placements.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0), reach);
+            WorldPoint pose = _placements.ObjectPosition(obj, tile.X, tile.Y, placed?.FloorHeight ?? 0);
+            yield return new UuSceneLightSource(
+                Identity.UuIdentityPolicy.LevelObjectIdentity(_session.Dungeon.CurrentLevel, index).Value,
+                new WorldPoint(pose.X, pose.Y + EyeHeight, pose.Z), reach);
         }
     }
 
@@ -2470,6 +2486,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             Attempt(() => _context.Engine.Graphics.PublishSnapshot(ReadOnlySpan<AppearanceFact>.Empty));
         }
 
+        Attempt(_sceneLights.Dispose);
         Attempt(() => _appearance?.Dispose());
         Attempt(() => _mesh?.Dispose());
         Attempt(() => _material?.Dispose());

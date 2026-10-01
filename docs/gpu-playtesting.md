@@ -167,3 +167,14 @@ enabled state. Save/load derives both drawing and collision from the saved
 door state. Debug positioning may set up this scenario but does not prove
 ordinary traversal. Also capture an admitted prop and creature, and a charged
 swing visibly lowering the creature into its corpse shape.
+
+## Geometry light checks
+
+Compare a corridor with the avatar's base light, the same view with a maintained
+light spell, and the view after that spell expires. Geometry beyond the current
+source ranges must stay dark, and the brighter range must move with the avatar.
+A burning floor light stays at its admitted object pose until taken; loading a
+save with that item carried must not recreate a floor light. The product uses
+Engine point lights without the default global rig. Attenuation is our tuning,
+and geometry shadows remain limited by the Engine; object visibility and map
+reveal still apply the tile line-of-sight policy.

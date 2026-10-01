@@ -13,7 +13,8 @@
   "light": {
     "baseRadiusTiles": 6,
     "spellBonusTiles": 8,
-    "placedLightReachTiles": 4
+    "placedLightReachTiles": 4,
+    "rendererIntensityPerSquareUnit": 0.08
   },
   "barter": {
     "maxPatience": 3
