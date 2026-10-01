@@ -30,7 +30,7 @@ internal static class TestContent
     public const int PropObjectIndex = 500;
 
     /// <summary>A burning light source (majorclass 1, classindex 4) the level places.</summary>
-    public const int LitLightItemId = 80;
+    public const int LitLightItemId = 148;
 
     /// <summary>A pressure plate: a door trap (majorclass 6, minor 0, classindex 8).</summary>
     public const int PlateItemId = 392;
@@ -113,7 +113,7 @@ internal static class TestContent
     internal static ProductContent Build(
         bool withLevel = true, int level = 1, bool withPlacements = true, bool withCritter = true,
         bool withSecondLevel = false, bool withRunes = false, string defaultClass = "fighter",
-        int creatureWhoAmI = 0, Func<string, string>? edit = null)
+        int creatureWhoAmI = 0, Func<string, string>? edit = null, bool withLighting = false)
     {
         List<ProductContentFile> files =
         [
@@ -183,6 +183,14 @@ internal static class TestContent
             File("abyss/content-packs/object-tables.json", ObjectTables()),
             File("abyss/content-packs/tuning.json", System.IO.File.ReadAllText(ShippedTuningPath())),
         ];
+
+        if (withLighting)
+        {
+            files.Add(File("abyss/packs/test.lighting.pack.json", Pack("abyssrpg.lighting", "abyss/content-packs/lighting.json")));
+            files.Add(File("abyss/content-packs/lighting.json", Lighting()));
+            files[0] = File("abyss/bundles/stygian-abyss.bundle.json", Encoding.UTF8.GetString(files[0].Bytes.Span)
+                .Replace("\"contentPacks\": [", "\"contentPacks\": [{\"id\":\"abyssrpg.lighting\"},"));
+        }
 
         if (withLevel) StageLevel(files, level, withPlacements, withCritter, withRunes, creatureWhoAmI);
         if (withSecondLevel) StageLevel(files, SecondLevel, withPlacements: true, withCritter: true);
@@ -371,7 +379,8 @@ internal static class TestContent
         { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 },
         { "itemId": 66, "level": 2, "avgHp": 20, "strength": 18, "dexterity": 10, "intelligence": 4, "speed": 4, "corpseIndex": 4, "swimmer": false, "flier": false, "faction": 2 }
       ],
-      "projectileDamage": [1,2,3,4,12,8,6,4,1,1,1,1,1,1,1,1],
+      "lights":[{"itemId":144,"brightness":0,"duration":0},{"itemId":145,"brightness":0,"duration":0},{"itemId":146,"brightness":0,"duration":0},{"itemId":147,"brightness":0,"duration":0},{"itemId":148,"brightness":4,"duration":10},{"itemId":149,"brightness":0,"duration":0},{"itemId":150,"brightness":0,"duration":0},{"itemId":151,"brightness":0,"duration":0},{"itemId":152,"brightness":0,"duration":0},{"itemId":153,"brightness":0,"duration":0},{"itemId":154,"brightness":0,"duration":0},{"itemId":155,"brightness":0,"duration":0},{"itemId":156,"brightness":0,"duration":0},{"itemId":157,"brightness":0,"duration":0},{"itemId":158,"brightness":0,"duration":0},{"itemId":159,"brightness":0,"duration":0}],
+          "projectileDamage": [1,2,3,4,12,8,6,4,1,1,1,1,1,1,1,1],
       "triggerTypes": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 }
@@ -384,6 +393,16 @@ internal static class TestContent
     /// order plus object rows) with one prop, one container with a content, and
     /// one critter standing on the spawn tile.
     /// </summary>
+    internal static string Lighting() => System.Text.Json.JsonSerializer.Serialize(new {
+        schemaVersion = 1,
+        sources = new[] { "PALS.DAT", "LIGHT.DAT", "SHADES.DAT" }.Select(name => new {
+            SourceGame = "UW1", SourceFile = "UW/DATA/" + name, Sha256Hex = new string('a', 64), ByteLength = 96,
+        }),
+        viewingDistances = new[] { 1, 2, 3, 4, 5, 6, 7, 8 },
+        colors = Enumerable.Range(0, 16).Select(band => Enumerable.Range(0, 256)
+            .Select(index => new[] { 1f - band / 16f, 0f, 0f }).ToArray()).ToArray(),
+    });
+
     internal static string Placements(int level, bool withCritter = true, bool withRunes = false, int creatureWhoAmI = 0)
     {
         var tiles = new System.Text.StringBuilder();

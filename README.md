@@ -231,3 +231,9 @@ does not restate it.
 A check that only compiles is not verification, and a demonstration is not
 completion. Run the smallest proof that answers the changed seam, and state
 plainly what was not run.
+
+Lighting imports include UW1 light brightness and duration, shade viewing distances,
+and palette remaps with per-file provenance. Placed burning lights use those
+distances; four distance bands and nearest-palette primitive colors remain our
+presentation approximation. Physical item collision radius does not set light
+reach. Fuel consumption and equipping remain equipment policy work.

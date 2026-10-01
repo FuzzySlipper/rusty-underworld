@@ -29,11 +29,14 @@ public static class ObjectTablePack
 
     public sealed record ContainerRow(int ItemId, int CapacityTenthStones, int ObjectsMask, int Slots);
 
+    public sealed record LightRow(int ItemId, int Brightness, int Duration);
+
     public sealed record Tables(
         IReadOnlyList<CritterRow> Critters,
         IReadOnlyList<ContainerRow> Containers,
         IReadOnlyList<int> TriggerTypes,
         IReadOnlyList<int> ProjectileDamage,
+        IReadOnlyList<LightRow> Lights,
         UwTableProvenance Provenance);
 
     public static Tables Emit(ObjectsDatReader.ObjectTables tables, UwTableProvenance provenance)
@@ -57,7 +60,8 @@ public static class ObjectTablePack
 
         // UnderworldGodot src/objectdata/triggerobjectdat.cs reads these bytes
         // from the same OBJECTS.DAT buffer (src/loaders/objectdatloader.cs).
-        return new Tables(critters, containers, tables.TriggerTypes.ToArray(), tables.Ranged.Select(row => row.Damage).ToArray(), provenance);
+        return new Tables(critters, containers, tables.TriggerTypes.ToArray(), tables.Ranged.Select(row => row.Damage).ToArray(),
+            tables.Lights.Select((row, index) => new LightRow(144 + index, row.Brightness, row.Duration)).ToArray(), provenance);
     }
 
     public static string ToJson(Tables tables)
@@ -69,6 +73,7 @@ public static class ObjectTablePack
             source = tables.Provenance,
             triggerTypes = tables.TriggerTypes,
             projectileDamage = tables.ProjectileDamage,
+            lights = tables.Lights.Select(row => new { itemId = row.ItemId, brightness = row.Brightness, duration = row.Duration }),
             critters = tables.Critters.Select(critter => new
             {
                 itemId = critter.ItemId,

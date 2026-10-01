@@ -44,7 +44,8 @@ public sealed class UuCritterAdmissionTests
       "critters": [
         { "itemId": 64, "level": 1, "avgHp": 12, "strength": 14, "dexterity": 12, "intelligence": 6, "speed": 3, "corpseIndex": 2, "swimmer": false, "flier": false, "faction": 3 }
       ],
-      "projectileDamage": [1,2,3,4,12,8,6,4,1,1,1,1,1,1,1,1],
+      "lights":[{"itemId":144,"brightness":0,"duration":0},{"itemId":145,"brightness":0,"duration":0},{"itemId":146,"brightness":0,"duration":0},{"itemId":147,"brightness":0,"duration":0},{"itemId":148,"brightness":4,"duration":10},{"itemId":149,"brightness":0,"duration":0},{"itemId":150,"brightness":0,"duration":0},{"itemId":151,"brightness":0,"duration":0},{"itemId":152,"brightness":0,"duration":0},{"itemId":153,"brightness":0,"duration":0},{"itemId":154,"brightness":0,"duration":0},{"itemId":155,"brightness":0,"duration":0},{"itemId":156,"brightness":0,"duration":0},{"itemId":157,"brightness":0,"duration":0},{"itemId":158,"brightness":0,"duration":0},{"itemId":159,"brightness":0,"duration":0}],
+          "projectileDamage": [1,2,3,4,12,8,6,4,1,1,1,1,1,1,1,1],
       "triggerTypes": [0,2,4,5,1,7,6,0,0,0,0,0,0,0,0,0],
       "containers": [
         { "itemId": 128, "capacityTenthStones": 125, "objectsMask": 255, "slots": 255 }
