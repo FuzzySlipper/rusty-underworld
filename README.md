@@ -31,8 +31,8 @@ Bundle assembles. Host launches.**
 > (`playtest-evidence-log`), and `docs/gpu-playtesting.md` is the operator setup.
 > Saves retain the canonical inventory across travel and fresh loads, including
 > the belongings of a fallen creature. A corpse remains its loot owner with
-> its saved pose and health. Equipment persistence is verified with the
-> equipment interactions tracked in Den.
+> its saved pose and health. Equipment, lock/key, conversation and progression
+> persistence remain tied to their gameplay integrations tracked in Den.
 > Start with `scripts/import-level.sh` before launching.
 
 ## Licence

@@ -135,6 +135,10 @@ travel and save/load retain their position, health and contents. For a fresh
 product load use a hosted profile with the same product state store.
 Label debug `abyss.goto` or `abyss.travel` positioning separately from ordinary
 movement; the use/save/load controls must still be exercised through the browser.
+The combined composition suite also checks wounds, an open door, a one-shot
+trigger and automap in one save restored twice. An open door does not establish
+lock/key persistence; equipment, conversation and progression interoperability
+remain tracked with their gameplay owners in Den.
 
 ## Current product limitations
 
