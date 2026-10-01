@@ -23,7 +23,10 @@ Bundle assembles. Host launches.**
 > inhabitants, and runs one admitted update: movement and look, charge-based melee,
 > the use channel (doors, talking to a creature, looting, taking, picking up
 > runestones), survival on the dungeon clock, and save and load, projected to the
-> companion UI. Pit and teleport traps move the avatar between imported levels;
+> companion UI. One Engine scene snapshot draws admitted props and actors at
+> their normalized live poses, including fallen creatures. Ordinary use opens
+> door leaves for movement and closes them to block it again.
+> Pit and teleport traps move the avatar between imported levels;
 > stairs, answering a conversation, and casting from play are not reached yet
 > (casting runs through the operator probe `abyss.cast`).
 > What that slice reaches, and what it does not, is measured in the Den
@@ -219,7 +222,7 @@ den-serve up rusty-underworld -repo "$PWD"
 
 The broker serves port 4177; staging the Host compiles the browser ESM companion
 through the SDK's UI build.
-See [GPU playtesting](docs/gpu-playtesting.md) to register the Crew Wolf profile
+See [GPU playtesting](docs/gpu-playtesting.md) to register the local Crew profile
 and capture the current product. A successful launch is not gameplay acceptance.
 
 ## Guidance and proof
@@ -243,6 +246,9 @@ character obstacle environment. Closed leaves block movement and projectiles;
 ordinary use opens them from outside the leaf. Open/closed state is restored
 from the dungeon save. Object offsets and static/mobile headings are admitted
 from content, and actor presentation follows live pose and facing.
+Our instantaneous door toggle refuses closing when the Engine capsule query
+reports the avatar obstructing the leaf. Step clear and use it again. This avoids
+inserting a solid obstacle around the avatar; movement recovery stays Engine-owned.
 
 Dungeon geometry is lit by Engine point lights derived from the same avatar and
 floor-light sources as object visibility and the automap. The default global
@@ -250,6 +256,3 @@ light rig is disabled. Renderer intensity is our typed tuning; point attenuation
 approximates the imported viewing distances. Wall shadows are not enabled in the
 current Engine surface, so the tile line-of-sight policy remains authoritative
 for objects and the automap; geometry does not claim matching shadow occlusion.
-Our instantaneous door toggle refuses closing when the Engine capsule query
-reports the avatar obstructing the leaf. Step clear and use it again. This avoids
-inserting a solid obstacle around the avatar; movement recovery stays Engine-owned.

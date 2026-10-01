@@ -171,6 +171,13 @@ enabled state. Save/load derives both drawing and collision from the saved
 door state. Debug positioning may set up this scenario but does not prove
 ordinary traversal. Also capture an admitted prop and creature, and a charged
 swing visibly lowering the creature into its corpse shape.
+Back away and look down when observing a small creature: standing immediately
+beside it can place its body below the field of view.
+Also try closing while overlapping the open leaf. The outcome must report an
+obstruction and leave it open; step clear, close, and test blocking from both
+sides. Use the rendered leaf's actual bounds rather than the whole door tile;
+its depth is much thinner than a tile. A close message followed by one-way escape
+through an overlapping leaf is a failure.
 
 ## Geometry light checks
 
@@ -182,7 +189,3 @@ save with that item carried must not recreate a floor light. The product uses
 Engine point lights without the default global rig. Attenuation is our tuning,
 and geometry shadows remain limited by the Engine; object visibility and map
 reveal still apply the tile line-of-sight policy.
-Also try closing while overlapping the open leaf. The outcome must report an
-obstruction and leave it open; step clear, close, and test blocking from both
-sides. A close message followed by one-way escape through an overlapping leaf
-is a failure.
