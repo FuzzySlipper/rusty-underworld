@@ -189,3 +189,9 @@ save with that item carried must not recreate a floor light. The product uses
 Engine point lights without the default global rig. Attenuation is our tuning,
 and geometry shadows remain limited by the Engine; object visibility and map
 reveal still apply the tile line-of-sight policy.
+
+The current `abyss.rune` probe collects a runestone but does not compose the
+casting shelf. An empty shelf returns `NotASpell`; it does not test geometry
+lighting or disprove the spell identity. Ordinary runebag/casting controls and
+their imported-scene Light/expiry check are tracked in Den. Keep base-light,
+floor-light and maintained-spell observations distinct in the evidence record.

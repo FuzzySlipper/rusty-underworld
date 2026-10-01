@@ -2245,10 +2245,10 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
     /// <summary>The door tiles this session's level state has opened.</summary>
     public IReadOnlyCollection<(int X, int Y)> OpenedDoors => _session.Dungeon.Current.OpenedDoors;
 
-    /// <summary>Collects one rune into the shelf through the casting owner (debug and pickup callers).</summary>
+    /// <summary>Collects one runestone through the casting owner; shelving is a separate action.</summary>
     public void CollectRune(int index) => _casting.CollectRune(index);
 
-    /// <summary>Shelf runes and attempt a cast through the casting owner; mana is charged on success.</summary>
+    /// <summary>Attempts a cast from the current shelf; the supplied id identifies its admitted effect.</summary>
     public UuCastingHosting.CastOutcome AttemptCast(int spellId)
     {
         UuCastingHosting.CastOutcome outcome = _casting.AttemptCast(
