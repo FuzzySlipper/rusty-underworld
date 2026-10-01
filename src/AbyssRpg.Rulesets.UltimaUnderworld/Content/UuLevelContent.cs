@@ -41,6 +41,13 @@ public sealed record UuLevelPlacements(
         (float)(floorHeight * HeightUnitsPerStep),
         (float)((tileY + 0.5d) * UnitsPerTile));
 
+    /// <summary>A normalized record's horizontal offsets and absolute height,
+    /// kept at least on the tile floor. Source normalization is importer-owned.</summary>
+    public WorldPoint ObjectPosition(AdmittedObject obj, int tileX, int tileY, int floorHeight) => new(
+        (float)((tileX + obj.TileOffsetX) * UnitsPerTile),
+        (float)(Math.Max(floorHeight, obj.Height) * HeightUnitsPerStep),
+        (float)((tileY + obj.TileOffsetY) * UnitsPerTile));
+
     /// <summary>The tile a world position stands on, or null outside the grid.</summary>
     public AdmittedTile? TileAt(AbyssRpg.Kit.Controls.WorldPoint position) => Tile(
         (int)Math.Floor(position.X / UnitsPerTile),

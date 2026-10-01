@@ -642,23 +642,23 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
 
                 // A mobile's tile lives on its own record when the level's tile list
                 // does not carry it.
-                if (!admission.Tiles.TryGetValue(index, out (int X, int Y) tile))
+                if (_session.PlacedObjectAt(level, index, out (int X, int Y) tile) is null)
                 {
                     if (obj.HomeTileX < 0 || obj.HomeTileY < 0) continue;
                     tile = (obj.HomeTileX, obj.HomeTileY);
                 }
                 AdmittedTile? placed = _placements?.Tile(tile.X, tile.Y);
-                bool door = placed?.Door == true || UuObjectShape.IsDoorItem(obj.ItemId);
+                bool door = UuObjectShape.IsDoorItem(obj.ItemId);
                 bool openDoor = door && open.Contains((tile.X, tile.Y));
-                UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, door);
+                UuObjectShape shape = ShapeOf(obj);
                 int band = _placements is not { } grid
                     ? 0
                     : BandAt(
-                        grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).X,
-                        grid.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0).Z);
+                        grid.ObjectPosition(obj, tile.X, tile.Y, placed?.FloorHeight ?? 0).X,
+                        grid.ObjectPosition(obj, tile.X, tile.Y, placed?.FloorHeight ?? 0).Z);
                 if (band >= Presentation.UuLightBands.Hidden) continue;
                 Appearance appearance = ObjectAppearance(shape, band);
-                WorldPoint center = _placements?.TileCenter(tile.X, tile.Y, placed?.FloorHeight ?? 0)
+                WorldPoint center = _placements?.ObjectPosition(obj, tile.X, tile.Y, placed?.FloorHeight ?? 0)
                     ?? new WorldPoint((tile.X + 0.5f) * 8f, 0.92f, (tile.Y + 0.5f) * 8f);
                 facts.Add(new AppearanceFact(
                     Identity.UuIdentityPolicy.LevelObjectIdentity(level, index).Value,
@@ -666,7 +666,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                     ParentObjectId: 0,
                     new Transform(
                         new Vector3(center.X, center.Y + (shape.Height / 2f), center.Z),
-                        Quaternion.Identity,
+                        ObjectRotation(obj),
                         new Vector3(shape.Width, shape.Height, shape.Depth)),
                     appearance,
                     // An open door stands aside; what stands in the light is drawn.
@@ -679,7 +679,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         // where they stand now rather than where content placed them.
         if (_placedCrittersByLevel.TryGetValue(level, out IReadOnlyDictionary<int, ActorState>? creatures))
         {
-            UuObjectShape creatureShape = UuObjectShape.Of(0, mobile: true, door: false);
+            UuObjectShape creatureShape = UuObjectShape.Of(64, mobile: true, door: false);
             foreach (ActorState creature in creatures.Values)
             {
                 // A fallen creature is a corpse where it fell, not a gap: it stays
@@ -696,7 +696,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                             creature.Position.X,
                             creature.Position.Y + (shape.Height / 2f),
                             creature.Position.Z),
-                        Quaternion.Identity,
+                        Quaternion.CreateFromAxisAngle(Vector3.UnitY, creature.HeadingYawRadians),
                         new Vector3(shape.Width, shape.Height, shape.Depth)),
                     ObjectAppearance(shape, creatureBand),
                     Visible: true,
@@ -751,7 +751,9 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             {
                 placement.Add(index);
                 placement.Add((int)MathF.Round(creature.Position.X * 10f));
+                placement.Add((int)MathF.Round(creature.Position.Y * 10f));
                 placement.Add((int)MathF.Round(creature.Position.Z * 10f));
+                placement.Add(creature.HeadingYawRadians);
             }
         }
 
@@ -1427,12 +1429,57 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         return ProductUpdateResult.None;
     }
 
+    private UuObjectShape ShapeOf(AdmittedObject obj)
+    {
+        UuObjectShape shape = UuObjectShape.Of(obj.ItemId, obj.Mobile, UuObjectShape.IsDoorItem(obj.ItemId));
+        // A leaf spans the tile corridor and stands higher than the character.
+        // The rendered primitive and Engine obstacle share these structural bounds.
+        return shape.Class == UuObjectShapeKind.Door ? shape with { Width = TileUnits, Height = TileUnits * .75f } : shape;
+    }
+
+    private static Quaternion ObjectRotation(AdmittedObject obj) => Quaternion.CreateFromAxisAngle(Vector3.UnitY,
+        obj.Heading < 0 ? 0f : obj.Heading * MathF.Tau / (obj.Mobile ? 32f : 8f));
+
+    private readonly record struct DoorLeaf(AdmittedTile Tile, EntityId Entity, Transform Pose, UuObjectShape Shape, bool Open);
+
+    private IEnumerable<DoorLeaf> DoorLeaves()
+    {
+        if (_placements is null || _session.PlacedAdmission(_session.Dungeon.CurrentLevel) is not { } admission) yield break;
+        foreach (var pair in admission.Objects)
+        {
+            AdmittedObject obj = pair.Value;
+            if (!UuObjectShape.IsDoorItem(obj.ItemId) || !_session.Dungeon.Current.IsLive(pair.Key)
+                || !admission.ByIndex.TryGetValue(pair.Key, out EntityId entity)
+                || _session.PlacedObjectAt(_session.Dungeon.CurrentLevel, pair.Key, out var at) is null
+                || _placements.Tile(at.X, at.Y) is not { } tile) continue;
+            if (IsCarriedOff(admission, _session.Dungeon.CurrentLevel, entity)) continue;
+            UuObjectShape shape = ShapeOf(obj);
+            WorldPoint position = _placements.ObjectPosition(obj, tile.X, tile.Y, tile.FloorHeight);
+            yield return new DoorLeaf(tile, entity,
+                new Transform(position.ToVector() + new Vector3(0, shape.Height / 2f, 0), ObjectRotation(obj), Vector3.One),
+                shape, _session.Dungeon.Current.OpenedDoors.Contains((tile.X, tile.Y)));
+        }
+    }
+
+    private CharacterStepEnvironment DoorEnvironment() => new(default,
+        DoorLeaves().Select(door => {
+            // The packaged obstacle bounds are translation-relative AABBs; its
+            // rotation carries support pose and does not rotate collision bounds.
+            Vector3 right = Vector3.Transform(Vector3.UnitX, door.Pose.Rotation);
+            Vector3 forward = Vector3.Transform(Vector3.UnitZ, door.Pose.Rotation);
+            Vector3 half = new(
+                MathF.Abs(right.X) * door.Shape.Width / 2f + MathF.Abs(forward.X) * door.Shape.Depth / 2f,
+                door.Shape.Height / 2f,
+                MathF.Abs(right.Z) * door.Shape.Width / 2f + MathF.Abs(forward.Z) * door.Shape.Depth / 2f);
+            return new CharacterObstacle(door.Entity.Value, door.Pose, -half, half, !door.Open, Vector3.Zero, Vector3.Zero);
+        }).ToArray());
+
     private void StepLocomotion(UuLocomotionPolicy.UuPlayerStep step, ProductUpdate update, double seconds)
     {
         var state = new ProductUpdateState((float)seconds);
         foreach (ProductInputEvent input in update.Input) state.Add(input);
         CharacterMotion before = _player.Motion;
-        CharacterStepReceipt? receipt = _movement.Step(_player, state, null, step.Controls);
+        CharacterStepReceipt? receipt = _movement.Step(_player, state, DoorEnvironment(), step.Controls);
         if (receipt is not { } confirmed) return;
         float fallDamage = UuStepConsequences.LandingDamage(before, confirmed, _tuning.Movement);
         if (fallDamage > 0f) ApplyDefeatDamage(fallDamage, "The fall hurts.");
@@ -1477,7 +1524,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         {
             if (actor.IsDefeated) continue;
             Vector3 at = actor.Position.ToVector();
-            UuObjectShape shape = UuObjectShape.Of(0, true, false);
+            UuObjectShape shape = UuObjectShape.Of(64, true, false);
             colliders.Add(new SpatialEntityCollider((ulong)actor.DurableId,
                 at - new Vector3(shape.Width / 2, 0, shape.Depth / 2),
                 at + new Vector3(shape.Width / 2, shape.Height, shape.Depth / 2),
@@ -1493,7 +1540,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 _outcome = $"The spell strikes for {flight.Damage}.";
             }
             else _outcome = "The spell strikes the dungeon.";
-        });
+        }, DoorEnvironment());
         if (_appearance is not null) PublishScene(_appearance);
     }
 
@@ -1892,6 +1939,17 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             found = UuReachTarget.AtDoor(door, 0f);
         }
 
+        foreach (var doorLeaf in DoorLeaves())
+        {
+            Vector3 local = Vector3.Transform(position.ToVector() - doorLeaf.Pose.Translation,
+                Quaternion.Inverse(doorLeaf.Pose.Rotation));
+            var half = new Vector2(doorLeaf.Shape.Width / 2f, doorLeaf.Shape.Depth / 2f);
+            var point = new Vector2(local.X, local.Z);
+            float distance = Vector2.Distance(point, Vector2.Clamp(point, -half, half));
+            if (distance <= InteractionReach && distance < found.Distance)
+                found = UuReachTarget.AtDoor(doorLeaf.Tile, distance);
+        }
+
         float nearest = InteractionReach;
         AdmittedObject? nearestObject = null;
         foreach (int index in _session.PlacedObjectIndexes(_session.Dungeon.CurrentLevel))
@@ -1907,7 +1965,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             if (Traps.UuTrapDispatch.IsTrap(obj.ItemId)) continue;
             AdmittedTile? on = _placements?.Tile(tile.X, tile.Y);
             if (on is null) continue;
-            WorldPoint center = _placements!.TileCenter(on.X, on.Y, on.FloorHeight);
+            WorldPoint center = _placements!.ObjectPosition(obj, on.X, on.Y, on.FloorHeight);
             float distance = center.HorizontalDistanceTo(position);
             if (distance > nearest) continue;
             // A tie keeps the object the chain names first: that is the one on top

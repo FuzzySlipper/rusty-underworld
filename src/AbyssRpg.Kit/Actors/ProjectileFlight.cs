@@ -50,7 +50,7 @@ public sealed class ProjectileFlights
     public void Clear() => _flights.Clear();
 
     public void Step(float seconds, SpatialMovementSystem spatial, IReadOnlyList<SpatialEntityCollider> entities,
-        Action<ProjectileFlight, SpatialHit> impact)
+        Action<ProjectileFlight, SpatialHit> impact, CharacterStepEnvironment? environment = null)
     {
         if (!float.IsFinite(seconds) || seconds <= 0) throw new ArgumentOutOfRangeException(nameof(seconds));
         for (int i = _flights.Count - 1; i >= 0; i--)
@@ -59,7 +59,7 @@ public sealed class ProjectileFlights
             Vector3 displacement = flight.Velocity * Math.Min(seconds, flight.RemainingSeconds);
             float distance = displacement.Length();
             var colliders = entities.Where(e => e.Entity != flight.Source).ToArray();
-            SpatialHit hit = spatial.CastRay(flight.Position, displacement / distance, distance, colliders);
+            SpatialHit hit = spatial.CastRay(flight.Position, displacement / distance, distance, colliders, environment);
             if (hit.Present)
             {
                 _flights.RemoveAt(i);

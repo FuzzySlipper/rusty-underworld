@@ -86,6 +86,8 @@ public sealed class UuSession : IDisposable
         // An object without a tile is inside a container rather than lying on
         // the floor, so the caller is told that by a negative position.
         tile = admission.Tiles.TryGetValue(objectIndex, out (int X, int Y) found) ? found : (-1, -1);
+        if (level == Dungeon.CurrentLevel && Dungeon.Current.MovedObjects.TryGetValue(objectIndex, out var moved))
+            tile = moved;
         return obj;
     }
 

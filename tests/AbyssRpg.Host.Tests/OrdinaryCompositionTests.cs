@@ -604,7 +604,7 @@ public sealed class OrdinaryCompositionTests
     public void Door_open_follows_lock_next_to_its_open_trigger()
     {
         ProductContent content = TestContent.Build(edit: json => json
-            .Replace("[512,0,200,0,0,0,0,0,-1,-1,-1]", "[512,0,320,0,0,0,0,502,-1,-1,-1]")
+            .Replace("[512,0,320,0,0,0,0,0,-1,-1,0]", "[512,0,320,0,0,0,0,502,-1,-1,-1]")
             .Replace("[502,0,128,0,0,0,0,503", "[502,0,271,0,0,514,0,503")
             .Replace("[514,0,420,6,5,0,0,521", "[514,0,421,6,5,0,0,521"));
         using AbyssProduct product = DrawProduct(out _, out _, out EngineSpatialDouble spatial, content);
@@ -1780,6 +1780,93 @@ public sealed class OrdinaryCompositionTests
         Assert.True(
             session.MappedTiles > mappedAtStart,
             $"walking reveals more of the map: {session.MappedTiles} of {mappedAtStart}");
+    }
+
+    [Fact]
+    public void Door_leaf_pose_and_toggle_state_reach_scene_and_Engine_steps_once()
+    {
+        using var product = DrawProduct(out _, out var graphics, out var spatial, TestContent.Build(edit: json => json.Replace("[512,0,320,0,0,0,0,0,-1,-1,0]", "[512,0,320,0,0,0,0,0,-1,-1,0,0,1,0,4,0,0.5,0.25]")));
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var entity = session.State.PlacedAdmission(1)!.ByIndex[TestContent.DoorObjectIndex];
+        ulong identity = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.DoorObjectIndex).Value;
+        var closed = Assert.Single(spatial.StepObstacles.Last(), obstacle => obstacle.Entity == entity.Value);
+        Assert.True(closed.CollisionEnabled);
+        var drawn = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == identity);
+        Assert.True(drawn.Visible);
+        Assert.Equal(drawn.Transform.Translation, closed.Transform.Translation);
+        Assert.Equal(drawn.Transform.Rotation, closed.Transform.Rotation);
+        Assert.Equal(drawn.Transform.Scale, closed.BoundsMax - closed.BoundsMin);
+        // The avatar is outside the closed slab, within use reach of its surface.
+        UseAt(product, spatial, 2, 12f, 7.5f);
+        Assert.Contains((1, 1), session.State.Dungeon.Current.OpenedDoors);
+        product.Update(SixtyHzUpdate(6));
+        Assert.False(Assert.Single(spatial.StepObstacles.Last(), obstacle => obstacle.Entity == entity.Value).CollisionEnabled);
+        Assert.False(Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == identity).Visible);
+        Assert.Single(spatial.ContentReplacements); // no static-world replacement per toggle
+        UseAt(product, spatial, 7, 12f, 7.5f);
+        product.Update(SixtyHzUpdate(11));
+        Assert.True(Assert.Single(spatial.StepObstacles.Last(), obstacle => obstacle.Entity == entity.Value).CollisionEnabled);
+        Assert.True(Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == identity).Visible);
+        Assert.Single(spatial.ContentReplacements);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        product.Update(SixtyHzUpdate(12));
+        entity = session.State.PlacedAdmission(1)!.ByIndex[TestContent.DoorObjectIndex];
+        Assert.True(Assert.Single(spatial.StepObstacles.Last(), obstacle => obstacle.Entity == entity.Value).CollisionEnabled);
+        UseAt(product, spatial, 13, 12f, 7.5f);
+        slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        product.Update(SixtyHzUpdate(17));
+        entity = session.State.PlacedAdmission(1)!.ByIndex[TestContent.DoorObjectIndex];
+        Assert.False(Assert.Single(spatial.StepObstacles.Last(), obstacle => obstacle.Entity == entity.Value).CollisionEnabled);
+    }
+
+    [Fact]
+    public void Imported_object_offsets_height_and_actor_heading_reach_presentation()
+    {
+        var content = TestContent.Build(edit: json => json.Replace(
+            "[500,0,200,0,0,0,0,0,-1,-1,5]", "[500,0,200,0,0,0,0,0,-1,-1,2,0,1,2,4,0,0.25,0.75]"));
+        using var product = DrawProduct(out _, out var graphics, out _, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        ulong id = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.PropObjectIndex).Value;
+        var fact = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == id);
+        Assert.Equal(2f, fact.Transform.Translation.X);
+        Assert.Equal(14f, fact.Transform.Translation.Z);
+        Assert.Equal(2.2f, fact.Transform.Translation.Y, 4);
+        Assert.Equal(System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, MathF.PI / 2), fact.Transform.Rotation);
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        var actor = Assert.Single(session.NearestActors(1)).Actor;
+        actor.ApplyPose(new AbyssRpg.Kit.Actors.ActorPose(actor.Position, MathF.PI / 2));
+        product.Update(SixtyHzUpdate(2));
+        var actorFact = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == (ulong)actor.DurableId);
+        Assert.Equal(System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, actor.HeadingYawRadians), actorFact.Transform.Rotation);
+    }
+
+    [Fact]
+    public void A_mobile_prop_uses_its_home_and_then_its_canonical_moved_tile()
+    {
+        var content = TestContent.Build(edit: json => json.Replace(
+            "[500,0,200,0,0,0,0,0,-1,-1,5]", "[500,1,200,0,0,0,0,0,4,1,8,0,1,0,4,0,0.25,0.75]"));
+        using var product = DrawProduct(out _, out var graphics, out _, content);
+        product.Start(); product.Update(SixtyHzUpdate(1));
+        ulong id = AbyssRpg.Rulesets.UltimaUnderworld.Identity.UuIdentityPolicy.LevelObjectIdentity(1, TestContent.PropObjectIndex).Value;
+        var fact = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == id);
+        Assert.Equal(34f, fact.Transform.Translation.X);
+        Assert.Equal(14f, fact.Transform.Translation.Z);
+        Assert.Equal(.4f, fact.Transform.Scale.Y);
+        Assert.Equal(System.Numerics.Quaternion.CreateFromAxisAngle(System.Numerics.Vector3.UnitY, MathF.PI / 2), fact.Transform.Rotation);
+        var session = (AbyssRpg.Rulesets.UltimaUnderworld.Session.UuGameSession)product.Session!;
+        session.State.Dungeon.Current.MoveObject(TestContent.PropObjectIndex, 3, 0);
+        product.Update(SixtyHzUpdate(2));
+        fact = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == id);
+        Assert.Equal(26f, fact.Transform.Translation.X);
+        string slot = product.Quicksave();
+        Assert.True(product.LoadSlot(slot));
+        fact = Assert.Single(graphics.LastSnapshot, fact => fact.ObjectId == id);
+        Assert.Equal(26f, fact.Transform.Translation.X);
     }
 
     [Fact]

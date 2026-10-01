@@ -231,3 +231,9 @@ does not restate it.
 A check that only compiles is not verification, and a demonstration is not
 completion. Run the smallest proof that answers the changed seam, and state
 plainly what was not run.
+
+Door leaves use the same normalized pose for presentation and the Engine
+character obstacle environment. Closed leaves block movement and projectiles;
+ordinary use opens them from outside the leaf. Open/closed state is restored
+from the dungeon save. Object offsets and static/mobile headings are admitted
+from content, and actor presentation follows live pose and facing.

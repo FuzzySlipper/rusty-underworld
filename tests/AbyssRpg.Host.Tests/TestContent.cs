@@ -443,7 +443,7 @@ internal static class TestContent
             [{{ContainerObjectIndex}},0,128,0,0,0,0,{{ContainerContentIndex}},-1,-1,-1],
             [{{ContainerContentIndex}},0,200,0,0,0,0,0,-1,-1,-1],
             [{{LitLightObjectIndex}},0,{{LitLightItemId}},0,0,0,0,0,-1,-1,-1],
-            [{{DoorObjectIndex}},0,200,0,0,0,0,0,-1,-1,-1],
+            [{{DoorObjectIndex}},0,320,0,0,0,0,0,-1,-1,0],
             [{{PlateObjectIndex}},0,421,6,3,{{PlatedDoorObjectIndex}},0,519,-1,-1,-1,-1,1,0,4],
             [{{PlatedDoorObjectIndex}},0,{{PlatedDoorItemId}},0,0,0,0,0,-1,-1,-1,-1],
             [{{PitObjectIndex}},0,420,6,4,0,0,520,-1,-1,-1,-1],
