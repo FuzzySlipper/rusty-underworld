@@ -748,6 +748,12 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
         int level = _session.Dungeon.CurrentLevel;
         UuLevelState state = _session.Dungeon.Current;
         var placement = new HashCode();
+        if (_player.Position is { } avatarPose)
+        {
+            placement.Add((int)MathF.Round(avatarPose.X * 10f));
+            placement.Add((int)MathF.Round(avatarPose.Y * 10f));
+            placement.Add((int)MathF.Round(avatarPose.Z * 10f));
+        }
         foreach (KeyValuePair<int, (int TileX, int TileY)> moved in state.MovedObjects.OrderBy(entry => entry.Key))
             placement.Add(moved);
         foreach (DroppedPlacement dropped in state.Dropped) placement.Add(dropped);

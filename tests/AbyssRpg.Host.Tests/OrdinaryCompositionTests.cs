@@ -1770,8 +1770,11 @@ public sealed class OrdinaryCompositionTests
         Assert.Equal(40f, graphics.Lights[source].Descriptor.Range); // imported brightness reaches five tiles
         Assert.Equal(20f, graphics.Lights[source].Descriptor.Position.X);
         var floorPose = graphics.Lights[source].Descriptor.Position;
+        spatial.StepTranslation = new System.Numerics.Vector3(5f, 1f, 4f);
+        product.Update(SixtyHzUpdate(2));
+        Assert.Equal(5f, graphics.Lights[1].Descriptor.Position.X); // moves within the same tile
         spatial.StepTranslation = new System.Numerics.Vector3(76f, 1f, 4f);
-        product.Update(SixtyHzUpdate(2)); product.Update(SixtyHzUpdate(3));
+        product.Update(SixtyHzUpdate(3));
         Assert.Equal(76f, graphics.Lights[1].Descriptor.Position.X);
         Assert.Equal(floorPose, graphics.Lights[source].Descriptor.Position);
         UseAt(product, spatial, 4, 20f, 4f);
