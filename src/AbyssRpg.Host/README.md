@@ -4,7 +4,7 @@ The ordinary Engine product entry, built-in ruleset selection, lifecycle,
 save slots and store, menu and HUD projections live here.
 
 Staging builds the TypeScript companion as browser ESM through the SDK's UI
-build (`RustyEngineProductUiBuildCommand` runs `scripts/build-ui.sh` against the
+build (`RustyEngineProductUiBuildCommand` runs `scripts/build-ui.mjs` against the
 pair's UI declarations, and only when a UI input changed) and stages it. `den-serve` launches that CoreCLR product; see
 [GPU playtesting](../../docs/gpu-playtesting.md).
 

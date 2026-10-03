@@ -77,7 +77,7 @@ for project in "${product_projects[@]}"; do
   run "build $project" bash -c "dotnet restore '$project' && dotnet build '$project' --configuration Release --no-restore"
 done
 
-# Staging runs the SDK's UI build (scripts/build-ui.sh against the pair's UI
+# Staging runs the SDK's UI build (scripts/build-ui.mjs against the pair's UI
 # declarations), so the DOM tests below exercise the UI the product ships.
 run "stage $host_project" dotnet msbuild "$host_project" -t:StageRustyEngineCoreClrProduct -p:Configuration=Release
 

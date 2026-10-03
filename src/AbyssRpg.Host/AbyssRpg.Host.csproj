@@ -17,7 +17,7 @@
          newer than its last build, and `rusty dev` reloads the UI alone when
          only UI sources change. -->
     <RustyEngineProductUiSourceRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../ui'))</RustyEngineProductUiSourceRoot>
-    <RustyEngineProductUiBuildCommand>bash &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../scripts/build-ui.sh'))&quot; &quot;$(RustyEngineProductUiTypes)&quot;</RustyEngineProductUiBuildCommand>
+    <RustyEngineProductUiBuildCommand>node &quot;$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../scripts/build-ui.mjs'))&quot; &quot;$(RustyEngineProductUiTypes)&quot;</RustyEngineProductUiBuildCommand>
     <RustyEngineProductContentRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../content'))</RustyEngineProductContentRoot>
     <RustyEngineProductUiEntry>main.js</RustyEngineProductUiEntry>
     <RustyEngineProductUiProjectionStream>abyss.hud</RustyEngineProductUiProjectionStream>
@@ -77,6 +77,6 @@
        lockfile, the build script, and the pair's UI declarations, so a pair
        move rebuilds the UI. -->
   <ItemGroup>
-    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../package-lock.json;$(MSBuildThisFileDirectory)../../scripts/build-ui.sh;$(RustyEngineProductUiTypes)" />
+    <RustyEngineProductUiInput Include="$(MSBuildThisFileDirectory)../../package.json;$(MSBuildThisFileDirectory)../../package-lock.json;$(MSBuildThisFileDirectory)../../scripts/build-ui.mjs;$(RustyEngineProductUiTypes)" />
   </ItemGroup>
 </Project>
