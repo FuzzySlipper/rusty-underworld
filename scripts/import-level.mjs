@@ -14,6 +14,7 @@
 // Windows and Linux.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const repoRoot = resolve(import.meta.dirname, '..');
@@ -50,7 +51,10 @@ if (existsSync(data('OBJECTS.DAT'))) {
 try {
   execFileSync('dotnet', [
     'run', '--project', join(repoRoot, 'src', 'UltimaUnderworld.Import.Tool', 'UltimaUnderworld.Import.Tool.csproj'),
-    '--configuration', 'Release', '--',
+    // Built on this machine, outside the checkout: Windows will not run or
+    // load a program from a share whose files carry no execute permission,
+    // and two machines sharing the checkout keep their own build output.
+    '--configuration', 'Release', `-p:ArtifactsPath=${join(tmpdir(), 'rusty-underworld-import-tool')}`, '--',
     'emit-level', '--levark', data('LEV.ARK'), '--terrain', data('TERRAIN.DAT'), '--level', level, '--out', out,
     ...tables,
   ], { stdio: 'inherit' });
