@@ -29,5 +29,5 @@ tests/**/[Tt]mp*.cs
 tests/**/Temp*.cs
 
 # Operator-imported level packs are derived from the original game's data and
-# are never committed. Regenerate them with scripts/import-level.sh.
+# are never committed. Regenerate them with node scripts/import-level.mjs.
 /content/abyss/imports/

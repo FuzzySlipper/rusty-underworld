@@ -4,7 +4,7 @@
 // catalog, strings, conversations) when their source files are given. Every
 // output is derived from the operator's own game data, so it goes under the
 // git-ignored content/abyss/imports/ tree, which the default bundle admits by
-// root. scripts/import-level.sh is the ordinary way to run it.
+// root. node scripts/import-level.mjs is the ordinary way to run it.
 using System.Security.Cryptography;
 using System.Text.Json;
 using UltimaUnderworld.Import;

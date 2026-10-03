@@ -93,8 +93,8 @@ is generated into the ignored content tree before the product can compose a
 world:
 
 ```bash
-scripts/import-level.sh            # level 1 from local/extracted/uw/UW/DATA
-scripts/import-level.sh 2 path/to/UW/DATA
+node scripts/import-level.mjs            # level 1 from local/extracted/uw/UW/DATA
+node scripts/import-level.mjs 2 path/to/UW/DATA
 ```
 
 The script emits the Engine collision artifact, the visible geometry, the level

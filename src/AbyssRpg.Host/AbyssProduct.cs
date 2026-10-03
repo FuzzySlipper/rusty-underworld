@@ -102,7 +102,7 @@ public sealed class AbyssProduct : IEngineProduct, IDebugCommandModuleSource, ID
             : string.Join(" ", resolution.Diagnostics.Select(diagnostic => diagnostic.Message));
         throw new InvalidOperationException(
             $"Game bundle '{bundle.Value}' did not resolve over the admitted content: {diagnostics} "
-            + "An imported level pack is operator-produced: run scripts/import-level.sh, then rebuild.");
+            + "An imported level pack is operator-produced: run node scripts/import-level.mjs, then rebuild.");
     }
 
     public AbyssLifecycleMode LifecycleMode => _lifecycle;

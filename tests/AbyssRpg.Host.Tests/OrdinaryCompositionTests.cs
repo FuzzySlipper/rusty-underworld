@@ -64,7 +64,7 @@ public sealed class OrdinaryCompositionTests
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
             new AbyssProduct(engine, TestContent.Build(withLevel: false), BuiltInRulesets.Resolve(BuiltInRulesets.UltimaUnderworld)));
         Assert.Contains("abyssrpg.level-1", error.Message, StringComparison.Ordinal);
-        Assert.Contains("import-level.sh", error.Message, StringComparison.Ordinal);
+        Assert.Contains("import-level.mjs", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -427,7 +427,7 @@ public sealed class OrdinaryCompositionTests
 
         InvalidOperationException missing = Assert.Throws<InvalidOperationException>(
             () => session.TravelToLevel(7, costTicks: 0));
-        Assert.Contains("scripts/import-level.sh", missing.Message, StringComparison.Ordinal);
+        Assert.Contains("scripts/import-level.mjs", missing.Message, StringComparison.Ordinal);
         Assert.Throws<InvalidOperationException>(() => session.TravelToLevel(1, costTicks: 0));
         Assert.Equal(1, session.Status.Level);
         Assert.Equal(1, session.PresentActors);

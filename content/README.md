@@ -13,7 +13,7 @@ Layout:
 | `abyss/packs/` | Hand-authored content-pack descriptors, one per authored pack, naming its payload. |
 | `abyss/content-packs/` | Authored payloads: avatar options, classes, the starting kit, and the tuning profile's values. |
 | `abyss/tuning/` | Tuning-profile descriptors; each names its payload in `content-packs/`. |
-| `abyss/imports/` | Git-ignored packs produced offline by `scripts/import-level.sh` from the operator's own installation: one directory per level (collision, render mesh, placements, level manifest) and `object-tables/` (object tables, item catalog, strings, conversations). Each generated descriptor records its source game, source file and hash. The default bundle admits every pack under this root, so importing never edits a tracked file. |
+| `abyss/imports/` | Git-ignored packs produced offline by `node scripts/import-level.mjs` from the operator's own installation: one directory per level (collision, render mesh, placements, level manifest) and `object-tables/` (object tables, item catalog, strings, conversations). Each generated descriptor records its source game, source file and hash. The default bundle admits every pack under this root, so importing never edits a tracked file. |
 
 Boundary rules:
 

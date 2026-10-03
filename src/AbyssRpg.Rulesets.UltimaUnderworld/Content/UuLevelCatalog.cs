@@ -44,7 +44,7 @@ public sealed class UuLevelCatalog
         ContentPack pack = _composition.ContentPacks.SingleOrDefault(candidate => LevelNumber(candidate.Id.Value) == level)
             ?? throw new InvalidOperationException(
                 $"The bundle carries no imported level {level}. Run the operator import for it "
-                + "(scripts/import-level.sh <level>) before launching, then rebuild.");
+                + "(node scripts/import-level.mjs <level>) before launching, then rebuild.");
         UuLevelDefinition definition = UuLevelContent.Read(pack.Payload, $"content pack '{pack.Id.Value}'");
         if (definition.Level != level)
             throw new InvalidOperationException($"Content pack '{pack.Id.Value}' declares level {definition.Level}.");

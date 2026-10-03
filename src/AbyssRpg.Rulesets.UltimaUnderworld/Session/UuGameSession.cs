@@ -533,7 +533,7 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
                 ? $"Save is on level {level}; the bundle admits no level {level}. "
                     + "Import that level before loading this save."
                 : "The default bundle carries no imported level pack. Run the operator import "
-                    + "(scripts/import-level.sh) before launching, then rebuild.");
+                    + "(node scripts/import-level.mjs) before launching, then rebuild.");
         }
 
         return (best, bestLevel);
@@ -568,11 +568,11 @@ public sealed class UuGameSession : IGameSession, IModeAwareGameSession, ISaveab
             material = _context.Engine.Graphics.CreateMaterial(new MaterialRequest(
                 new Color(1f, 1f, 1f, 1f),
                 default,
-                Roughness: 0.95f,
+                roughness: 0.95f,
                 new Color(1f, 1f, 1f, 1f),
-                EmissionColor: default,
-                EmissionIntensity: 0.12f,
-                DoubleSided: false,
+                emissionColor: default,
+                emissionIntensity: 0.12f,
+                doubleSided: false,
                 MaterialAlphaMode.Opaque,
                 0.5f));
             mesh = _context.Engine.Graphics.CreateMeshResource(new MeshResourceCreateRequest(

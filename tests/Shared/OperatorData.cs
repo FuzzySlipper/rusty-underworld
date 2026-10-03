@@ -111,7 +111,7 @@ public static class OperatorData
             return Directory.Exists(ImportsRoot())
                 && Directory.EnumerateFiles(ImportsRoot(), "*.pack.json", SearchOption.AllDirectories).Any()
                 ? null
-                : "The operator import has not run: content/abyss/imports holds no packs (scripts/import-level.sh).";
+                : "The operator import has not run: content/abyss/imports holds no packs (node scripts/import-level.mjs).";
         }
         catch (DirectoryNotFoundException)
         {

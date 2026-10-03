@@ -36,7 +36,7 @@ Bundle assembles. Host launches.**
 > the belongings of a fallen creature. A corpse remains its loot owner with
 > its saved pose and health. Equipment, lock/key, conversation and progression
 > persistence remain tied to their gameplay integrations tracked in Den.
-> Start with `scripts/import-level.sh` before launching.
+> Start with `node scripts/import-level.mjs` before launching.
 
 ## Licence
 
@@ -203,14 +203,14 @@ bundle admits by root without being edited. Level 1 is enough to launch; the
 launch fails with this command when no level is imported:
 
 ```bash
-scripts/import-level.sh
+node scripts/import-level.mjs
 ```
 
 Import further levels to make them reachable by travel (a pit or teleport to a
 level that is not imported says so rather than moving the avatar):
 
 ```bash
-scripts/import-level.sh 2
+node scripts/import-level.mjs 2
 ```
 
 Start the Engine host after installing the pair and UI dependencies:
