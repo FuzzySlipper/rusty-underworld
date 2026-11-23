@@ -24,6 +24,8 @@
     <RustyEngineProductUiProjectionContract>abyss.ui.snapshot.v1</RustyEngineProductUiProjectionContract>
     <RustyEngineProductLifecycleMode>realtime</RustyEngineProductLifecycleMode>
     <RustyEngineProductDefaultWorldLights>disabled</RustyEngineProductDefaultWorldLights>
+    <!-- Turns on the Engine's occlusion culling of hidden opaque parts and splats; disabled is the off switch. -->
+    <RustyEngineProductOcclusionCulling>enabled</RustyEngineProductOcclusionCulling>
     <RustyEngineProductFixedStepHz>60</RustyEngineProductFixedStepHz>
     <RustyEngineProductFixedStepMaxCatchUpSteps>4</RustyEngineProductFixedStepMaxCatchUpSteps>
     <RustyEngineProductInputCursorMode>pointer-lock</RustyEngineProductInputCursorMode>
